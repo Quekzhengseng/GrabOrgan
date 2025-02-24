@@ -164,14 +164,14 @@ def update_donor(donorId):
 
         # update status
         new_data = request.get_json()
-        # print(new_data)
+        print(type(new_data))
         print(new_data["data"])
         if new_data['status'] < 400:
             db.collection("donors").document(donorId).set(new_data["data"], merge=True)
             return jsonify(
                 {
                     "code": 200,
-                    "data": new_data.json()
+                    "data": new_data
                 }
             ), 200
     except Exception as e:
