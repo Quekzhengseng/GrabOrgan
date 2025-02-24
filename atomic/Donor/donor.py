@@ -126,9 +126,9 @@ def get_all():
             donor_data = doc.to_dict()
             donor_data["donorID"] = doc.id  # Add document ID
             donors[doc.id] = donor_data
-        return jsonify({"success" : True, "data": donors}), 200
+        return jsonify({"success" : True, "code":200, "data": donors}), 200
     except Exception as e:
-        return jsonify({"success" : False, "error": str(e)}), 500
+        return jsonify({"success" : False, "code":500, "error": str(e)}), 500
 
 
 @app.route("/donor/<string:donorId>")
@@ -138,15 +138,56 @@ def get_donor(donorId):
         doc = donors_ref.get()
         if doc.exists:
             donor_obj = Donor.from_dict(donorId, doc.to_dict())
-            return donor_obj.to_dict()  # Convert back to JSON-friendly format
+            return {"success" : True, "code":200, "data": donor_obj.to_dict()}  # Convert back to JSON-friendly format
         else:
-            return jsonify({"success" : False, "error": "Donor does not exist"}), 404
+            return jsonify({"success" : False, "code":404, "error": "Donor does not exist"}), 404
 
     except Exception as e:
-        return jsonify({"success" : False, "error": str(e)}), 500
+        return jsonify({"success" : False, "code":500, "error": str(e)}), 500
 
 
-# def update_donor(donorId):
+@app.route("/donor/<string:donorId>", methods=['PUT'])
+def update_donor(donorId):
+    try:
+        donors_ref = db.collection("donors").document(donorId)
+        doc = donors_ref.get()
+        if not doc.exists:
+            return jsonify(
+                {
+                    "code": 404,
+                    "data": {
+                        "donorId": donorId
+                    },
+                    "message": "Donor not found."
+                }
+            ), 404
+
+        # update status
+        new_data = request.get_json()
+        # print(new_data)
+        print(new_data["data"])
+        if new_data['status'] < 400:
+            db.collection("donors").document(donorId).set(new_data["data"], merge=True)
+            return jsonify(
+                {
+                    "code": 200,
+                    "data": new_data.json()
+                }
+            ), 200
+    except Exception as e:
+        print("Error: {}".format(str(e)))
+        return jsonify(
+            {
+                "code": 500,
+                "data": {
+                    "donorId": donorId
+                },
+                "message": "An error occurred while updating the donor information. " + str(e)
+            }
+        ), 500
+            
+
+# def create_donor(donorId):
 
 if __name__ == '__main__':
     print("This is flask for " + os.path.basename(__file__) + ": manage donors ...")
