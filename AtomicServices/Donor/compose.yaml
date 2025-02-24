@@ -1,0 +1,11 @@
+services:
+  book:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    image: GrabOrgan/patient:1.0
+    container_name: patient
+    ports:
+      - "5001:5001"
+    environment:
+      - dbURL=mysql+mysqlconnector://is213@host.docker.internal:3306/book
