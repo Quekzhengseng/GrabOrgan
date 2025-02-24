@@ -12,12 +12,14 @@ app = Flask(__name__)
 
 CORS(app)
 
-# Use a service account.
-cred = credentials.Certificate('Donor_IAM_Admin_SDK.json')
+# Load the key from an environment variable
+key_path = os.getenv("DONOR_DB_KEY")
 
+# Initialize Firestore
+cred = credentials.Certificate(key_path)
 app = firebase_admin.initialize_app(cred)
 
 db = firestore.client()
 
 doc_ref = db.collection("donors").document("alovelace")
-doc_ref.set({"first": "Ada", "last": "Lovelace", "born": 1815})
+doc_ref.set({"first": "Isaiah", "last": "Lovelace", "born": 1815})
