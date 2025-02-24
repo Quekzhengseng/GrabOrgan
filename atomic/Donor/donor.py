@@ -12,13 +12,16 @@ app = Flask(__name__)
 
 CORS(app)
 
-
 # Load the key from an environment variable
 key_path = os.getenv("DONOR_DB_KEY")
 
+if not key_path or not os.path.isfile(key_path):
+    raise FileNotFoundError(f"Could not find the Firebase JSON at {key_path}")
 # Initialize Firestore
 cred = credentials.Certificate(key_path)
 firebase_app = firebase_admin.initialize_app(cred)
+
+print("Firestore initialized successfully with!")
 
 db = firestore.client()
 

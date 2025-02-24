@@ -1,11 +1,14 @@
 services:
-  book:
+  donor:
     build:
       context: ./
-      dockerfile: Dockerfile.patient
-    image: GrabOrgan/patient:1.0
-    container_name: patient
+      dockerfile: Dockerfile.donor
+    image: GrabOrgan/donor:1.0
+    volumes:
+      - ./secrets/Donor_Key.json:/usr/src/app/Donor_Key.json:ro
+    environment:
+      - DONOR_DB_KEY=/usr/src/app/Donor_Key.json
+    # restart: always
+    container_name: donor_service
     ports:
       - "5001:5001"
-    environment:
-      - dbURL=mysql+mysqlconnector://is213@host.docker.internal:3306/book
