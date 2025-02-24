@@ -17,7 +17,7 @@ key_path = os.getenv("DONOR_DB_KEY")
 
 # Initialize Firestore
 cred = credentials.Certificate(key_path)
-app = firebase_admin.initialize_app(cred)
+firebase_app = firebase_admin.initialize_app(cred)
 
 db = firestore.client()
 
