@@ -21,8 +21,8 @@ app = firebase_admin.initialize_app(cred)
 
 db = firestore.client()
 
-# doc_ref = db.collection("donors").document("alovelace")
-# doc_ref.set({"first": "Isaiah", "last": "Lovelace", "born": 1815})
+doc_ref = db.collection("donors").document("isaidchia")
+doc_ref.set({"first": "isaac", "last": "chia", "born": 1915})
 
 # Read data from firebase
 users_ref = db.collection("donors")
@@ -30,3 +30,6 @@ docs = users_ref.stream()
 
 for doc in docs:
     print(f"{doc.id} => {doc.to_dict()}")
+
+def get_all():
+    donor_dict = db.collection("donors")
