@@ -21,7 +21,8 @@ if not key_path or not os.path.isfile(key_path):
 cred = credentials.Certificate(key_path)
 firebase_app = firebase_admin.initialize_app(cred)
 
-print("Firestore initialized successfully with!")
+print("Firestore initialized successfully for Donor!")
+
 
 db = firestore.client()
 
