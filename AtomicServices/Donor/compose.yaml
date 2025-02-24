@@ -2,7 +2,7 @@ services:
   book:
     build:
       context: ./
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.patient
     image: GrabOrgan/patient:1.0
     container_name: patient
     ports:
