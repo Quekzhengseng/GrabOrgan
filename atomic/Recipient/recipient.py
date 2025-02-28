@@ -101,43 +101,43 @@ def get_recipient(recipientId):
         return jsonify({"success" : False, "code":500, "error": str(e)}), 500
 
 
-# @app.route("/recipient/<string:recipientId>/update", methods=['PUT'])
-# def update_recipient(recipientId):
-#     try:
-#         recipient_ref = db.collection("recipients").document(recipientId)
-#         doc = recipient_ref.get()
-#         if not doc.exists:
-#             return jsonify(
-#                 {
-#                     "code": 404,
-#                     "data": {
-#                         "recipientId": recipientId
-#                     },
-#                     "message": "Recipient not found."
-#                 }
-#             ), 404
+@app.route("/recipient/<string:recipientId>", methods=['PUT'])
+def update_recipient(recipientId):
+    try:
+        recipient_ref = db.collection("recipients").document(recipientId)
+        doc = recipient_ref.get()
+        if not doc.exists:
+            return jsonify(
+                {
+                    "code": 404,
+                    "data": {
+                        "recipientId": recipientId
+                    },
+                    "message": "Recipient not found."
+                }
+            ), 404
 
-#         # update status
-#         new_data = request.get_json()
-#         if new_data['status'] < 400:
-#             db.collection("recipients").document(recipientId).set(new_data["data"], merge=True)
-#             return jsonify(
-#                 {
-#                     "code": 200,
-#                     "data": new_data
-#                 }
-#             ), 200
-#     except Exception as e:
-#         print("Error: {}".format(str(e)))
-#         return jsonify(
-#             {
-#                 "code": 500,
-#                 "data": {
-#                     "recipientId": recipientId
-#                 },
-#                 "message": "An error occurred while updating the recipient information. " + str(e)
-#             }
-#         ), 500
+        # update status
+        new_data = request.get_json()
+        if new_data['status'] < 400:
+            db.collection("recipients").document(recipientId).set(new_data["data"], merge=True)
+            return jsonify(
+                {
+                    "code": 200,
+                    "data": new_data
+                }
+            ), 200
+    except Exception as e:
+        print("Error: {}".format(str(e)))
+        return jsonify(
+            {
+                "code": 500,
+                "data": {
+                    "recipientId": recipientId
+                },
+                "message": "An error occurred while updating the recipient information. " + str(e)
+            }
+        ), 500
     
 
 if __name__ == '__main__':
