@@ -57,18 +57,18 @@ class Recipient:
         """Create a Recipient object from Firestore document data."""
         return Recipient(
             recipient_id=recipient_id,
-            first_name=data["name"]["firstName"],
-            last_name=data["name"]["lastName"],
-            date_of_birth=data["dateOfBirth"],
+            first_name=data["first_name"],
+            last_name=data["last_name"],
+            date_of_birth=data["date_of_birth"],
             gender=data["gender"],
-            blood_type=data["bloodType"],
-            organs_needed=data["organsNeeded"],
-            medical_history=data["medicalHistory"],
+            blood_type=data["blood_type"],
+            organs_needed=data["organs_needed"],
+            medical_history=data["medical_history"],
             allergies=data["allergies"],
-            nok_contact=data["nokContact"]
+            nok_contact=data["nok_contact"]
         )
 
-@app.route("/", methods=['GET'])
+@app.route("/recipient", methods=['GET'])
 def get_all():
     """Retrieve all recipients from Firestore."""
     try:
@@ -86,6 +86,60 @@ def get_all():
     except Exception as e:
         return jsonify({"success": False, "code": 500, "error": str(e)}), 500
 
+@app.route("/recipient/<string:recipientId>", methods=['GET'])
+def get_recipient(recipientId):
+    try:
+        recipient_ref = db.collection("recipients").document(recipientId)
+        doc = recipient_ref.get()
+        if doc.exists:
+            recipient_obj = Recipient.from_dict(recipientId, doc.to_dict())
+            return {"success" : True, "code":200, "data": recipient_obj.to_dict()}  # Convert back to JSON-friendly format
+        else:
+            return jsonify({"success" : False, "code":404, "error": "Recipient does not exist"}), 404
+
+    except Exception as e:
+        return jsonify({"success" : False, "code":500, "error": str(e)}), 500
+
+
+# @app.route("/recipient/<string:recipientId>/update", methods=['PUT'])
+# def update_recipient(recipientId):
+#     try:
+#         recipient_ref = db.collection("recipients").document(recipientId)
+#         doc = recipient_ref.get()
+#         if not doc.exists:
+#             return jsonify(
+#                 {
+#                     "code": 404,
+#                     "data": {
+#                         "recipientId": recipientId
+#                     },
+#                     "message": "Recipient not found."
+#                 }
+#             ), 404
+
+#         # update status
+#         new_data = request.get_json()
+#         if new_data['status'] < 400:
+#             db.collection("recipients").document(recipientId).set(new_data["data"], merge=True)
+#             return jsonify(
+#                 {
+#                     "code": 200,
+#                     "data": new_data
+#                 }
+#             ), 200
+#     except Exception as e:
+#         print("Error: {}".format(str(e)))
+#         return jsonify(
+#             {
+#                 "code": 500,
+#                 "data": {
+#                     "recipientId": recipientId
+#                 },
+#                 "message": "An error occurred while updating the recipient information. " + str(e)
+#             }
+#         ), 500
+    
+
 if __name__ == '__main__':
     print("Starting Flask server for recipient management...")
-    app.run(host='0.0.0.0', port=5001)
+    app.run(host='0.0.0.0', port=5001, debug=True)
