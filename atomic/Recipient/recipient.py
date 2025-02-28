@@ -1,4 +1,5 @@
 from datetime import datetime
+import uuid
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import firebase_admin
@@ -139,6 +140,115 @@ def update_recipient(recipientId):
             }
         ), 500
     
+@app.route("/recipient/<string:recipientId>", methods=["DELETE"])
+def delete_recipient(recipientId):
+    try:
+        recipient_ref = db.collection("recipients").document(recipientId)
+        doc = recipient_ref.get()
+        
+        if not doc.exists:
+            return jsonify(
+                {
+                    "code": 404,
+                    "data": {
+                        "recipientId": recipientId
+                    },
+                    "message": "Recipient not found."
+                }
+            ), 404
+
+        # Delete the document
+        recipient_ref.delete()
+
+        return jsonify(
+            {
+                "code": 200,
+                "data": {
+                    "recipientId": recipientId
+                },
+                "message": "Recipient successfully deleted."
+            }
+        ), 200
+
+    except Exception as e:
+        print("Error:", str(e))
+        return jsonify(
+            {
+                "code": 500,
+                "data": {
+                    "recipientId": recipientId
+                },
+                "message": "An error occurred while deleting the recipient. " + str(e)
+            }
+        ), 500
+
+
+@app.route("/recipient", methods=["POST"])
+def create_recipient():
+    try:
+        data = request.get_json()
+
+        required_fields = [
+            "first_name", "last_name", "date_of_birth", "gender",
+            "blood_type", "organs_needed", "medical_history", "nok_contact"
+        ]
+
+        # Check if all required fields are present
+        missing_fields = [field for field in required_fields if field not in data]
+        if missing_fields:
+            return jsonify(
+                {
+                    "code": 400,
+                    "message": f"Missing required fields: {', '.join(missing_fields)}"
+                }
+            ), 400
+        # Generate a unique recipient ID
+        recipient_id = str(uuid.uuid4())
+
+        # Create a new recipient object
+        recipient = {
+            "recipient_id": recipient_id,
+            "name": {
+                "firstName": data["first_name"],
+                "lastName": data["last_name"]
+            },
+            "dateOfBirth": data["date_of_birth"],
+            "gender": data["gender"],
+            "bloodType": data["blood_type"],
+            "medicalHistory": data["medical_history"],  # Now an array of maps
+            "organsNeeded": data["organs_needed"],  # An array of organs
+            "nokContact": data["nok_contact"]  # Map containing contact details
+        }
+
+        # Store the recipient data in Firestore
+        recipient_ref = db.collection("recipients").document(str(recipient_id))
+        recipient_ref.set(recipient)
+
+        return jsonify(
+            {
+                "code": 201,
+                "data": {
+                    "recipientId": recipient_id,
+                    "name": recipient["name"],
+                    "dateOfBirth": recipient["dateOfBirth"],
+                    "gender": recipient["gender"],
+                    "bloodType": recipient["bloodType"],
+                    "medicalHistory": recipient["medicalHistory"],
+                    "organsNeeded": recipient["organsNeeded"],
+                    "nokContact": recipient["nokContact"]
+                },
+                "message": "Recipient successfully created."
+            }
+        ), 201
+
+    except Exception as e:
+        print("Error:", str(e))
+        return jsonify(
+            {
+                "code": 500,
+                "message": "An error occurred while creating the recipient. " + str(e)
+            }
+        ), 500
 
 if __name__ == '__main__':
     print("Starting Flask server for recipient management...")
