@@ -1,0 +1,39 @@
+
+[
+  {
+    "reportId": "R54321",
+    "reportName": "Organ Donor Compatibility Test Report",
+    "testType": "Organ Compatibility Test",
+    "patientName": "Sophia Williams",
+    "dateOfReport": "2025-03-02",
+    "results": {
+      "bloodType": "A-",
+      "tissueType": "B2",
+      "antibodyScreen": "Negative",
+      "crossMatch": "Incompatible",
+      "organCompatibility": [
+        {
+          "organ": "Kidney",
+          "compatibility": "Compatible",
+          "notes": "Kidney tissue matches well, suitable for donation."
+        },
+        {
+          "organ": "Heart",
+          "compatibility": "Not Compatible",
+          "notes": "Heart tissue mismatch, transplant not advisable at this time."
+        },
+        {
+          "organ": "Liver",
+          "compatibility": "Compatible",
+          "notes": "Liver compatible, no abnormalities detected."
+        },
+        {
+          "organ": "Cornea",
+          "compatibility": "Compatible",
+          "notes": "No issues, suitable for donation."
+        }
+      ]
+    },
+    "comments": "The kidney, liver, and cornea are suitable for donation. The heart is not compatible, and further tests may be necessary in the future."
+  }
+]
