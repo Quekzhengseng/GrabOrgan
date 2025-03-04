@@ -142,7 +142,64 @@ def update_donor(donorId):
                 "message": "An error occurred while updating the donor information. " + str(e)
             }
         ), 500
-            
+    
+@app.route("/donor", methods=['POST'])
+def create_donor():
+    try:
+        # Get the JSON payload from the request
+        donor_data = request.get_json()
+
+        # Ensure donorId is provided in the request
+        donor_id = donor_data.get("donorId")
+        if not donor_id:
+            return jsonify({
+                "code": 400,
+                "data": {},
+                "message": "Donor ID is required."
+            }), 400
+
+        # Reference to the donor document in Firestore
+        donor_ref = db.collection("donors").document(donor_id)
+        if donor_ref.get().exists:
+            return jsonify({
+                "code": 409,
+                "data": {"donorId": donor_id},
+                "message": "Donor already exists."
+            }), 409
+
+        # Create a new Donor object
+        new_donor = Donor(
+            donor_id=donor_id,
+            first_name=donor_data["firstName"],
+            last_name=donor_data["lastName"],
+            date_of_birth=donor_data["dateOfBirth"],
+            datetime_of_death=donor_data.get("datetimeOfDeath"),  # Optional field
+            gender=donor_data["gender"],
+            blood_type=donor_data["bloodType"],
+            organs=donor_data.get("organs", []),  # Optional list
+            medical_history=donor_data.get("medicalHistory", []),  # Optional list
+            allergies=donor_data.get("allergies", []),  # Optional list
+            nok_contact=donor_data["nokContact"]
+        )
+
+        # Save the new donor to Firestore
+        donor_ref.set(new_donor.to_dict())
+
+        # Return success response
+        return jsonify({
+            "code": 201,
+            "data": new_donor.to_dict(),
+            "message": "Donor created successfully."
+        }), 201
+
+    except Exception as e:
+        print("Error: {}".format(str(e)))
+        return jsonify({
+            "code": 500,
+            "data": {},
+            "message": "An error occurred while creating the donor: " + str(e)
+        }), 500
+    
 
 # def create_donor(donorId):
 
