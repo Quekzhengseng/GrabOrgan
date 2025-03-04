@@ -53,11 +53,11 @@ def generate_order_id(pickup_location, pickup_date):
     print(f"{prefix}{count:04d}")
     return f"{prefix}{count:04d}"  # 4-digit incremental value
 
-# 🚀 Helper Functions for Validation
 def format_datetime(dt_str):
     """Convert a datetime string to Firestore-compatible format with YYYYMMDD date."""
     try:
-        dt = datetime.strptime(dt_str, "%d %b %Y %I:%M:%S %p")
+        # Try parsing the new YYYYMMDD format first
+        dt = datetime.strptime(dt_str, "%Y%m%d %I:%M:%S %p")
         formatted_date = dt.strftime("%Y%m%d")  # Convert to YYYYMMDD
         formatted_time = dt.strftime("%I:%M:%S %p")  # Keep HH:MM:SS AM/PM
         return f"{formatted_date} {formatted_time}", dt
@@ -150,14 +150,14 @@ def create_delivery():
         # Format and validate pickup_time
         formatted_pickup_time, pickup_dt = format_datetime(data["pickup_time"])
         if not pickup_dt:
-            return jsonify({"success": False, "code": 400, "error": "Invalid pickup_time format. Expected 'DD MMM YYYY HH:MM:SS AM/PM'"}), 400
+            return jsonify({"success": False, "code": 400, "error": "Invalid pickup_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
 
         # Format and validate destination_time
         formatted_destination_time, destination_dt = None, None
-        if data["destination_time"]:
+        if data["destination_time"] is not None:
             formatted_destination_time, destination_dt = format_datetime(data["destination_time"])
             if not destination_dt:
-                return jsonify({"success": False, "code": 400, "error": "Invalid destination_time format."}), 400
+                return jsonify({"success": False, "code": 400, "error": "Invalid destination_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
             
             if destination_dt <= pickup_dt:
                 return jsonify({"success": False, "code": 400, "error": "destination_time must be after pickup_time."}), 400
@@ -213,7 +213,7 @@ def update_delivery(order_id):
         if "pickup_time" in filtered_data and filtered_data["pickup_time"]:
             formatted_pickup_time, pickup_dt = format_datetime(filtered_data["pickup_time"])
             if not pickup_dt:
-                return jsonify({"success": False, "code": 400, "error": "Invalid pickup_time format."}), 400
+                return jsonify({"success": False, "code": 400, "error": "Invalid pickup_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
             filtered_data["pickup_time"] = formatted_pickup_time
 
         # Validate destination_time (only if it exists)
@@ -221,7 +221,7 @@ def update_delivery(order_id):
         if "destination_time" in filtered_data and filtered_data["destination_time"]:
             formatted_destination_time, destination_dt = format_datetime(filtered_data["destination_time"])
             if not destination_dt:
-                return jsonify({"success": False, "code": 400, "error": "Invalid destination_time format."}), 400
+                return jsonify({"success": False, "code": 400, "error": "Invalid destination_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
             
             # Ensure destination_time is after pickup_time
             if pickup_dt and destination_dt and destination_dt <= pickup_dt:
