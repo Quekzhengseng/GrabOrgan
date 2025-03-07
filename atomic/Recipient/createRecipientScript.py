@@ -72,38 +72,7 @@ def random_phone():
     return str(random.randint(80000000, 99999999))
 
 
-recipient_names = [
-    ("Ryan", "Leow"),
-    ("Jia Zheng", "Lim"),
-    ("Ivan", "Tan"),
-    ("Eng Kit", "Lum"),
-    ("Lay Foo", "Thiang"),
-    ("Swetha", "Gottipati"),
-    ("Danish", "Lim"),
-    ("Khong Kham", "Nang"),
-    ("Angela", "Neo"),
-    ("Yi Kai", "Neo"),
-    ("Daryl", "Ng"),
-    ("Nicholas", "Lam"),
-    ("Nicholas", "Lim"),
-    ("Zheng Feng", "Ong"),
-    ("Phoebe", "Neo"),
-    ("Precia", "Lam"),
-    ("Zheng Seng", "Quek"),
-    ("Ramasamy", "Vighnesh"),
-    ("Yu Xuan", "Shiow"),
-    ("Eunice", "Sng"),
-    ("Barry", "Tan"),
-    ("Wei Wen", "Tan"),
-    ("Shamel", "TengKu"),
-    ("Panhchaknut", "Tou"),
-    ("Ze Jia", "Goh"),
-    ("Lucas", "Wong"),
-    ("Zavier", "Yan"),
-    ("Kang Yan", "Yang"),
-    ("Ming", "Yuen"),
-    ("Jia Jun", "Zhang")
-]
+recipient_names = []
 recipients = []
 
 for i, (first, last) in enumerate(recipient_names, start=1):

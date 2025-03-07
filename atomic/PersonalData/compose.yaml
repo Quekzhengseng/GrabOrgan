@@ -1,0 +1,14 @@
+services:
+  donor:
+    build:
+      context: ./
+      dockerfile: Dockerfile.personal.data
+    image: GrabOrgan/personaldata:1.0
+    volumes:
+      - ./secrets/PersonalData_Key.json:/usr/src/app/PersonalData_Key.json:ro
+    environment:
+      - PERSONAL_DATA_DB_KEY=/usr/src/app/PersonalData_Key.json
+    # restart: always
+    container_name: personal_data_service
+    ports:
+      - "5007:5007"
