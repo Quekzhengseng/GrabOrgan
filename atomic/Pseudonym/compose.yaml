@@ -1,5 +1,5 @@
 services:
-  donor:
+  pseudonym:
     build:
       context: ./
       dockerfile: Dockerfile.pseudonym

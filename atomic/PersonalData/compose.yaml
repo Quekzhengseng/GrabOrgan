@@ -1,5 +1,5 @@
 services:
-  donor:
+  personalData:
     build:
       context: ./
       dockerfile: Dockerfile.personal.data
