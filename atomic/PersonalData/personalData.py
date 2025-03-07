@@ -2,14 +2,11 @@ from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import firebase_admin
-from firebase_admin import credentials
-from firebase_admin import firestore
+from firebase_admin import credentials, firestore
 from os import environ
 import os
 
-
 app = Flask(__name__)
-
 CORS(app)
 
 # Load the key from an environment variable
@@ -17,191 +14,150 @@ key_path = os.getenv("PERSONAL_DATA_DB_KEY")
 
 if not key_path or not os.path.isfile(key_path):
     raise FileNotFoundError(f"Could not find the Firebase JSON at {key_path}")
+
 # Initialize Firestore
 cred = credentials.Certificate(key_path)
 firebase_app = firebase_admin.initialize_app(cred)
-
-print("Firestore initialized successfully for Donor!")
-
+print("Firestore initialized successfully for Person!")
 
 db = firestore.client()
 
 
-class Donor:
-    def __init__(self, donor_id, first_name, last_name, date_of_birth, datetime_of_death,
-                 gender, blood_type, organs, medical_history, allergies, nok_contact):
-        self.donor_id = donor_id
-        self.name = {"firstName": first_name, "lastName": last_name}
+class Person:
+    def __init__(self, person_id, first_name, last_name, date_of_birth, nok_contact):
+        self.person_id = person_id
+        self.first_name = first_name
+        self.last_name = last_name
         self.date_of_birth = date_of_birth
-        self.datetime_of_death = datetime_of_death
-        self.gender = gender
-        self.blood_type = blood_type
-        self.organs = organs  # List of organ dictionaries
-        self.medical_history = medical_history  # List of medical history records
-        self.allergies = allergies  # List of allergies
         self.nok_contact = nok_contact  # Next of kin contact details
 
     def to_dict(self):
         """Convert the object to a Firestore-compatible dictionary."""
         return {
-            "name": self.name,
+            "firstName": self.first_name,
+            "lastName": self.last_name,
             "dateOfBirth": self.date_of_birth,
-            "datetimeOfDeath": self.datetime_of_death,
-            "gender": self.gender,
-            "bloodType": self.blood_type,
-            "organs": self.organs,
-            "medicalHistory": self.medical_history,
-            "allergies": self.allergies,
             "nokContact": self.nok_contact
         }
 
     @staticmethod
-    def from_dict(donor_id, data):
-        """Create a Donor object from Firestore document data."""
-        return Donor(
-            donor_id=donor_id,
-            first_name=data["name"]["firstName"],
-            last_name=data["name"]["lastName"],
-            date_of_birth=data["dateOfBirth"],
-            datetime_of_death=data["datetimeOfDeath"],
-            gender=data["gender"],
-            blood_type=data["bloodType"],
-            organs=data["organs"],
-            medical_history=data["medicalHistory"],
-            allergies=data["allergies"],
-            nok_contact=data["nokContact"]
+    def from_dict(person_id, data):
+        """Create a Person object from Firestore document data."""
+        return Person(
+            person_id=person_id,
+            first_name=data.get("firstName"),
+            last_name=data.get("lastName"),
+            date_of_birth=data.get("dateOfBirth"),
+            nok_contact=data.get("nokContact")
         )
 
-@app.route("/donor", methods=['GET'])
+
+@app.route("/person", methods=['GET'])
 def get_all():
-    # Read data from firebase
+    # Read data from Firestore
     try:
-        donors_ref = db.collection("donors")
-        # docs = donors_ref.stream()
-        docs = donors_ref.get()
-        donors = {};
+        persons_ref = db.collection("PersonalData")
+        docs = persons_ref.get()
+        persons = {}
 
         for doc in docs:
-            donor_data = doc.to_dict()
-            donor_data["donorID"] = doc.id  # Add document ID
-            donors[doc.id] = donor_data
-        return jsonify({"success" : True, "code":200, "data": donors}), 200
+            person_data = doc.to_dict()
+            person_data["personID"] = doc.id  # Include the document ID
+            persons[doc.id] = person_data
+        return jsonify({"success": True, "code": 200, "data": persons}), 200
     except Exception as e:
-        return jsonify({"success" : False, "code":500, "error": str(e)}), 500
+        return jsonify({"success": False, "code": 500, "error": str(e)}), 500
 
 
-@app.route("/donor/<string:donorId>")
-def get_donor(donorId):
+@app.route("/person/<string:personId>")
+def get_person(personId):
     try:
-        donors_ref = db.collection("donors").document(donorId)
-        doc = donors_ref.get()
+        person_ref = db.collection("PersonalData").document(personId)
+        doc = person_ref.get()
         if doc.exists:
-            donor_obj = Donor.from_dict(donorId, doc.to_dict())
-            return {"success" : True, "code":200, "data": donor_obj.to_dict()}  # Convert back to JSON-friendly format
+            person_obj = Person.from_dict(personId, doc.to_dict())
+            return jsonify({"success": True, "code": 200, "data": person_obj.to_dict()})
         else:
-            return jsonify({"success" : False, "code":404, "error": "Donor does not exist"}), 404
+            return jsonify({"success": False, "code": 404, "error": "Person does not exist"}), 404
 
     except Exception as e:
-        return jsonify({"success" : False, "code":500, "error": str(e)}), 500
+        return jsonify({"success": False, "code": 500, "error": str(e)}), 500
 
 
-@app.route("/donor/<string:donorId>", methods=['PUT'])
-def update_donor(donorId):
+@app.route("/person/<string:personId>", methods=['PUT'])
+def update_person(personId):
     try:
-        donors_ref = db.collection("donors").document(donorId)
-        doc = donors_ref.get()
+        person_ref = db.collection("PersonalData").document(personId)
+        doc = person_ref.get()
         if not doc.exists:
-            return jsonify(
-                {
-                    "code": 404,
-                    "data": {
-                        "donorId": donorId
-                    },
-                    "message": "Donor not found."
-                }
-            ), 404
+            return jsonify({
+                "code": 404,
+                "data": {"personId": personId},
+                "message": "Person not found."
+            }), 404
 
-        # update status
         new_data = request.get_json()
         if new_data['status'] < 400:
-            db.collection("donors").document(donorId).set(new_data["data"], merge=True)
-            return jsonify(
-                {
-                    "code": 200,
-                    "data": new_data
-                }
-            ), 200
+            # Merge update into Firestore document.
+            db.collection("PersonalData").document(personId).set(new_data["data"], merge=True)
+            return jsonify({"code": 200, "data": new_data}), 200
     except Exception as e:
-        print("Error: {}".format(str(e)))
-        return jsonify(
-            {
-                "code": 500,
-                "data": {
-                    "donorId": donorId
-                },
-                "message": "An error occurred while updating the donor information. " + str(e)
-            }
-        ), 500
-    
-@app.route("/donor", methods=['POST'])
-def create_donor():
+        return jsonify({
+            "code": 500,
+            "data": {"personId": personId},
+            "message": "An error occurred while updating the person information: " + str(e)
+        }), 500
+
+
+@app.route("/person", methods=['POST'])
+def create_person():
     try:
         # Get the JSON payload from the request
-        donor_data = request.get_json()
+        person_data = request.get_json()
 
-        # Ensure donorId is provided in the request
-        donor_id = donor_data.get("donorId")
-        if not donor_id:
+        # Ensure personId is provided in the request payload.
+        person_id = person_data.get("personId")
+        if not person_id:
             return jsonify({
                 "code": 400,
                 "data": {},
-                "message": "Donor ID is required."
+                "message": "Person ID is required."
             }), 400
 
-        # Reference to the donor document in Firestore
-        donor_ref = db.collection("donors").document(donor_id)
-        if donor_ref.get().exists:
+        # Reference to the person document in Firestore
+        person_ref = db.collection("PersonalData").document(person_id)
+        if person_ref.get().exists:
             return jsonify({
                 "code": 409,
-                "data": {"donorId": donor_id},
-                "message": "Donor already exists."
+                "data": {"personId": person_id},
+                "message": "Person already exists."
             }), 409
 
-        # Create a new Donor object
-        new_donor = Donor(
-            donor_id=donor_id,
-            first_name=donor_data["firstName"],
-            last_name=donor_data["lastName"],
-            date_of_birth=donor_data["dateOfBirth"],
-            datetime_of_death=donor_data.get("datetimeOfDeath"),  # Optional field
-            gender=donor_data["gender"],
-            blood_type=donor_data["bloodType"],
-            organs=donor_data.get("organs", []),  # Optional list
-            medical_history=donor_data.get("medicalHistory", []),  # Optional list
-            allergies=donor_data.get("allergies", []),  # Optional list
-            nok_contact=donor_data["nokContact"]
+        # Create a new Person object from the provided data.
+        new_person = Person(
+            person_id=person_id,
+            first_name=person_data["firstName"],
+            last_name=person_data["lastName"],
+            date_of_birth=person_data["dateOfBirth"],
+            nok_contact=person_data["nokContact"]
         )
 
-        # Save the new donor to Firestore
-        donor_ref.set(new_donor.to_dict())
+        # Save the new person to Firestore.
+        person_ref.set(new_person.to_dict())
 
-        # Return success response
         return jsonify({
             "code": 201,
-            "data": new_donor.to_dict(),
-            "message": "Donor created successfully."
+            "data": new_person.to_dict(),
+            "message": "Person created successfully."
         }), 201
 
     except Exception as e:
-        print("Error: {}".format(str(e)))
         return jsonify({
             "code": 500,
             "data": {},
-            "message": "An error occurred while creating the donor: " + str(e)
+            "message": "An error occurred while creating the person: " + str(e)
         }), 500
-    
 
-# def create_donor(donorId):
 
 if __name__ == '__main__':
     print("This is flask for " + os.path.basename(__file__) + ": manage Personal Data ...")
