@@ -147,5 +147,5 @@ def pseudonymise_service():
     return jsonify(response), 200
 
 if __name__ == '__main__':
-    print("This is flask for " + os.path.basename(__file__) + ": pseudonymise ...")
+    print("This is flask for " + os.path.basename(__file__) + ": manage pseudonym ...")
     app.run(host='0.0.0.0', port=5001, debug=True)
