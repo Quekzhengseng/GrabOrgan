@@ -148,4 +148,4 @@ def pseudonymise_service():
 
 if __name__ == '__main__':
     print("This is flask for " + os.path.basename(__file__) + ": manage pseudonym ...")
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=5006, debug=True)
