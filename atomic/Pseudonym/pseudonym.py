@@ -126,6 +126,29 @@ def process_pii(data):
 @app.route('/pseudonymise', methods=['POST'])
 def pseudonymise_service():
     data = request.get_json()
+    """
+    Takes in 
+    {
+      "donorid-1234": {
+            "firstName": "isaiah",
+            "lastName": "chia",
+            "age": "72",
+            "datetimeOfDeath": "2069-01-01T24:12:34+00:00",
+            "gender": "Male",
+            "bloodType": "O+",
+            "organs": ["organId1", "organId2", "organId3"],
+            "medicalHistory": [],
+            "allergies": ["nuts", "GPD", "aspirin"],
+            "nokContact": {
+                "firstName": "First name of the patient.",
+                "lastName": "Last name of the patient.",
+                "relationship": "Spouse",
+                "phone": "54326789"
+            },
+            "dateOfBirth": "1953-01-08"
+       }
+    }
+    """
     if not data:
         return jsonify({"error": "No data provided"}), 400
 
@@ -153,6 +176,50 @@ def pseudonymise_service():
         "personalData": personal_data
     }
     return jsonify(response), 200
+# returns
+# {
+#     "person": {
+#         "donorid-1234": {
+#             "age": "70",
+#             "allergies": [
+#                 "nuts",
+#                 "GPD",
+#                 "aspirin"
+#             ],
+#             "bloodType": "O+",
+#             "dateOfBirth": "19XX-X1-X8",
+#             "datetimeOfDeath": "2069-01-01T24:12:34+00:00",
+#             "donorId": "donorid-1234",
+#             "firstName": "wheat",
+#             "gender": "Male",
+#             "lastName": "denim",
+#             "medicalHistory": [],
+#             "nokContact": {
+#                 "firstName": "darkolivegreen",
+#                 "lastName": "gainsboro",
+#                 "phone": "XXXXX789",
+#                 "relationship": "Spouse"
+#             },
+#             "organs": [
+#                 "organId1",
+#                 "organId2",
+#                 "organId3"
+#             ]
+#         }
+#     },
+#     "personalData": {
+#         "dateOfBirth": "1953-01-08",
+#         "firstName": "isaiah",
+#         "lastName": "chia",
+#         "nokContact": {
+#             "firstName": "First name of the patient.",
+#             "lastName": "Last name of the patient.",
+#             "phone": "54326789",
+#             "relationship": "Spouse"
+#         },
+#         "personId": "donorid-1234"
+#     }
+# }
 
 if __name__ == '__main__':
     print("This is flask for " + os.path.basename(__file__) + ": manage pseudonym ...")
