@@ -53,11 +53,12 @@ def random_phone():
     """Generate a random 8-digit phone number."""
     return str(random.randint(80000000, 99999999))
 
-donor_names =[] # add donor names as tuples ("firstName", "lastName")
+# donor_names =[] # add donor names as tuples ("firstName", "lastName")
+donor_names = []
 
 donors = []
 
-for i, (first, last) in enumerate(donor_names, start=31):
+for i, (first, last) in enumerate(donor_names, start=1):
     new_donor = Donor(
         donor_id=str(i),
         first_name=first,
