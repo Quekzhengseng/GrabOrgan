@@ -134,18 +134,20 @@ def pseudonymise_service():
 
     # Process the data to pseudonymise/mask PII fields.
     masked_data = process_pii(record_data)
-    # masked_data["personId"] = record_id
+    # Add the required ID field to the masked data.
+    masked_data["donorId"] = record_id
 
     # Build the Personal Data block from the original data.
     personal_data = {
-        "personId": record_id,             # Added required Person ID
+        "personId": record_id,
         "firstName": record_data.get("firstName", ""),
         "lastName": record_data.get("lastName", ""),
         "dateOfBirth": record_data.get("dateOfBirth", ""),
         "nokContact": record_data.get("nokContact", {})
     }
 
-    # Return a JSON with two blocks: one for the masked donor data and one for the personal data.
+    # Return a JSON with two blocks: one for the masked donor data (keyed under "person")
+    # and one for the personal data (keyed under "personalData").
     response = {
         "person": { record_id: masked_data },
         "personalData": personal_data

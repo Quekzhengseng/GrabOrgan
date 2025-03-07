@@ -53,39 +53,7 @@ def random_phone():
     return str(random.randint(80000000, 99999999))
 
 # --- Generate Dummy Donor Data ---
-
-donor_names = [
-    ("Ryan", "Leow"),
-    ("Jia Zheng", "Lim"),
-    ("Ivan", "Tan"),
-    ("Eng Kit", "Lum"),
-    ("Lay Foo", "Thiang"),
-    ("Swetha", "Gottipati"),
-    ("Danish", "Lim"),
-    ("Khong Kham", "Nang"),
-    ("Angela", "Neo"),
-    ("Yi Kai", "Neo"),
-    ("Daryl", "Ng"),
-    ("Nicholas", "Lam"),
-    ("Nicholas", "Lim"),
-    ("Zheng Feng", "Ong"),
-    ("Phoebe", "Neo"),
-    ("Precia", "Lam"),
-    ("Zheng Seng", "Quek"),
-    ("Ramasamy", "Vighnesh"),
-    ("Yu Xuan", "Shiow"),
-    ("Eunice", "Sng"),
-    ("Barry", "Tan"),
-    ("Wei Wen", "Tan"),
-    ("Shamel", "TengKu"),
-    ("Panhchaknut", "Tou"),
-    ("Ze Jia", "Goh"),
-    ("Lucas", "Wong"),
-    ("Zavier", "Yan"),
-    ("Kang Yan", "Yang"),
-    ("Ming", "Yuen"),
-    ("Jia Jun", "Zhang")
-]
+donor_names = []
 
 donors = []
 
@@ -124,12 +92,18 @@ for donor in donors:
     # Prepare payload for pseudonym service.
     # The pseudonym service expects a JSON structure with the donor ID as key.
     pseudonym_payload = {
-        donor.donor_id: {
-            "firstName": donor.first_name,
-            "lastName": donor.last_name,
-            "dateOfBirth": donor.date_of_birth,
-            "nokContact": donor.nok_contact
-            # Add any additional fields as required by the pseudonym service.
+    donor.donor_id: {
+        "firstName": donor.first_name,
+        "lastName": donor.last_name,
+        "dateOfBirth": donor.date_of_birth,
+        "age": donor.age,
+        "datetimeOfDeath": donor.datetime_of_death,
+        "gender": donor.gender,
+        "bloodType": donor.blood_type,
+        "organs": donor.organs,
+        "medicalHistory": donor.medical_history,
+        "allergies": donor.allergies,
+        "nokContact": donor.nok_contact
         }
     }
     print(f"Sending to pseudonym service for donor {donor.donor_id}: {pseudonym_payload}")
@@ -141,6 +115,8 @@ for donor in donors:
         continue
 
     pseudo_result = pseudo_resp.json()
+    # print(pseudo_result)
+
     # Using keys as returned by the pseudonym service: "person" and "personalData"
     masked_donor_data = pseudo_result.get("person", {}).get(donor.donor_id)
     personal_data = pseudo_result.get("personalData")
@@ -152,6 +128,7 @@ for donor in donors:
     # Post the masked donor data to the donor endpoint.
     donor_resp = requests.post(DONOR_URL, json=masked_donor_data)
     if donor_resp.status_code != 201:
+        # print(masked_donor_data)
         print(f"Error posting masked donor data for donor {donor.donor_id}: {donor_resp.text}")
     else:
         print(f"Masked donor data posted successfully for donor {donor.donor_id}")
