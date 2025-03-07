@@ -28,10 +28,12 @@ db = firestore.client()
 
 
 class Donor:
-    def __init__(self, donor_id, first_name, last_name, date_of_birth, datetime_of_death,
+    def __init__(self, donor_id, first_name, last_name, age ,date_of_birth, datetime_of_death,
                  gender, blood_type, organs, medical_history, allergies, nok_contact):
         self.donor_id = donor_id
-        self.name = {"firstName": first_name, "lastName": last_name}
+        self.first_name = first_name
+        self.last_name = last_name
+        self.age = age
         self.date_of_birth = date_of_birth
         self.datetime_of_death = datetime_of_death
         self.gender = gender
@@ -44,7 +46,9 @@ class Donor:
     def to_dict(self):
         """Convert the object to a Firestore-compatible dictionary."""
         return {
-            "name": self.name,
+            "firstName": self.first_name,
+            "lasttName": self.last_name,
+            "age": self.age,
             "dateOfBirth": self.date_of_birth,
             "datetimeOfDeath": self.datetime_of_death,
             "gender": self.gender,
@@ -60,8 +64,9 @@ class Donor:
         """Create a Donor object from Firestore document data."""
         return Donor(
             donor_id=donor_id,
-            first_name=data["name"]["firstName"],
-            last_name=data["name"]["lastName"],
+            first_name=data["firstName"],
+            last_name=data["lastName"],
+            age=data["age"],
             date_of_birth=data["dateOfBirth"],
             datetime_of_death=data["datetimeOfDeath"],
             gender=data["gender"],
@@ -172,6 +177,7 @@ def create_donor():
             donor_id=donor_id,
             first_name=donor_data["firstName"],
             last_name=donor_data["lastName"],
+            age=donor_data["age"],
             date_of_birth=donor_data["dateOfBirth"],
             datetime_of_death=donor_data.get("datetimeOfDeath"),  # Optional field
             gender=donor_data["gender"],

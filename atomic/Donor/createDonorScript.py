@@ -1,6 +1,10 @@
 import random
 import datetime
-from donor import Donor, db
+import uuid
+import requests
+from donor import Donor  # Assuming you have a Donor class defined in donor.py
+
+# --- Dummy Data Generation Functions ---
 
 def random_date(start_year, end_year):
     """Generate a random date within a given range."""
@@ -11,26 +15,24 @@ def random_date(start_year, end_year):
 def random_datetime_of_death():
     """Generate a random datetime of death in the future."""
     future_date = random_date(2000, 2010)
+    # Return in ISO format with fixed time and timezone offset.
     return future_date.strftime("%Y-%m-%dT%H:%M:%S+00:00")
 
 def random_blood_type():
-    """Random blood type generator."""
     return random.choice(["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"])
 
 def random_gender():
-    """Random gender assignment."""
     return random.choice(["Male", "Female"])
 
 def random_organs():
-    """Generate a list of random organs with statuses."""
     organ_types = ["heart", "liver", "lungs", "kidneys", "pancreas", "intestines", "cornea"]
     conditions = ["Excellent", "Good", "Normal", "Fair"]
     statuses = ["Donated", "Available", "Unavailable"]
-    
-    return [{"organType": organ, "status": random.choice(statuses), "condition": random.choice(conditions)} for organ in random.sample(organ_types, 3)]
+    # Randomly pick 3 unique organs
+    return [{"organType": organ, "status": random.choice(statuses), "condition": random.choice(conditions)}
+            for organ in random.sample(organ_types, 3)]
 
 def random_medical_history():
-    """Generate a random medical history."""
     conditions = [
         {"condition": "Hypertension", "description": "Controlled with medication", "treatment": "Beta-blockers"},
         {"condition": "Diabetes", "description": "Type 2, managed with diet", "treatment": "Metformin"},
@@ -38,32 +40,65 @@ def random_medical_history():
         {"condition": "High Cholesterol", "description": "Mild, controlled with exercise", "treatment": "Statins"},
         {"condition": "Anemia", "description": "Iron deficiency", "treatment": "Iron supplements"}
     ]
-    
     return [
         {**random.choice(conditions), "dateDiagnosed": str(random_date(1990, 2025))}
         for _ in range(random.randint(1, 3))
     ]
 
 def random_allergies():
-    """Generate a random list of allergies."""
     possible_allergies = ["pollen", "penicillin", "peanuts", "shellfish", "gluten", "lactose"]
     return random.sample(possible_allergies, random.randint(0, 3))
 
 def random_phone():
-    """Generate a random 8-digit phone number."""
     return str(random.randint(80000000, 99999999))
 
-# donor_names =[] # add donor names as tuples ("firstName", "lastName")
-donor_names = []
+# --- Generate Dummy Donor Data ---
+
+donor_names = [
+    ("Ryan", "Leow"),
+    ("Jia Zheng", "Lim"),
+    ("Ivan", "Tan"),
+    ("Eng Kit", "Lum"),
+    ("Lay Foo", "Thiang"),
+    ("Swetha", "Gottipati"),
+    ("Danish", "Lim"),
+    ("Khong Kham", "Nang"),
+    ("Angela", "Neo"),
+    ("Yi Kai", "Neo"),
+    ("Daryl", "Ng"),
+    ("Nicholas", "Lam"),
+    ("Nicholas", "Lim"),
+    ("Zheng Feng", "Ong"),
+    ("Phoebe", "Neo"),
+    ("Precia", "Lam"),
+    ("Zheng Seng", "Quek"),
+    ("Ramasamy", "Vighnesh"),
+    ("Yu Xuan", "Shiow"),
+    ("Eunice", "Sng"),
+    ("Barry", "Tan"),
+    ("Wei Wen", "Tan"),
+    ("Shamel", "TengKu"),
+    ("Panhchaknut", "Tou"),
+    ("Ze Jia", "Goh"),
+    ("Lucas", "Wong"),
+    ("Zavier", "Yan"),
+    ("Kang Yan", "Yang"),
+    ("Ming", "Yuen"),
+    ("Jia Jun", "Zhang")
+]
 
 donors = []
 
 for i, (first, last) in enumerate(donor_names, start=1):
+    new_uuid = str(uuid.uuid4())
+    random_dob = str(random_date(1940, 1990))
+    random_age = 2025 - int(random_dob[:4])
     new_donor = Donor(
-        donor_id=str(i),
+        donor_id=new_uuid,
         first_name=first,
         last_name=last,
-        date_of_birth=str(random_date(1940, 1990)),
+        date_of_birth=random_dob,
+        age=random_age,
         datetime_of_death=random_datetime_of_death(),
         gender=random_gender(),
         blood_type=random_blood_type(),
@@ -72,38 +107,58 @@ for i, (first, last) in enumerate(donor_names, start=1):
         allergies=random_allergies(),
         nok_contact={
             "firstName": random.choice(["Michael", "Sarah", "David", "Emily"]),
-            "lastName": last,
+            "lastName": last,  # using donor's last name for simplicity
             "relationship": random.choice(["Son", "Daughter", "Spouse", "Sibling"]),
             "phone": random_phone()
         }
     )
     donors.append(new_donor)
 
-# Add Donors
-# print(donors[0].name)
+# --- Endpoints (Container URLs) ---
+PERSONAL_DATA_URL = "http://localhost:5007/person"    # POST endpoint for personal data
+DONOR_URL = "http://localhost:5002/donor"              # POST endpoint for donor data
+PSEUDONYM_URL = "http://localhost:5006/pseudonymise"     # POST endpoint for pseudonym service
+
+# --- Process and Split Data for Each Donor ---
 for donor in donors:
-    db.collection("donors").document(donor.donor_id).set(donor.to_dict())
+    # Prepare payload for pseudonym service.
+    # The pseudonym service expects a JSON structure with the donor ID as key.
+    pseudonym_payload = {
+        donor.donor_id: {
+            "firstName": donor.first_name,
+            "lastName": donor.last_name,
+            "dateOfBirth": donor.date_of_birth,
+            "nokContact": donor.nok_contact
+            # Add any additional fields as required by the pseudonym service.
+        }
+    }
+    print(f"Sending to pseudonym service for donor {donor.donor_id}: {pseudonym_payload}")
+    
+    # Call pseudonym service.
+    pseudo_resp = requests.post(PSEUDONYM_URL, json=pseudonym_payload)
+    if pseudo_resp.status_code != 200:
+        print(f"Error in pseudonym service for donor {donor.donor_id}: {pseudo_resp.text}")
+        continue
 
+    pseudo_result = pseudo_resp.json()
+    # Using keys as returned by the pseudonym service: "person" and "personalData"
+    masked_donor_data = pseudo_result.get("person", {}).get(donor.donor_id)
+    personal_data = pseudo_result.get("personalData")
 
-"""
-Example Donor Schema
-new_donor = Donor(
-    donor_id="1",
-    first_name="John",
-    last_name="Doe",
-    date_of_birth="1980-01-01",
-    datetime_of_death="2005-01-01T24:12:34+00:00",
-    gender="Male",
-    blood_type="O+",
-    organs=[
-        {"organType": "heart", "status": "Donated", "condition": "Healthy"},
-        {"organType": "kidney", "status": "Available", "condition": "Good"}
-    ],
-    medical_history=[
-        {"condition": "Diabetes", "description": "Managed", "dateDiagnosed": "2010-01-01", "treatment": "Insulin"},
-    ],
-    allergies=["peanuts", "aspirin"],
-    nok_contact={"firstName": "Jane", "lastName": "Doe", "relationship": "Spouse", "phone": "12345678"}
-)
+    if not masked_donor_data or not personal_data:
+        print(f"Incomplete pseudonym response for donor {donor.donor_id}: {pseudo_result}")
+        continue
 
-"""
+    # Post the masked donor data to the donor endpoint.
+    donor_resp = requests.post(DONOR_URL, json=masked_donor_data)
+    if donor_resp.status_code != 201:
+        print(f"Error posting masked donor data for donor {donor.donor_id}: {donor_resp.text}")
+    else:
+        print(f"Masked donor data posted successfully for donor {donor.donor_id}")
+
+    # Post the personal data to the personalData endpoint.
+    personal_resp = requests.post(PERSONAL_DATA_URL, json=personal_data)
+    if personal_resp.status_code != 201:
+        print(f"Error posting personal data for donor {donor.donor_id}: {personal_resp.text}")
+    else:
+        print(f"Personal data posted successfully for donor {donor.donor_id}")

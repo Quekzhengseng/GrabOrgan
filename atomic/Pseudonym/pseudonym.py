@@ -79,9 +79,6 @@ def masked_birth(dateOfBirth):
 def pseudonymise_address(address):
     return "masked-address"
 
-# List of substrings indicating PII fields.
-pii_keywords = ["name", "age", "phone", "mobile", "dob", "birth", "address", "email", "nric", "number"]
-
 def pseudonymise_value(key, value):
     lkey = key.lower()
     if isinstance(value, str):
@@ -112,7 +109,6 @@ def process_pii(data):
         new_dict = {}
         for key, value in data.items():
             if isinstance(value, dict):
-                # Special-case for known nested PII blocks like 'nokContact'
                 if key.lower() == "nokcontact":
                     new_dict[key] = pseudonymise_nok(value)
                 else:
@@ -130,19 +126,29 @@ def process_pii(data):
 @app.route('/pseudonymise', methods=['POST'])
 def pseudonymise_service():
     data = request.get_json()
-    # print("Received data:", data)
     if not data:
         return jsonify({"error": "No data provided"}), 400
 
-    # For simplicity, assume the JSON contains a single donor record keyed by an ID.
-    donor_id, donor_data = list(data.items())[0]
+    # Assume the JSON contains a single record keyed by an ID.
+    record_id, record_data = list(data.items())[0]
 
-    # Process the donor data to pseudonymise/mask PII fields.
-    processed_data = process_pii(donor_data)
+    # Process the data to pseudonymise/mask PII fields.
+    masked_data = process_pii(record_data)
+    # masked_data["personId"] = record_id
 
-    # Return the data in the desired format.
+    # Build the Personal Data block from the original data.
+    personal_data = {
+        "personId": record_id,             # Added required Person ID
+        "firstName": record_data.get("firstName", ""),
+        "lastName": record_data.get("lastName", ""),
+        "dateOfBirth": record_data.get("dateOfBirth", ""),
+        "nokContact": record_data.get("nokContact", {})
+    }
+
+    # Return a JSON with two blocks: one for the masked donor data and one for the personal data.
     response = {
-        donor_id: processed_data
+        "person": { record_id: masked_data },
+        "personalData": personal_data
     }
     return jsonify(response), 200
 
