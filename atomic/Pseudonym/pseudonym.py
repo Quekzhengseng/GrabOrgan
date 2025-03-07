@@ -176,51 +176,52 @@ def pseudonymise_service():
         "personalData": personal_data
     }
     return jsonify(response), 200
-# returns
-# {
-#     "person": {
-#         "donorid-1234": {
-#             "age": "70",
-#             "allergies": [
-#                 "nuts",
-#                 "GPD",
-#                 "aspirin"
-#             ],
-#             "bloodType": "O+",
-#             "dateOfBirth": "19XX-X1-X8",
-#             "datetimeOfDeath": "2069-01-01T24:12:34+00:00",
-#             "donorId": "donorid-1234",
-#             "firstName": "wheat",
-#             "gender": "Male",
-#             "lastName": "denim",
-#             "medicalHistory": [],
-#             "nokContact": {
-#                 "firstName": "darkolivegreen",
-#                 "lastName": "gainsboro",
-#                 "phone": "XXXXX789",
-#                 "relationship": "Spouse"
-#             },
-#             "organs": [
-#                 "organId1",
-#                 "organId2",
-#                 "organId3"
-#             ]
-#         }
-#     },
-#     "personalData": {
-#         "dateOfBirth": "1953-01-08",
-#         "firstName": "isaiah",
-#         "lastName": "chia",
-#         "nokContact": {
-#             "firstName": "First name of the patient.",
-#             "lastName": "Last name of the patient.",
-#             "phone": "54326789",
-#             "relationship": "Spouse"
-#         },
-#         "personId": "donorid-1234"
-#     }
-# }
-
+"""
+returns
+{
+    "person": {
+        "donorid-1234": {
+            "age": "70",
+            "allergies": [
+                "nuts",
+                "GPD",
+                "aspirin"
+            ],
+            "bloodType": "O+",
+            "dateOfBirth": "19XX-X1-X8",
+            "datetimeOfDeath": "2069-01-01T24:12:34+00:00",
+            "donorId": "donorid-1234",
+            "firstName": "wheat",
+            "gender": "Male",
+            "lastName": "denim",
+            "medicalHistory": [],
+            "nokContact": {
+                "firstName": "darkolivegreen",
+                "lastName": "gainsboro",
+                "phone": "XXXXX789",
+                "relationship": "Spouse"
+            },
+            "organs": [
+                "organId1",
+                "organId2",
+                "organId3"
+            ]
+        }
+    },
+    "personalData": {
+        "dateOfBirth": "1953-01-08",
+        "firstName": "isaiah",
+        "lastName": "chia",
+        "nokContact": {
+            "firstName": "First name of the patient.",
+            "lastName": "Last name of the patient.",
+            "phone": "54326789",
+            "relationship": "Spouse"
+        },
+        "personId": "donorid-1234"
+    }
+}
+"""
 if __name__ == '__main__':
     print("This is flask for " + os.path.basename(__file__) + ": manage pseudonym ...")
     app.run(host='0.0.0.0', port=5006, debug=True)
