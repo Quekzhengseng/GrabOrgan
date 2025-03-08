@@ -31,7 +31,16 @@ def random_organs():
     # Randomly pick 3 unique organs
     return [{"organType": organ, "status": random.choice(statuses), "condition": random.choice(conditions)}
             for organ in random.sample(organ_types, 3)]
+def random_organs(new_uuid):
+    organ_types = ["heart", "liver", "lungs", "kidneys", "pancreas", "intestines", "cornea"]
+    organIdArr = []
 
+    for organ in random.sample(organ_types, 3):
+        organId = new_uuid[:8]+ "-"+ organ
+        organIdArr.append(organId)
+    return organIdArr
+
+# print(random_organs("fcb3258f"))
 def random_medical_history():
     conditions = [
         {"condition": "Hypertension", "description": "Controlled with medication", "treatment": "Beta-blockers"},
@@ -53,7 +62,8 @@ def random_phone():
     return str(random.randint(80000000, 99999999))
 
 # --- Generate Dummy Donor Data ---
-donor_names = []
+# donor_names = []
+
 
 donors = []
 
@@ -70,7 +80,7 @@ for i, (first, last) in enumerate(donor_names, start=1):
         datetime_of_death=random_datetime_of_death(),
         gender=random_gender(),
         blood_type=random_blood_type(),
-        organs=random_organs(),
+        organs=random_organs(new_uuid),
         medical_history=random_medical_history(),
         allergies=random_allergies(),
         nok_contact={

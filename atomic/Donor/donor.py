@@ -38,7 +38,7 @@ class Donor:
         self.datetime_of_death = datetime_of_death
         self.gender = gender
         self.blood_type = blood_type
-        self.organs = organs  # List of organ dictionaries
+        self.organs = organs  # List of organId
         self.medical_history = medical_history  # List of medical history records
         self.allergies = allergies  # List of allergies
         self.nok_contact = nok_contact  # Next of kin contact details
@@ -47,7 +47,7 @@ class Donor:
         """Convert the object to a Firestore-compatible dictionary."""
         return {
             "firstName": self.first_name,
-            "lasttName": self.last_name,
+            "lastName": self.last_name,
             "age": self.age,
             "dateOfBirth": self.date_of_birth,
             "datetimeOfDeath": self.datetime_of_death,
