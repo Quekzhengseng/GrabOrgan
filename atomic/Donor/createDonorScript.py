@@ -62,7 +62,7 @@ def random_phone():
     return str(random.randint(80000000, 99999999))
 
 # --- Generate Dummy Donor Data ---
-# donor_names = []
+donor_names = []
 
 
 donors = []
