@@ -10,14 +10,14 @@ app = Flask(__name__)
 CORS(app)
 
 # Load Firebase credentials
-key_path = os.getenv("RECIPIENT_DB_KEY", "secrets/firebase-key.json") 
+key_path = os.getenv("RECIPIENT_DB_KEY", "/usr/src/app/secrets/recipient_Key.json") 
 
 if not key_path or not os.path.isfile(key_path):
     raise FileNotFoundError(f"Could not find the Firebase JSON at {key_path}")
 
 # Initialize Firestore only if it hasn't been initialized
 if not firebase_admin._apps:
-    cred = credentials.Certificate("secrets/firebase-key.json")
+    cred = credentials.Certificate(key_path)  
     firebase_app = firebase_admin.initialize_app(cred, {
         'projectId': 'esd-recipient'  # Specify the project ID here
     })
