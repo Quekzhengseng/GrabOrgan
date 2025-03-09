@@ -1,5 +1,5 @@
-from datetime import datetime
 import uuid
+from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import firebase_admin
@@ -10,17 +10,18 @@ app = Flask(__name__)
 CORS(app)
 
 # Load Firebase credentials
-key_path = os.getenv("ORGAN_DB_KEY", "/usr/src/app/secrets/organ_Key.json")
+key_path = os.getenv("ORGAN_DB_KEY", "/usr/src/app/secrets/organ_Key.json") 
 
 if not key_path or not os.path.isfile(key_path):
     raise FileNotFoundError(f"Could not find the Firebase JSON at {key_path}")
 
 # Initialize Firestore only if it hasn't been initialized
 if not firebase_admin._apps:
-    cred = credentials.Certificate(key_path)
+    cred = credentials.Certificate(key_path)  
     firebase_app = firebase_admin.initialize_app(cred, {
         'projectId': 'organs-7ede9'  # Specify the project ID here
     })
+
 
 print("Firestore initialized successfully for Organ!")
 
@@ -73,16 +74,16 @@ class Organ:
             organ_id=organId,
             donor_id=data["donorId"],
             organ_type=data["organType"],
-            retrieval_datetime=data["retrievalDatetime"],  # Corrected field name
-            expiry_datetime=data["expiryDatetime"],  # Corrected field name
+            retrieval_datetime=data["retrievalDatetime"],
+            expiry_datetime=data["expiryDatetime"],
             status=data["status"],
             condition=data["condition"],
-            blood_type=data["bloodType"],  # Corrected field name
-            weight_grams=data["weightGrams"],  # Corrected field name
-            hla_typing=data["hlaTyping"],  # Corrected field name
+            blood_type=data["bloodType"],
+            weight_grams=data["weightGrams"],
+            hla_typing=data["hlaTyping"],
             histopathology=data["histopathology"],
-            storage_temp_celsius=data["storageTempCelsius"],  # Corrected field name
-            preservation_solution=data["preservationSolution"],  # Corrected field name
+            storage_temp_celsius=data["storageTempCelsius"],
+            preservation_solution=data["preservationSolution"],
             notes=data["notes"]
         )
 
@@ -198,7 +199,11 @@ def create_organ():
         data = request.get_json()
 
         # Generate a unique organId (can be done using UUID or custom logic)
-        organ_id = str(uuid.uuid4())
+        donor_id_part = data['donorId'].split('-')[0] if 'donorId' in data else ''
+        organ_type_part = data['organType'].split('-')[-1] if 'organType' in data else ''
+        
+        # Generate a unique organId (concatenate parts from donorId and organType)
+        organ_id = f"{donor_id_part}-{organ_type_part}"
 
         # Create Organ object
         organ = Organ(

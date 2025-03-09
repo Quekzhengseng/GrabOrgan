@@ -1,16 +1,27 @@
 import json
+import os
 import firebase_admin
 from firebase_admin import credentials, firestore
-import uuid
 import random
+import uuid
 from datetime import datetime, timedelta
 from organ import Organ
 
-# Initialize Firebase
-cred = credentials.Certificate("secrets/organ_Key.json")
-firebase_admin.initialize_app(cred)
+firebase_key_path = os.getenv("ORGAN_DB_KEY")
 
-# Reference to Firestore
+if not firebase_key_path or not os.path.exists(firebase_key_path):
+    raise FileNotFoundError(f"❌ Firebase JSON key not found at {firebase_key_path}")
+
+print(f"✅ Using Firebase key from {firebase_key_path}")
+
+if not firebase_admin._apps:
+    cred = credentials.Certificate(firebase_key_path)
+    firebase_admin.initialize_app(cred)
+    print("✅ Firebase initialized successfully!")
+else:
+    print("⚠ Firebase has already been initialized!")
+
+# Initialize Firestore
 db = firestore.client()
 
 # Load donor data from JSON file
@@ -26,8 +37,13 @@ start_date = datetime(2025, 3, 1)
 for donor_id, donor in data.items():
     blood_type = donor.get("bloodType", "Unknown")
 
+    
+    if "organs" not in donor:
+        continue  
+
     for organ_type in donor.get("organs", []):
-        organ_id = str(uuid.uuid4())  # Generate a unique organ ID
+        
+        organ_id = f"{donor_id.split('-')[0]}-{organ_type.split('-')[-1]}"  # Use the first part of donor_id, and the organ name
 
         # Random retrieval date (March 2025 onwards)
         days_offset = random.randint(0, 60)  # Spread out over 2 months
