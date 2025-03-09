@@ -24,8 +24,8 @@ class Organ:
             "organId": self.organ_id,
             "donorId": self.donor_id,
             "organType": self.organ_type,
-            "retrievalDatetime": self.retrieval_datetime,
-            "expiryDatetime": self.expiry_datetime,
+            "retrievalDatetime": self.retrieval_datetime,  # Store as ISO string
+            "expiryDatetime": self.expiry_datetime,  # Store as ISO string
             "status": self.status,
             "condition": self.condition,
             "bloodType": self.blood_type,
@@ -36,3 +36,7 @@ class Organ:
             "preservationSolution": self.preservation_solution,
             "notes": self.notes,
         }
+
+    # Optional: Method to update or add notes after creation
+    def update_notes(self, new_notes):
+        self.notes = new_notes

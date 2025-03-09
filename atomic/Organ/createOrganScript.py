@@ -1,13 +1,23 @@
 import json
+import firebase_admin
+from firebase_admin import credentials, firestore
 import uuid
 import random
 from datetime import datetime, timedelta
 from organ import Organ
 
+# Initialize Firebase
+cred = credentials.Certificate("secrets/organ_Key.json")
+firebase_admin.initialize_app(cred)
+
+# Reference to Firestore
+db = firestore.client()
+
 # Load donor data from JSON file
 with open("getAllDonors.json", "r") as file:
     data = json.load(file)["data"]
 
+# Create a list to hold organ data
 organs_list = []
 
 # Start date for organ retrieval (March 2025 onwards)
@@ -17,7 +27,7 @@ for donor_id, donor in data.items():
     blood_type = donor.get("bloodType", "Unknown")
 
     for organ_type in donor.get("organs", []):
-        organ_id = str(uuid.uuid4())
+        organ_id = str(uuid.uuid4())  # Generate a unique organ ID
 
         # Random retrieval date (March 2025 onwards)
         days_offset = random.randint(0, 60)  # Spread out over 2 months
@@ -42,10 +52,15 @@ for donor_id, donor in data.items():
             notes="None"
         )
 
+        # Convert organ to dictionary and append to list
         organs_list.append(organ.to_dict())
 
-# Save generated organ data to JSON
-with open("organs.json", "w") as file:
-    json.dump(organs_list, file, indent=4)
+        # Upload the organ data to Firestore (direct upload)
+        organ_ref = db.collection("organs").document(organ_id)  # Use organ_id as document ID
+        organ_ref.set(organ.to_dict())
 
-print(f"Generated {len(organs_list)} organ records.")
+# Optionally save the generated organs to the JSON file if needed
+# with open("organs.json", "w") as file:
+#     json.dump(organs_list, file, indent=4)
+
+print(f"Generated and uploaded {len(organs_list)} organ records to Firestore.")
