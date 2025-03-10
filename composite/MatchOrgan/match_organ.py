@@ -61,7 +61,7 @@ def publishMessage(exchange_name, routing_key, message_body, status_code):
      
      if status_code not in range(200, 300):
         # Inform the error microservice
-        print("  Publish message with routing_key={routing_key}\n")
+        print("Publish message with routing_key={routing_key}\n")
         channel.basic_publish(
                 exchange=exchange_name,
                 # routing_key="order.error",
