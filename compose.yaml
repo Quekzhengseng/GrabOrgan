@@ -2,17 +2,17 @@ version: "3.8"
 
 volumes:
   rabbitmq_data:
-    name: esd_rabbitmq_data
+    name: grabOrgan_rabbitmq_data
 
 networks:
-  esd-net:
+  grabOrgan-net:
     driver: bridge
-    name: esd-net
+    name: grabOrgan-net
 
 services:
   rabbitmq:
     image: rabbitmq:3-management
-    hostname: esd-rabbit
+    hostname: grabOrgan-rabbit
     restart: always
     ports:
       - "5672:5672"
@@ -20,7 +20,7 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
-      - esd-net
+      - grabOrgan-net
   book:
     build:
       context: .
@@ -32,7 +32,7 @@ services:
       - dbURL=mysql+mysqlconnector://is213@host.docker.internal:3306/book
     command: ["python", "book.py"]
     networks:
-      - esd-net
+      - grabOrgan-net
   order:
     build:
       context: .
@@ -44,7 +44,7 @@ services:
       - dbURL=mysql+mysqlconnector://is213@host.docker.internal:3306/order
     command: ["python", "order.py"]
     networks:
-      - esd-net
+      - grabOrgan-net
   shipping_record:
     build:
       context: .
@@ -54,7 +54,7 @@ services:
       - "5002:5002"
     command: ["python", "shipping_record.py"]
     networks:
-      - esd-net
+      - grabOrgan-net
   activity_log:
     build:
       context: .
@@ -65,7 +65,7 @@ services:
       - AMQP_URL=amqp://rabbitmq:5672/
     command: ["python", "activity_log.py"]
     networks:
-      - esd-net
+      - grabOrgan-net
 
   error:
     build:
@@ -78,7 +78,7 @@ services:
       - AMQP_URL=amqp://rabbitmq:5672/
     command: ["python", "error.py"]
     networks:
-      - esd-net
+      - grabOrgan-net
 
   place_order:
     build:
@@ -97,4 +97,4 @@ services:
       - AMQP_URL=amqp://rabbitmq:5672/
     command: ["python", "place_order.py"]
     networks:
-      - esd-net
+      - grabOrgan-net
