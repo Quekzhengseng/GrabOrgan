@@ -14,4 +14,4 @@ services:
     # restart: always
     container_name: lab_info_service
     ports:
-      - "5000:5000"
+      - "5003:5003"

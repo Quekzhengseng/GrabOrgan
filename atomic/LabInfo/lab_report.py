@@ -169,4 +169,4 @@ def delete_lab_report(reportId):
 
 if __name__ == '__main__':
     print("This is flask for " + os.path.basename(__file__) + ": manage lab reports ...")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5003, debug=True)
