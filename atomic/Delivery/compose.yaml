@@ -1,0 +1,14 @@
+services:
+  delivery_info:
+    build:
+      context: ./
+      dockerfile: Dockerfile.deliveryinfo
+    image: GrabOrgan/deliveryinfo:1.0
+    volumes:
+      - ./secrets/delivery_Key.json:/usr/src/app/delivery_Key.json:ro
+    environment:
+      - DELIVERY_DB_KEY=/usr/src/app/delivery_Key.json
+    # restart: always
+    container_name: delivery_service
+    ports:
+      - "5002:5002"

@@ -2,6 +2,6 @@ FROM python:3-slim
 WORKDIR /usr/src/app
 COPY requirements.txt ./
 RUN python -m pip install --no-cache-dir -r requirements.txt
-COPY donor.py .
+COPY deliveryinfo.py .
 EXPOSE 5002
-CMD [ "python", "./donor.py" ]
+CMD [ "python", "./deliveryinfo.py" ]
