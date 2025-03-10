@@ -1,8 +1,12 @@
 import firebase_admin
 from firebase_admin import credentials, firestore
 from flask import Flask, jsonify, request
+import os
 
-cred = credentials.Certificate("./driverinfo-graborgan-firebase-adminsdk-fbsvc-64abd351d4.json")
+key_path = os.getenv("DRIVERINFO_DB_KEY", "./secrets/driverInfo_Key.json")  # Default for local testing
+cred = credentials.Certificate(key_path)
+
+# cred = credentials.Certificate("/usr/src/app/driverInfo_Key.json")
 firebase_admin.initialize_app(cred)
 
 db = firestore.client()
