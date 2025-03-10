@@ -50,6 +50,9 @@ def setup_amqp():
     connection = pika.BlockingConnection(
         pika.ConnectionParameters(host=amqp_host, port=amqp_port, heartbeat=300, blocked_connection_timeout=300)
     )
+    print("Connected")
+
+    print("Open channel")
     channel = connection.channel()
 
     # Create exchanges
