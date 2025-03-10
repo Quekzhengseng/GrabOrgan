@@ -116,7 +116,7 @@ def process_match_request(match_request):
     # 2. Get specific recipient from DB
     # Invoke the order microservice
     print("Invoking recipient microservice...")
-    recipient_result = invoke_http(donor_URL, method="GET", json=match_request) # need to see what match_request decodes to
+    recipient_result = invoke_http(recipient_URL, method="GET", json=match_request) # need to see what match_request decodes to
     print(f"recipient_result: { recipient_result}\n")
 
     message = json.dumps(recipient_result)
