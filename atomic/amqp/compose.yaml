@@ -1,0 +1,24 @@
+volumes:
+  rabbitmq_data:
+    name: grabOrgan_rabbitmq_data
+
+networks:
+  grabOrgan-net:
+    driver: bridge
+    name: grabOrgan-net
+
+services:
+  ####################################
+  # RabbitMQ: The messaging broker
+  ####################################
+  rabbitmq:
+    image: rabbitmq:3-management
+    hostname: grabOrgan-rabbit
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - grabOrgan-net
