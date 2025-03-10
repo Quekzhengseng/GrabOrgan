@@ -157,7 +157,7 @@ def pseudonymise_service():
         }
         """
         if not data:
-            return jsonify({"error": "No data provided"}), 400
+            return jsonify({"message": "No data provided"}), 400
 
         # Assume the JSON contains a single record keyed by an ID.
         record_id, record_data = list(data.items())[0]

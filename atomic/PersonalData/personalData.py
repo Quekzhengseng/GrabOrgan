@@ -64,9 +64,9 @@ def get_all():
             person_data = doc.to_dict()
             person_data["personID"] = doc.id  # Include the document ID
             persons[doc.id] = person_data
-        return jsonify({"success": True, "code": 200, "data": persons}), 200
+        return jsonify({"code": 200, "data": persons}), 200
     except Exception as e:
-        return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 
 @app.route("/person/<string:personId>")
@@ -76,12 +76,12 @@ def get_person(personId):
         doc = person_ref.get()
         if doc.exists:
             person_obj = Person.from_dict(personId, doc.to_dict())
-            return jsonify({"success": True, "code": 200, "data": person_obj.to_dict()})
+            return jsonify({"code": 200, "data": person_obj.to_dict()})
         else:
-            return jsonify({"success": False, "code": 404, "error": "Person does not exist"}), 404
+            return jsonify({"code": 404, "message": "Person does not exist"}), 404
 
     except Exception as e:
-        return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 
 @app.route("/person/<string:personId>", methods=['PUT'])
