@@ -1,0 +1,14 @@
+services:
+  driverInfo:
+    build:
+      context: ./
+      dockerfile: Dockerfile.driverInfo
+    image: GrabOrgan/driverinfo:1.0
+    volumes:
+      - ./secrets/driverInfo_Key.json:/usr/src/app/driverInfo_Key.json:ro
+    environment:
+      - DRIVERINFO_DB_KEY=/usr/src/app/driverInfo_Key.json
+    # restart: always
+    container_name: driverInfo_service
+    ports:
+      - "5020:5020"
