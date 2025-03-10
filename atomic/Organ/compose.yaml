@@ -11,6 +11,6 @@ services:
     environment:
       - ORGAN_DB_KEY=/usr/src/app/secrets/organ_Key.json
     ports:
-      - "5008:5008"
+      - "5009:5009"
     container_name: organ_service
     restart: always
