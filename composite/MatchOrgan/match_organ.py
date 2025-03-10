@@ -4,8 +4,8 @@ import json
 import pika
 import sys, os
 
-import amqp_lib
-from invokes import invoke_http
+from common import amqp_lib
+from common.invokes import invoke_http
 
 app = Flask(__name__)
 
@@ -13,11 +13,12 @@ CORS(app)
 
 # order_URL = "http://order:5001/order" # if dockerised
 recipient_URL = "http://localhost:5001/recipient" #localhost if not dockerised
-# shipping_record_URL = "http://shipping_record:5002/shipping_record" # if dockerised
-shipping_record_URL = "http://localhost:5002/shipping_record" # if localhost
+# shipping_record_URL = "http://shipping_record:5002/shipping_record" # only for full deployment for docker containers to communicate
+donor_URL = "http://localhost:5002/donor" # if localhost
 
 # RabbitMQ
-rabbit_host = "rabbitmq" #localhost if not dockerised
+# rabbit_host = "rabbitmq" # if dockerised
+rabbit_host = "localhost" #localhost if not dockerised
 rabbit_port = 5672
 
 
@@ -30,7 +31,7 @@ EXCHANGES = {
 
 SUBSCRIBE_QUEUES = [
     {"name": "match_request_queue", "exchange": "request_organ_exchange", "routing_key": "match.request" },
-    {"name": "test_result_queue", "exchange": "test_result_exchange", "routing_key": "test.result" },
+    {"name": "match_test_result_queue", "exchange": "test_result_exchange", "routing_key": "test.result" },
 ]
 
 
@@ -42,7 +43,7 @@ def connectAMQP():
     """Establish a connection to RabbitMQ and start consuming messages."""
     global connection, channel
 
-    print("  Connecting to AMQP broker...")
+    print("Connecting to AMQP broker...")
     try:
         # Establish a single connection and channel
         connection = pika.BlockingConnection(
@@ -52,13 +53,14 @@ def connectAMQP():
 
         # Subscribe to queues (declaration already done in setup script)
         for queue in SUBSCRIBE_QUEUES:
-            print(f"  Subscribing to queue: {queue['name']}")
-            channel.basic_consume(queue=queue["name"], on_message_callback=handle_message, auto_ack=True)
-
-        print("✅ AMQP Connection Established & Listening for Messages!")
+            print(f"Subscribing to queue: {queue['name']}")
+            channel.basic_consume(queue=queue["name"], on_message_callback=handle_message, auto_ack=False)
+        print("AMQP Connection Established!")
+        print("Waiting for messages...")
+        channel.start_consuming()
 
     except Exception as e:
-        print(f"❌ Unable to connect to RabbitMQ: {e}")
+        print(f"Unable to connect to RabbitMQ: {e}")
         exit(1)  # Terminate on failure
 
 # def publish_message(exchange_name, routing_key, message_body, status_code, result):
@@ -81,11 +83,17 @@ def connectAMQP():
 #         }
 def handle_message(ch, method, properties, body):
     """Callback function to process incoming messages."""
-    print(f"📩 Received message from {method.routing_key}: {body.decode()}")
+    print(f"Received message from {method.routing_key}: {body.decode()}") # debugging print statement
 
     if method.routing_key == "match.request":
         match_request = process_match_request(body.decode())
-        publish_message("test_compatibility_exchange", "test.compatibility", match_request)
+        ch.basic_ack(delivery_tag=method.delivery_tag)  # <-- Manually acknowledge
+        # publish_message("test_compatibility_exchange", "test.compatibility", match_request)
+    if method.routing_key == "test.result":
+        print("yes")
+        ch.basic_ack(delivery_tag=method.delivery_tag)  # <-- Manually acknowledge
+
+
 
     # Example: If this is a test result, send a final match result
     # if method.routing_key == "test.result":
@@ -108,8 +116,8 @@ def process_match_request(match_request):
     # 2. Get specific recipient from DB
     # Invoke the order microservice
     print("Invoking recipient microservice...")
-    recipient_result = invoke_http(recipient_URL, method="GET", json=match_request) # need to see what match_request decodes to
-    print(f"  recipient_result: { recipient_result}\n")
+    recipient_result = invoke_http(donor_URL, method="GET", json=match_request) # need to see what match_request decodes to
+    print(f"recipient_result: { recipient_result}\n")
 
     message = json.dumps(recipient_result)
 
@@ -119,7 +127,7 @@ def process_match_request(match_request):
 
     if code not in range(200, 300):
         # Inform the error microservice
-        print("  Publish message with routing_key=match_request.error\n")
+        print("Publish message with routing_key=match_request.error\n")
         channel.basic_publish(
                 exchange="match.request",
                 routing_key="match_request.error",
@@ -135,6 +143,7 @@ def process_match_request(match_request):
             "data": {"recipient_result": recipient_result},
             "message": "Faild to Get Recipients sent for error handling.",
         }
+    # print("Publish message with routing_key=\n")
 
 
 

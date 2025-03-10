@@ -1,0 +1,100 @@
+version: "3.8"
+
+volumes:
+  rabbitmq_data:
+    name: grabOrgan_rabbitmq_data
+
+networks:
+  grabOrgan-net:
+    driver: bridge
+    name: grabOrgan-net
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    hostname: grabOrgan-rabbit
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - grabOrgan-net
+  book:
+    build:
+      context: .
+      dockerfile: Dockerfile # this is by default, but can have Dockerfile.book
+    container_name: book_service
+    ports:
+      - "5000:5000"
+    environment:
+      - dbURL=mysql+mysqlconnector://is213@host.docker.internal:3306/book
+    command: ["python", "book.py"]
+    networks:
+      - grabOrgan-net
+  order:
+    build:
+      context: .
+      dockerfile: Dockerfile # this is by default, but can have Dockerfile.book
+    container_name: order_service
+    ports:
+      - "5001:5001"
+    environment:
+      - dbURL=mysql+mysqlconnector://is213@host.docker.internal:3306/order
+    command: ["python", "order.py"]
+    networks:
+      - grabOrgan-net
+  shipping_record:
+    build:
+      context: .
+      dockerfile: Dockerfile # this is by default, but can have Dockerfile.book
+    container_name: shipping_record_service
+    ports:
+      - "5002:5002"
+    command: ["python", "shipping_record.py"]
+    networks:
+      - grabOrgan-net
+  activity_log:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5003-5010:5003"
+    environment:
+      - AMQP_URL=amqp://rabbitmq:5672/
+    command: ["python", "activity_log.py"]
+    networks:
+      - grabOrgan-net
+
+  error:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: error_service
+    ports:
+      - "5004:5004"
+    environment:
+      - AMQP_URL=amqp://rabbitmq:5672/
+    command: ["python", "error.py"]
+    networks:
+      - grabOrgan-net
+
+  place_order:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: place_order_service
+    ports:
+      - "5100:5100"
+    depends_on:
+      - book
+      - order
+      - shipping_record
+      - activity_log
+      - error
+    environment:
+      - AMQP_URL=amqp://rabbitmq:5672/
+    command: ["python", "place_order.py"]
+    networks:
+      - grabOrgan-net
