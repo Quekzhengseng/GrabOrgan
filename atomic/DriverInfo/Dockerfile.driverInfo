@@ -7,7 +7,6 @@ WORKDIR /app
 # 🔥 Step 3: Copy only required files to avoid unnecessary files in the image
 COPY requirements.txt .
 COPY app.py .
-COPY driverinfo-graborgan-firebase-adminsdk-fbsvc-64abd351d4.json .
 
 # 🔥 Step 4: Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt

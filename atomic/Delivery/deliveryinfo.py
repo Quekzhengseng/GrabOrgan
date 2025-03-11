@@ -115,9 +115,12 @@ def get_all_deliveries():
             delivery_obj = DeliveryInfo.from_dict(doc.id, doc.to_dict())
             deliveries[doc.id] = delivery_obj.to_dict()  # Convert back to dict
         
-        return jsonify({"success": True, "code": 200, "data": deliveries}), 200
+        # return jsonify({"success": True, "code": 200, "data": deliveries}), 200
+        return jsonify({"code": 200, "data": deliveries}), 200
+    
     except Exception as e:
-        return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        # return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 
 # 📌 Route: Get a specific delivery order
@@ -129,12 +132,16 @@ def get_delivery(order_id):
         
         if doc.exists:
             delivery_obj = DeliveryInfo.from_dict(order_id, doc.to_dict())
-            return jsonify({"success": True, "code": 200, "data": delivery_obj.to_dict()}), 200
+            # return jsonify({"success": True, "code": 200, "data": delivery_obj.to_dict()}), 200
+            return jsonify({"code": 200, "data": delivery_obj.to_dict()}), 200
+
         else:
-            return jsonify({"success": False, "code": 404, "error": "Delivery order not found"}), 404
+            # return jsonify({"success": False, "code": 404, "error": "Delivery order not found"}), 404
+            return jsonify({"code": 404, "message": "Delivery order not found"}), 404
 
     except Exception as e:
-        return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        # return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 
 # 📌 Route: Create a new delivery order (Auto-Generated Order ID)
@@ -145,26 +152,31 @@ def create_delivery():
         required_fields = ["status", "pickup", "pickup_time", "destination", "destination_time"]
         
         if not all(field in data for field in required_fields):
-            return jsonify({"success": False, "code": 400, "error": "Missing required fields"}), 400
+            # return jsonify({"success": False, "code": 400, "error": "Missing required fields"}), 400
+            return jsonify({"code": 400, "message": "Missing required fields"}), 400
 
         # Format and validate pickup_time
         formatted_pickup_time, pickup_dt = format_datetime(data["pickup_time"])
         if not pickup_dt:
-            return jsonify({"success": False, "code": 400, "error": "Invalid pickup_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
+            # return jsonify({"success": False, "code": 400, "error": "Invalid pickup_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
+            return jsonify({"code": 400, "message": "Invalid pickup_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
 
         # Format and validate destination_time
         formatted_destination_time, destination_dt = None, None
         if data["destination_time"] is not None:
             formatted_destination_time, destination_dt = format_datetime(data["destination_time"])
             if not destination_dt:
-                return jsonify({"success": False, "code": 400, "error": "Invalid destination_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
+                # return jsonify({"success": False, "code": 400, "error": "Invalid destination_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
+                return jsonify({"code": 400, "message": "Invalid destination_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
             
             if destination_dt <= pickup_dt:
-                return jsonify({"success": False, "code": 400, "error": "destination_time must be after pickup_time."}), 400
+                # return jsonify({"success": False, "code": 400, "error": "destination_time must be after pickup_time."}), 400
+                return jsonify({"code": 400, "message": "destination_time must be after pickup_time."}), 400
 
         # Validate status constraints
         if not is_valid_status(data["status"], formatted_destination_time):
-            return jsonify({"success": False, "code": 400, "error": "destination_time should be empty if status is 'Awaiting pickup' or 'In progress'."}), 400
+            # return jsonify({"success": False, "code": 400, "error": "destination_time should be empty if status is 'Awaiting pickup' or 'In progress'."}), 400
+            return jsonify({"code": 400, "message": "destination_time should be empty if status is 'Awaiting pickup' or 'In progress'."}), 400
 
         # Generate Order ID
         order_id = generate_order_id(data["pickup"], pickup_dt)
@@ -181,9 +193,11 @@ def create_delivery():
 
         db.collection(DELIVERY_COLLECTION).document(order_id).set(delivery_data)
 
-        return jsonify({"success": True, "code": 201, "message": "Delivery order created successfully", "orderID": order_id}), 201
+        # return jsonify({"success": True, "code": 201, "message": "Delivery order created successfully", "orderID": order_id}), 201
+        return jsonify({"code": 201, "message": "Delivery order created successfully", "data": {"orderID": order_id}}), 201
     except Exception as e:
-        return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        # return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 
 # 📌 Route: Update a delivery order
@@ -194,7 +208,8 @@ def update_delivery(order_id):
         doc = delivery_ref.get()
         
         if not doc.exists:
-            return jsonify({"success": False, "code": 404, "error": "Delivery order not found"}), 404
+            # return jsonify({"success": False, "code": 404, "error": "Delivery order not found"}), 404
+            return jsonify({"code": 404, "message": "Delivery order not found"}), 404
 
         update_data = request.get_json()
 
@@ -203,7 +218,8 @@ def update_delivery(order_id):
         filtered_data = {key: update_data[key] for key in valid_fields if key in update_data}
 
         if not filtered_data:
-            return jsonify({"success": False, "code": 400, "error": "No valid fields to update"}), 400
+            # return jsonify({"success": False, "code": 400, "error": "No valid fields to update"}), 400
+            return jsonify({"code": 400, "message": "No valid fields to update"}), 400
 
         # Retrieve existing data
         existing_data = doc.to_dict()
@@ -213,7 +229,8 @@ def update_delivery(order_id):
         if "pickup_time" in filtered_data and filtered_data["pickup_time"]:
             formatted_pickup_time, pickup_dt = format_datetime(filtered_data["pickup_time"])
             if not pickup_dt:
-                return jsonify({"success": False, "code": 400, "error": "Invalid pickup_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
+                # return jsonify({"success": False, "code": 400, "error": "Invalid pickup_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
+                return jsonify({"code": 400, "message": "Invalid pickup_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
             filtered_data["pickup_time"] = formatted_pickup_time
 
         # Validate destination_time (only if it exists)
@@ -221,26 +238,32 @@ def update_delivery(order_id):
         if "destination_time" in filtered_data and filtered_data["destination_time"]:
             formatted_destination_time, destination_dt = format_datetime(filtered_data["destination_time"])
             if not destination_dt:
-                return jsonify({"success": False, "code": 400, "error": "Invalid destination_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
+                # return jsonify({"success": False, "code": 400, "error": "Invalid destination_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
+                return jsonify({"code": 400, "message": "Invalid destination_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
             
             # Ensure destination_time is after pickup_time
             if pickup_dt and destination_dt and destination_dt <= pickup_dt:
-                return jsonify({"success": False, "code": 400, "error": "destination_time must be after pickup_time."}), 400
+                # return jsonify({"success": False, "code": 400, "error": "destination_time must be after pickup_time."}), 400
+                return jsonify({"code": 400, "message": "destination_time must be after pickup_time."}), 400
 
             filtered_data["destination_time"] = formatted_destination_time
         
         # Validate status constraints
         if "status" in filtered_data:
             if not is_valid_status(filtered_data["status"], filtered_data.get("destination_time")):
-                return jsonify({"success": False, "code": 400, "error": "destination_time should be empty if status is 'Awaiting pickup' or 'In progress'."}), 400
+                # return jsonify({"success": False, "code": 400, "error": "destination_time should be empty if status is 'Awaiting pickup' or 'In progress'."}), 400
+                return jsonify({"code": 400, "message": "destination_time should be empty if status is 'Awaiting pickup' or 'In progress'."}), 400
 
         # Update Firestore document
         db.collection(DELIVERY_COLLECTION).document(order_id).set(filtered_data, merge=True)
 
-        return jsonify({"success": True, "code": 200, "message": "Delivery order updated successfully"}), 200
+        # return jsonify({"success": True, "code": 200, "message": "Delivery order updated successfully"}), 200
+        return jsonify({"code": 200, "message": "Delivery order updated successfully"}), 200
+    
     except Exception as e:
         print(f"Error updating delivery: {e}")  # Log the error
-        return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        # return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 # 📌 Route: Delete a delivery order
 @app.route("/deliveryinfo/<string:order_id>", methods=["DELETE"])
@@ -250,12 +273,15 @@ def delete_delivery(order_id):
         doc = delivery_ref.get()
         
         if not doc.exists:  # Fixed: removed parentheses
-            return jsonify({"success": False, "code": 404, "error": "Delivery order not found"}), 404
+            # return jsonify({"success": False, "code": 404, "error": "Delivery order not found"}), 404
+            return jsonify({"code": 404, "message": "Delivery order not found"}),
         
         delivery_ref.delete()
-        return jsonify({"success": True, "code": 200, "message": "Delivery order deleted successfully"}), 200
+        # return jsonify({"success": True, "code": 200, "message": "Delivery order deleted successfully"}), 200
+        return jsonify({"code": 200, "message": "Delivery order deleted successfully"}), 200
     except Exception as e:
-        return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        # return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 # Run Flask app
 if __name__ == '__main__':

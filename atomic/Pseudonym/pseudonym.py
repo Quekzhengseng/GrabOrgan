@@ -62,7 +62,7 @@ def pseudo_age(age):
 def masked_nric(nric):
     symbol = "X"
     if nric and len(nric) > 5:
-        return "T" + symbol*4 + nric[5:]
+        return nric[0] + symbol*4 + nric[5:]
     return nric
 
 def masked_birth(dateOfBirth):
@@ -80,6 +80,14 @@ def pseudonymise_address(address):
     return "masked-address"
 
 def pseudonymise_value(key, value):
+    """
+    Personally Identifiable Info Keywords: [
+        "email", "nric", "dob",
+        "birth", "phone", "mobile",
+        "age", "first", "last" 
+        "name", "address"
+    ]
+    """
     lkey = key.lower()
     if isinstance(value, str):
         if "email" in lkey:
@@ -92,9 +100,7 @@ def pseudonymise_value(key, value):
             return masked_phone_number(value)
         elif "age" in lkey:
             return pseudo_age(value)
-        elif "first" in lkey and "name" in lkey:
-            return pseudonymise_name(value)
-        elif "last" in lkey and "name" in lkey:
+        elif "name" in lkey:
             return pseudonymise_name(value)
         elif "address" in lkey:
             return pseudonymise_address(value)
@@ -125,61 +131,74 @@ def process_pii(data):
 
 @app.route('/pseudonymise', methods=['POST'])
 def pseudonymise_service():
-    data = request.get_json()
-    """
-    Takes in 
-    {
-      "donorid-1234": {
-            "firstName": "isaiah",
-            "lastName": "chia",
-            "age": "72",
-            "datetimeOfDeath": "2069-01-01T24:12:34+00:00",
-            "gender": "Male",
-            "bloodType": "O+",
-            "organs": ["organId1", "organId2", "organId3"],
-            "medicalHistory": [],
-            "allergies": ["nuts", "GPD", "aspirin"],
-            "nokContact": {
-                "firstName": "First name of the patient.",
-                "lastName": "Last name of the patient.",
-                "relationship": "Spouse",
-                "phone": "54326789"
-            },
-            "dateOfBirth": "1953-01-08"
-       }
-    }
-    """
-    if not data:
-        return jsonify({"error": "No data provided"}), 400
+    try:
+        data = request.get_json()
+        """
+        Takes in 
+        {
+        "donorid-1234": {
+                "firstName": "isaiah",
+                "lastName": "chia",
+                "age": "72",
+                "datetimeOfDeath": "2069-01-01T24:12:34+00:00",
+                "gender": "Male",
+                "bloodType": "O+",
+                "organs": ["organId1", "organId2", "organId3"],
+                "medicalHistory": [],
+                "allergies": ["nuts", "GPD", "aspirin"],
+                "nokContact": {
+                    "firstName": "First name of the patient.",
+                    "lastName": "Last name of the patient.",
+                    "relationship": "Spouse",
+                    "phone": "54326789"
+                },
+                "dateOfBirth": "1953-01-08"
+        }
+        }
+        """
+        if not data:
+            return jsonify({"message": "No data provided"}), 400
 
-    # Assume the JSON contains a single record keyed by an ID.
-    record_id, record_data = list(data.items())[0]
+        # Assume the JSON contains a single record keyed by an ID.
+        record_id, record_data = list(data.items())[0]
 
-    # Process the data to pseudonymise/mask PII fields.
-    masked_data = process_pii(record_data)
-    # Add the required ID field to the masked data.
-    masked_data["donorId"] = record_id
+        # Process the data to pseudonymise/mask PII fields.
+        masked_data = process_pii(record_data)
+        # Add the required ID field to the masked data.
+        masked_data["donorId"] = record_id
 
-    # Build the Personal Data block from the original data.
-    personal_data = {
-        "personId": record_id,
-        "firstName": record_data.get("firstName", ""),
-        "lastName": record_data.get("lastName", ""),
-        "dateOfBirth": record_data.get("dateOfBirth", ""),
-        "nokContact": record_data.get("nokContact", {})
-    }
+        # Build the Personal Data block from the original data.
+        personal_data = {
+            "personId": record_id,
+            "firstName": record_data.get("firstName", ""),
+            "lastName": record_data.get("lastName", ""),
+            "dateOfBirth": record_data.get("dateOfBirth", ""),
+            "nokContact": record_data.get("nokContact", {})
+        }
 
-    # Return a JSON with two blocks: one for the masked donor data (keyed under "person")
-    # and one for the personal data (keyed under "personalData").
-    response = {
-        "person": { record_id: masked_data },
-        "personalData": personal_data
-    }
-    return jsonify(response), 200
+        # Return a JSON with two blocks: one for the masked donor data (keyed under "person")
+        # and one for the personal data (keyed under "personalData").
+        response = {
+            "maskedData": { record_id: masked_data },
+            "personalData": personal_data
+        }
+        return jsonify(response), 200
+    except Exception as e:
+        record_id, record_data = list(data.items())[0]
+        print("Error: {}".format(str(e)))
+        return jsonify(
+            {
+                "code": 500,
+                "data": {
+                    "personId": record_id
+                },
+                "message": "An error occurred while updating the donor information. " + str(e)
+            }
+        ), 500
 """
 returns
 {
-    "person": {
+    "maskedData": {
         "donorid-1234": {
             "age": "70",
             "allergies": [

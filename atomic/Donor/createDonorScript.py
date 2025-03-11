@@ -127,8 +127,8 @@ for donor in donors:
     pseudo_result = pseudo_resp.json()
     # print(pseudo_result)
 
-    # Using keys as returned by the pseudonym service: "person" and "personalData"
-    masked_donor_data = pseudo_result.get("person", {}).get(donor.donor_id)
+    # Using keys as returned by the pseudonym service: "maskedData" and "personalData"
+    masked_donor_data = pseudo_result.get("maskedData", {}).get(donor.donor_id)
     personal_data = pseudo_result.get("personalData")
 
     if not masked_donor_data or not personal_data:

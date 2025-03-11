@@ -82,10 +82,10 @@ def get_all():
             recipient_data["recipientID"] = doc.id  # Add Firestore document ID
             recipient_list.append(recipient_data)
 
-        return jsonify({"success": True, "code": 200, "data": recipient_list}), 200
+        return jsonify({"code": 200, "data": recipient_list}), 200
 
     except Exception as e:
-        return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 @app.route("/recipient/<string:recipientId>", methods=['GET'])
 def get_recipient(recipientId):
@@ -94,12 +94,12 @@ def get_recipient(recipientId):
         doc = recipient_ref.get()
         if doc.exists:
             recipient_obj = Recipient.from_dict(recipientId, doc.to_dict())
-            return {"success" : True, "code":200, "data": recipient_obj.to_dict()}  # Convert back to JSON-friendly format
+            return {"code":200, "data": recipient_obj.to_dict()}  # Convert back to JSON-friendly format
         else:
-            return jsonify({"success" : False, "code":404, "error": "Recipient does not exist"}), 404
+            return jsonify({"code":404, "message": "Recipient does not exist"}), 404
 
     except Exception as e:
-        return jsonify({"success" : False, "code":500, "error": str(e)}), 500
+        return jsonify({"code":500, "message": str(e)}), 500
 
 
 @app.route("/recipient/<string:recipientId>", methods=['PUT'])
