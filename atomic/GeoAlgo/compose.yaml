@@ -1,0 +1,10 @@
+services:
+  geoalgo:
+    build:
+      context: ./
+      dockerfile: dockerfile.geoalgo
+    image: GrabOrgan/geoalgo:1.0
+    # restart: always
+    container_name: geoalgo_service
+    ports:
+      - "5011:5000"
