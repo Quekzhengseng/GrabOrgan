@@ -27,9 +27,17 @@ def get_all_lab_reports():
         docs = lab_reports_ref.get()
         lab_reports = [doc.to_dict() for doc in docs]
 
-        return jsonify({"success": True, "code": 200, "data": lab_reports}), 200
+        return jsonify({
+            "code": 200,
+            "data": lab_reports,
+            "message": "Lab reports fetched successfully"
+        }), 200
     except Exception as e:
-        return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        return jsonify({
+            "code": 500,
+            "data": {"error": str(e)},
+            "message": "An error occurred while fetching lab reports"
+        }), 500
 
 
 @app.route("/lab-reports/<string:uuid>", methods=['GET'])
@@ -40,12 +48,24 @@ def get_lab_report(uuid):
 
         if docs:
             report_data = docs[0].to_dict()
-            return jsonify({"success": True, "code": 200, "data": report_data}), 200
+            return jsonify({
+                "code": 200,
+                "data": report_data,
+                "message": "Lab report fetched successfully"
+            }), 200
         else:
-            return jsonify({"success": False, "code": 404, "error": "Lab report not found"}), 404
+            return jsonify({
+                "code": 404,
+                "data": {"uuid": uuid},
+                "message": "Lab report not found"
+            }), 404
 
     except Exception as e:
-        return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        return jsonify({
+            "code": 500,
+            "data": {"error": str(e)},
+            "message": "An error occurred while fetching the lab report"
+        }), 500
 
 
 @app.route("/lab-reports/<string:uuid>", methods=['PUT'])
@@ -63,12 +83,24 @@ def update_lab_report(uuid):
         if docs:
             doc_ref = docs[0].reference
             doc_ref.update(update_data)
-            return jsonify({"success": True, "code": 200, "message": "Lab report updated successfully"}), 200
+            return jsonify({
+                "code": 200,
+                "data": {"uuid": uuid},
+                "message": "Lab report updated successfully"
+            }), 200
         else:
-            return jsonify({"success": False, "code": 404, "error": "Lab report not found"}), 404
+            return jsonify({
+                "code": 404,
+                "data": {"uuid": uuid},
+                "message": "Lab report not found"
+            }), 404
 
     except Exception as e:
-        return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        return jsonify({
+            "code": 500,
+            "data": {"error": str(e)},
+            "message": "An error occurred while updating the lab report"
+        }), 500
 
 
 if __name__ == '__main__':
