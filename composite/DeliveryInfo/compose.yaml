@@ -1,0 +1,10 @@
+services:
+  delivery_info:
+    build:
+      context: ./
+      dockerfile: Dockerfile.createDelivery
+    image: GrabOrgan/deliveryinfo:1.0
+    # restart: always
+    container_name: deliveryInfo
+    ports:
+      - "5000:5000"

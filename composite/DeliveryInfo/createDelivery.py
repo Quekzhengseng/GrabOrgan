@@ -117,64 +117,6 @@ def createDelivery():
                         "message": f"{e}"}), 500
 
 
-@app.route('/updateDelivery', methods=['POST'])
-def updateDelivery():
-    """
-    API endpoint to decode a polyline
-    
-    Expects JSON data with format: 
-    {
-        "deliveryID" : String,
-        "driverCoord": String
-
-    }
-    
-    Returns:
-    {
-        "Code" : String
-        "data“ ：{
-            "Polyline" : String
-            }
-    }
-    """
-    
-    #Draw the delivery with deliveryId
-    try:
-        data = request.get_json()
-
-        if not data:
-            return jsonify({"error": "No json data received"}), 400
-        
-        deliveryId = data.get("deliveryId")
-        driverCoord = data.get("driverCoord")
-
-    #Check for deviation given driverCoord
-
-        DeviationJson = {}
-
-        DeviationResponse = requests.post(GeoAlgoEndpoint + "", headers=headers, data=json.dumps(DeviationJson))
-
-        if DeviationResponse.status_code == 200:
-            DeviationResponse_data = DeviationResponse.json()  # Parse the JSON response
-            try:
-                DeviationSuccess = DeviationResponse_data.get("Success")
-                print(f"Delivery Response: {DeviationResponse_data}")
-            except KeyError as e:
-                print(f"KeyError: Missing expected key {e}")
-
-        if (DeviationSuccess):
-
-
-    #If deviate, return new polyline
-
-    
-
-    #update the deliveryId with new polyline and driverCoord
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
 @app.route('/health', methods=['GET'])
 def health_check():
     """Simple health check endpoint"""
