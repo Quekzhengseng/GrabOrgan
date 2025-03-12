@@ -12,8 +12,8 @@ import pika  # or your preferred AMQP library
 # connection = pika.BlockingConnection(parameters)
 # channel = connection.channel()
 
-rabbit_host = "localhost" #localhost if not dockerised
-# rabbit_host = "rabbitmq" # if dockerised
+# rabbit_host = "localhost" #localhost if not dockerised
+rabbit_host = "rabbitmq" # if dockerised
 rabbit_port = 5672
 queue_name = "activity_log_queue"
 

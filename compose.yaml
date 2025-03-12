@@ -16,9 +16,13 @@ services:
       - "5672:5672"
       - "15672:15672"
     volumes:
-      - ./common/rabbitmq_data:/var/lib/rabbitmq
+      # - ./common/rabbitmq_data:/var/lib/rabbitmq
+      - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - grabOrgan-net
+    # environment:
+    #   - RABBITMQ_DEFAULT_USER=guest
+    #   - RABBITMQ_DEFAULT_PASS=guest
   activity_log:
     build:
       context: .
@@ -28,6 +32,7 @@ services:
     environment:
       # - AMQP_URL=amqp://rabbitmq:5672/ if dockerised
       - AMQP_URL=amqp://rabbitmq:5672/
+      - PYTHONPATH=/app:/app/common
     command: ["python", "activity_log.py"]
     networks:
       - grabOrgan-net
@@ -86,6 +91,7 @@ services:
       - "5005:5005"
     environment:
       - AMQP_URL=amqp://rabbitmq:5672/
+      - PYTHONPATH=/app:/app/common
     command: ["python", "error.py"]
     networks:
       - grabOrgan-net

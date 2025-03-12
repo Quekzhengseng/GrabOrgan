@@ -13,8 +13,8 @@ import pika  # or your preferred AMQP library
 # channel = connection.channel()
 
 
-rabbit_host = "localhost" #localhost if not dockerised
-# rabbit_host = "rabbitmq" # if dockerised
+# rabbit_host = "localhost" #localhost if not dockerised
+rabbit_host = "rabbitmq" # if dockerised
 rabbit_port = 5672
 queue_name = "error_queue"
 
