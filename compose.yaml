@@ -32,6 +32,8 @@ services:
     container_name: delivery_service
     ports:
       - "5000:5002"
+    networks:
+      - grabOrgan-net
   donor:
     build:
       context: atomic/Donor/.
@@ -45,6 +47,8 @@ services:
     container_name: donor_service
     ports:
       - "5001:5002"
+    networks:
+      - grabOrgan-net
 
   driverInfo:
     build:
@@ -59,6 +63,8 @@ services:
     container_name: driverInfo_service
     ports:
       - "5002:5020"
+    networks:
+      - grabOrgan-net
 
   geoalgo:
     build:
@@ -69,6 +75,8 @@ services:
     container_name: geoalgo_service
     ports:
       - "5003:5000"
+    networks:
+      - grabOrgan-net
 
   lab_report_service:
     build:
@@ -83,6 +91,8 @@ services:
     container_name: lab_info_service
     ports:
       - "5004:5003"
+    networks:
+      - grabOrgan-net
 
   organ:
     build:
@@ -96,7 +106,9 @@ services:
     ports:
       - "5005:5009"
     container_name: organ_service
-    restart: always
+    # restart: always
+    networks:
+      - grabOrgan-net
 
   personalData:
     build:
@@ -111,6 +123,8 @@ services:
     container_name: personal_data_service
     ports:
       - "5006:5008"
+    networks:
+      - grabOrgan-net
 
   pseudonym:
     build:
@@ -121,6 +135,8 @@ services:
     container_name: pseudonym_service
     ports:
       - "5007:5007"
+    networks:
+      - grabOrgan-net
 
   recipient:
     build:
@@ -134,7 +150,9 @@ services:
     ports:
       - "5008:5001"
     container_name: recipient_service
-    restart: always
+    # restart: always
+    networks:
+      - grabOrgan-net
 
   order:
     build:
@@ -149,3 +167,5 @@ services:
     container_name: order_service
     ports:
       - "5009:5006"
+    networks:
+      - grabOrgan-net
