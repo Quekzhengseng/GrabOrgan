@@ -1,0 +1,14 @@
+services:
+  order:
+    build:
+      context: ./
+      dockerfile: Dockerfile.order
+    image: GrabOrgan/order:1.0
+    volumes:
+      - ./secrets/Order_Key.json:/usr/src/app/Order_Key.json:ro
+    environment:
+      - ORDER_DB_KEY=/usr/src/app/Order_Key.json
+    # restart: always
+    container_name: order_service
+    ports:
+      - "5006:5006"
