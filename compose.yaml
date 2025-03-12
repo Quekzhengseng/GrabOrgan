@@ -31,7 +31,7 @@ services:
     # restart: always
     container_name: delivery_service
     ports:
-      - "5000:5002"
+      - "5002:5002"
     networks:
       - grabOrgan-net
   donor:
@@ -46,7 +46,7 @@ services:
     # restart: always
     container_name: donor_service
     ports:
-      - "5001:5002"
+      - "5003:5003"
     networks:
       - grabOrgan-net
 
@@ -62,7 +62,7 @@ services:
     # restart: always
     container_name: driverInfo_service
     ports:
-      - "5002:5020"
+      - "5004:5004"
     networks:
       - grabOrgan-net
 
@@ -74,11 +74,11 @@ services:
     # restart: always
     container_name: geoalgo_service
     ports:
-      - "5003:5000"
+      - "5006:5006"
     networks:
       - grabOrgan-net
 
-  lab_report_service:
+  labInfo:
     build:
       context: atomic/LabInfo/.
       dockerfile: Dockerfile.lab_report
@@ -90,7 +90,38 @@ services:
     # restart: always
     container_name: lab_info_service
     ports:
-      - "5004:5003"
+      - "5007:5007"
+    networks:
+      - grabOrgan-net
+  match:
+    build:
+      context: atomic/Match
+      dockerfile: Dockerfile.match
+    image: GrabOrgan/order:1.0
+    volumes:
+      - ./secrets/order/Match_Key.json:/usr/src/app/Match_Key.json:ro
+    environment:
+      - MATCH_DB_KEY=/usr/src/app/Match_Key.json
+    # restart: always
+    container_name: match_service
+    ports:
+      - "5009:5009"
+    networks:
+      - grabOrgan-net
+
+  order:
+    build:
+      context: atomic/Order
+      dockerfile: Dockerfile.order
+    image: GrabOrgan/order:1.0
+    volumes:
+      - ./secrets/order/Order_Key.json:/usr/src/app/Order_Key.json:ro
+    environment:
+      - ORDER_DB_KEY=/usr/src/app/Order_Key.json
+    # restart: always
+    container_name: order_service
+    ports:
+      - "5009:5009"
     networks:
       - grabOrgan-net
 
@@ -104,7 +135,7 @@ services:
     environment:
       - ORGAN_DB_KEY=/usr/src/app/secrets/organ_Key.json
     ports:
-      - "5005:5009"
+      - "5010:5010"
     container_name: organ_service
     # restart: always
     networks:
@@ -122,7 +153,7 @@ services:
     # restart: always
     container_name: personal_data_service
     ports:
-      - "5006:5008"
+      - "5011:5011"
     networks:
       - grabOrgan-net
 
@@ -134,7 +165,7 @@ services:
     # restart: always
     container_name: pseudonym_service
     ports:
-      - "5007:5007"
+      - "5012:5012"
     networks:
       - grabOrgan-net
 
@@ -148,24 +179,8 @@ services:
     environment:
       - RECIPIENT_DB_KEY=/usr/src/app/secrets/recipient_Key.json
     ports:
-      - "5008:5001"
+      - "5013:5013"
     container_name: recipient_service
     # restart: always
-    networks:
-      - grabOrgan-net
-
-  order:
-    build:
-      context: atomic/Order
-      dockerfile: Dockerfile.order
-    image: GrabOrgan/order:1.0
-    volumes:
-      - ./secrets/order/Order_Key.json:/usr/src/app/Order_Key.json:ro
-    environment:
-      - ORDER_DB_KEY=/usr/src/app/Order_Key.json
-    # restart: always
-    container_name: order_service
-    ports:
-      - "5009:5006"
     networks:
       - grabOrgan-net

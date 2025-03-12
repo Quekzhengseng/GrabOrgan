@@ -72,7 +72,7 @@ def random_phone():
     return str(random.randint(80000000, 99999999))
 
 
-recipient_names = []
+recipient_names = ["dfafa", "SAFsaf"]
 recipients = []
 
 for i, (first, last) in enumerate(recipient_names, start=1):
