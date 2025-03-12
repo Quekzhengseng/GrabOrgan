@@ -1,22 +1,20 @@
-# Use an official Python runtime as the base image
-FROM python:3.8-slim
+# Use a Python 3.10 base image
+FROM python:3.10-slim
 
-# Set the working directory in the container
+# Set the working directory
 WORKDIR /app
 
-# Copy the current directory contents into the container at /app
+# Copy the current directory contents into the container
 COPY . /app
 
-# Install any needed dependencies
+# Install the dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Expose the necessary port
+# Set the environment variable for the Flask app
+ENV FLASK_APP=match.py
+
+# Expose port 5005
 EXPOSE 5005
 
-# Define environment variables (if any)
-ENV FLASK_APP=match.py
-ENV FLASK_ENV=development
-ENV MATCH_KEY_PATH=/app/secrets/Match_Key.json
-
-# Command to run the app
-CMD ["flask", "run", "--host=0.0.0.0", "--port=5005"]
+# Run the application
+CMD ["python", "match.py"]

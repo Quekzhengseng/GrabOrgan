@@ -1,0 +1,12 @@
+version: "3.8"
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.match  # Specify the custom Dockerfile
+    volumes:
+      - ./secrets:/app/secrets
+    environment:
+      - MATCH_DB_KEY=/app/secrets/Match_Key.json
+    ports:
+      - "5005:5005"
