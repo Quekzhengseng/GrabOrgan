@@ -6,7 +6,7 @@ from firebase_admin import credentials, firestore
 import os
 import json
 
-key_path = "/Users/isabelle/Documents/SMU/Y2S2/ESD/grabOrgan/GrabOrgan/secrets/Lab_Info_Key.json"
+key_path = os.path.join(os.getcwd(), 'secrets', 'Lab_Info_Key.json')
 
 if not os.path.isfile(key_path):
     raise FileNotFoundError(f"Could not find the Firebase JSON at {key_path}")

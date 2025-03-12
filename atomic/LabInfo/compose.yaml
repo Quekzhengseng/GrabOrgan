@@ -7,8 +7,7 @@ services:
       dockerfile: Dockerfile.lab_report
     image: GrabOrgan/labinfo:1.0
     volumes:
-      - ../../secrets/Lab_Info_Key.json:/usr/src/app/Lab_Info_Key.json:ro
-
+      - ./secrets/Lab_Info_Key.json:/usr/src/app/Lab_Info_Key.json:ro
     environment:
       - LABINFO_DB_KEY=/usr/src/app/Lab_Info_Key.json
     # restart: always
