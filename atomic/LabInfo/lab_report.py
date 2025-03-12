@@ -105,4 +105,4 @@ def update_lab_report(uuid):
 
 if __name__ == '__main__':
     print("This is Flask for " + os.path.basename(__file__) + ": manage lab reports ...")
-    app.run(host='0.0.0.0', port=5003, debug=True)
+    app.run(host='0.0.0.0', port=5007, debug=True)

@@ -11,4 +11,4 @@ services:
     # restart: always
     container_name: order_service
     ports:
-      - "5006:5006"
+      - "5009:5009"

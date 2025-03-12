@@ -3,5 +3,5 @@ WORKDIR /usr/src/app
 COPY requirements.txt ./
 RUN python -m pip install --no-cache-dir -r requirements.txt
 COPY recipient.py .
-EXPOSE 5012
+EXPOSE 5013
 CMD [ "python", "./recipient.py" ]

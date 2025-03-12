@@ -11,6 +11,6 @@ services:
     environment:
       - RECIPIENT_DB_KEY=/usr/src/app/secrets/recipient_Key.json
     ports:
-      - "5001:5001"
+      - "5013:5013"
     container_name: recipient_service
     restart: always

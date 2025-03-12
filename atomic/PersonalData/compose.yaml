@@ -11,4 +11,4 @@ services:
     # restart: always
     container_name: personal_data_service
     ports:
-      - "5008:5008"
+      - "5011:5011"

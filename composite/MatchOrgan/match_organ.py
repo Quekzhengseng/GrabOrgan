@@ -12,13 +12,13 @@ app = Flask(__name__)
 CORS(app)
 
 # order_URL = "http://order:5001/order" # if dockerised
-recipient_URL = "http://localhost:5013/recipient" #localhost if not dockerised
+recipient_URL = "http://localhost:5013/recipient" #localhost if match_organ service is not dockerised
 # shipping_record_URL = "http://shipping_record:5002/shipping_record" # only for full deployment for docker containers to communicate
-donor_URL = "http://localhost:5003/donor" # if localhost
+donor_URL = "http://localhost:5003/donor" # localhost if match_organ service is not dockerised
 
 # RabbitMQ
 # rabbit_host = "rabbitmq" # if dockerised
-rabbit_host = "localhost" #localhost if not dockerised
+rabbit_host = "localhost" #localhost if match_organ service is not dockerised
 rabbit_port = 5672
 
 
@@ -116,7 +116,7 @@ def process_match_request(match_request):
     # 2. Get specific recipient from DB
     # Invoke the order microservice
     print("Invoking recipient microservice...")
-    recipient_result = invoke_http(donor_URL, method="GET", json=match_request) # need to see what match_request decodes to
+    recipient_result = invoke_http(recipient_URL, method="GET", json=match_request) # need to see what match_request decodes to
     print(f"recipient_result: { recipient_result}\n")
 
     message = json.dumps(recipient_result)
@@ -151,4 +151,4 @@ def process_match_request(match_request):
 if __name__ == "__main__":
     print("This is flask " + os.path.basename(__file__) + " for matching an organ...")
     connectAMQP()
-    app.run(host="0.0.0.0", port=5011, debug=True)
+    app.run(host="0.0.0.0", port=5020, debug=True)

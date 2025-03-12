@@ -289,4 +289,4 @@ def delete_organ(organId):
 
 if __name__ == '__main__':
     print("Starting Flask server for organ management...")
-    app.run(host='0.0.0.0', port=5008, debug=True)
+    app.run(host='0.0.0.0', port=5010, debug=True)

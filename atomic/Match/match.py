@@ -104,4 +104,4 @@ def get_match_by_id(match_id):
 
 if __name__ == '__main__':
     print("This is Flask for " + os.path.basename(__file__) + ": manage matches ...")
-    app.run(host='0.0.0.0', port=5005, debug=True)
+    app.run(host='0.0.0.0', port=5008, debug=True)
