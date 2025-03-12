@@ -1,10 +1,7 @@
-FROM python:3.10
-
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY . .
-
-CMD ["python", "lab_report.py"]
+FROM python:3-slim
+WORKDIR /usr/src/app
+COPY requirements.txt ./
+RUN python -m pip install --no-cache-dir -r requirements.txt
+COPY lab_report.py .
+EXPOSE 5007
+CMD [ "python", "./lab_report.py" ]

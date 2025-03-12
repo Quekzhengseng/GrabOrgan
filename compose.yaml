@@ -11,12 +11,24 @@ services:
   rabbitmq:
     image: rabbitmq:3-management
     hostname: grabOrgan-rabbit
-    restart: always
+    # restart: always
     ports:
       - "5672:5672"
       - "15672:15672"
     volumes:
       - ./common/rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - grabOrgan-net
+  activity_log:
+    build:
+      context: .
+      dockerfile: atomic/ActivityLog/Dockerfile.activity.log
+    ports:
+      - "5001:5001"
+    environment:
+      # - AMQP_URL=amqp://rabbitmq:5672/ if dockerised
+      - AMQP_URL=amqp://rabbitmq:5672/
+    command: ["python", "activity_log.py"]
     networks:
       - grabOrgan-net
   delivery_info:
@@ -65,6 +77,18 @@ services:
       - "5004:5004"
     networks:
       - grabOrgan-net
+  error:
+    build:
+      context: .
+      dockerfile: atomic/Error/Dockerfile.error
+    container_name: error_service
+    ports:
+      - "5005:5005"
+    environment:
+      - AMQP_URL=amqp://rabbitmq:5672/
+    command: ["python", "error.py"]
+    networks:
+      - grabOrgan-net
 
   geoalgo:
     build:
@@ -95,23 +119,23 @@ services:
       - grabOrgan-net
   match:
     build:
-      context: atomic/Match
+      context: atomic/Match/.
       dockerfile: Dockerfile.match
-    image: GrabOrgan/order:1.0
+    image: GrabOrgan/match:1.0
     volumes:
-      - ./secrets/order/Match_Key.json:/usr/src/app/Match_Key.json:ro
+      - ./secrets/Match/Match_Key.json:/usr/src/app/Match_Key.json:ro
     environment:
       - MATCH_DB_KEY=/usr/src/app/Match_Key.json
     # restart: always
     container_name: match_service
     ports:
-      - "5009:5009"
+      - "5008:5008"
     networks:
       - grabOrgan-net
 
   order:
     build:
-      context: atomic/Order
+      context: atomic/Order/.
       dockerfile: Dockerfile.order
     image: GrabOrgan/order:1.0
     volumes:
@@ -171,7 +195,7 @@ services:
 
   recipient:
     build:
-      context: atomic/Recipient
+      context: atomic/Recipient/.
       dockerfile: Dockerfile.recipient
     image: graborgan/recipient:1.0
     volumes:

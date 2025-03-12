@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
-import amqp_lib
+from common import amqp_lib
 import pika  # or your preferred AMQP library
 
 # # Retrieve the connection URL from the environment, with a fallback if needed.
@@ -12,29 +12,30 @@ import pika  # or your preferred AMQP library
 # connection = pika.BlockingConnection(parameters)
 # channel = connection.channel()
 
-rabbit_host = "rabbitmq" #localhost if not dockerised
+rabbit_host = "localhost" #localhost if not dockerised
+# rabbit_host = "rabbitmq" # if dockerised
 rabbit_port = 5672
-exchange_name = "order_topic"
-exchange_type = "topic"
-queue_name = "Activity_Log"
+queue_name = "activity_log_queue"
 
 
 def callback(channel, method, properties, body):
-    # required signature for the callback; no return
+     # required signature for the callback; no return
+    """Handles incoming messages from RabbitMQ."""
     try:
-        error = json.loads(body)
-        print(f"JSON: {error}")
-    except Exception as e:
-        print(f"Unable to parse JSON: {e=}")
-        print(f"Message: {body}")
+        log_entry = json.loads(body)
+        print(f"Received Log Entry: {log_entry}")
+    except json.JSONDecodeError:
+        print(f"Unable to parse JSON: {body}")
+    
     print()
+    channel.basic_ack(delivery_tag=method.delivery_tag)  # Ensure message is acknowledged
 
 
 if __name__ == "__main__":
-    print(f"This is {os.path.basename(__file__)} - amqp consumer...")
+    print(f"This is {os.path.basename(__file__)} - amqp consumer (Activity_Log)...")
     try:
         amqp_lib.start_consuming(
-            rabbit_host, rabbit_port, exchange_name, exchange_type, queue_name, callback
+            rabbit_host, rabbit_port, queue_name, callback
         )
     except Exception as exception:
         print(f"  Unable to connect to RabbitMQ.\n     {exception=}\n")
