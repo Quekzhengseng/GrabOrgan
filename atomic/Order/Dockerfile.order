@@ -3,5 +3,5 @@ WORKDIR /usr/src/app
 COPY requirements.txt ./
 RUN python -m pip install --no-cache-dir -r requirements.txt
 COPY order.py .
-EXPOSE 5006
+EXPOSE 5009
 CMD [ "python", "./order.py" ]

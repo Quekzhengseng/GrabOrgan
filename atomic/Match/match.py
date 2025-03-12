@@ -8,7 +8,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Load the Firebase key from an environment variable
-key_path = os.path.join(os.getcwd(), "secrets", "Match_Key.json")
+key_path = os.getenv("MATCH_DB_KEY")
 
 if not key_path or not os.path.isfile(key_path):
     raise FileNotFoundError(f"Could not find the Firebase JSON at {key_path}")

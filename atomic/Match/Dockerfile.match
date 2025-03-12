@@ -1,20 +1,7 @@
-# Use a Python 3.10 base image
-FROM python:3.10-slim
-
-# Set the working directory
-WORKDIR /app
-
-# Copy the current directory contents into the container
-COPY . /app
-
-# Install the dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Set the environment variable for the Flask app
-ENV FLASK_APP=match.py
-
-# Expose port 5005
-EXPOSE 5005
-
-# Run the application
-CMD ["python", "match.py"]
+FROM python:3-slim
+WORKDIR /usr/src/app
+COPY requirements.txt ./
+RUN python -m pip install --no-cache-dir -r requirements.txt
+COPY match.py .
+EXPOSE 5008
+CMD [ "python", "./match.py" ]

@@ -12,9 +12,9 @@ app = Flask(__name__)
 CORS(app)
 
 # order_URL = "http://order:5001/order" # if dockerised
-recipient_URL = "http://localhost:5001/recipient" #localhost if not dockerised
+recipient_URL = "http://localhost:5013/recipient" #localhost if not dockerised
 # shipping_record_URL = "http://shipping_record:5002/shipping_record" # only for full deployment for docker containers to communicate
-donor_URL = "http://localhost:5002/donor" # if localhost
+donor_URL = "http://localhost:5003/donor" # if localhost
 
 # RabbitMQ
 # rabbit_host = "rabbitmq" # if dockerised
@@ -116,7 +116,7 @@ def process_match_request(match_request):
     # 2. Get specific recipient from DB
     # Invoke the order microservice
     print("Invoking recipient microservice...")
-    recipient_result = invoke_http(recipient_URL, method="GET", json=match_request) # need to see what match_request decodes to
+    recipient_result = invoke_http(donor_URL, method="GET", json=match_request) # need to see what match_request decodes to
     print(f"recipient_result: { recipient_result}\n")
 
     message = json.dumps(recipient_result)
