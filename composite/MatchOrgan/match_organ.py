@@ -3,6 +3,7 @@ from flask_cors import CORS
 import json
 import pika
 import sys, os
+import ast
 
 from common import amqp_lib
 from common.invokes import invoke_http
@@ -12,15 +13,15 @@ app = Flask(__name__)
 CORS(app)
 
 # order_URL = "http://order:5001/order" # if dockerised
-recipient_URL = "http://localhost:5013/recipient" #localhost if match_organ service is not dockerised
+RECIPIENT_URL = "http://localhost:5013/recipient" #localhost if match_organ service is not dockerised
 # shipping_record_URL = "http://shipping_record:5002/shipping_record" # only for full deployment for docker containers to communicate
-donor_URL = "http://localhost:5003/donor" # localhost if match_organ service is not dockerised
+DONOR_URL = "http://localhost:5003/donor" # localhost if match_organ service is not dockerised
 """
 for testing:
 routing_key = match.request
 amqp message:
 {
-recipientId : "5RWWwCxq2M2eoXX91Z5BBsONTLs="
+"recipientId" : "5RWWwCxq2M2eoXX91Z5BBsONTLs="
 }
 """
 
@@ -92,9 +93,10 @@ def connectAMQP():
 def handle_message(ch, method, properties, body):
     """Callback function to process incoming messages."""
     print(f"Received message from {method.routing_key}: {body.decode()}") # debugging print statement
-
+    decoded_msg_to_dict = ast.literal_eval(body.decode())
+    # print(type(ast.literal_eval(decoded_msg)))
     if method.routing_key == "match.request":
-        match_request = process_match_request(body.decode())
+        match_request = process_match_request(decoded_msg_to_dict)
         ch.basic_ack(delivery_tag=method.delivery_tag)  # <-- Manually acknowledge
         # publish_message("test_compatibility_exchange", "test.compatibility", match_request)
     if method.routing_key == "test.result":
@@ -117,14 +119,16 @@ def start_consuming():
         print("❌ Error: AMQP channel not available.")
 
 
-def process_match_request(match_request):
+def process_match_request(match_request_dict)->dict:
     if connection is None or not amqp_lib.is_connection_open(connection):
         connectAMQP()
     
     # 2. Get specific recipient from DB
+    recipient_id = match_request_dict["recipientId"]
+    recipient_URL = RECIPIENT_URL +"/"+ recipient_id
     # Invoke the order microservice
     print("Invoking recipient microservice...")
-    recipient_result = invoke_http(recipient_URL, method="GET", json=match_request) # need to see what match_request decodes to
+    recipient_result = invoke_http(recipient_URL, method="GET", json=match_request_dict) # need to see what match_request decodes to
     print(f"recipient_result: { recipient_result}\n")
 
     message = json.dumps(recipient_result)
