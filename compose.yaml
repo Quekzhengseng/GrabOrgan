@@ -11,7 +11,7 @@ services:
   rabbitmq:
     image: rabbitmq:3-management
     hostname: grabOrgan-rabbit
-    # restart: always
+    restart: always
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -44,7 +44,6 @@ services:
       - ./secrets/delivery/delivery_Key.json:/usr/src/app/delivery_Key.json:ro
     environment:
       - DELIVERY_DB_KEY=/usr/src/app/delivery_Key.json
-    # restart: always
     container_name: delivery_service
     ports:
       - "5002:5002"
@@ -59,7 +58,6 @@ services:
       - ./secrets/Donor/Donor_Key.json:/usr/src/app/Donor_Key.json:ro
     environment:
       - DONOR_DB_KEY=/usr/src/app/Donor_Key.json
-    # restart: always
     container_name: donor_service
     ports:
       - "5003:5003"
@@ -75,7 +73,6 @@ services:
       - ./secrets/driverInfo/driver_Key.json:/usr/src/app/driverInfo_Key.json:ro
     environment:
       - DRIVERINFO_DB_KEY=/usr/src/app/driverInfo_Key.json
-    # restart: always
     container_name: driverInfo_service
     ports:
       - "5004:5004"
@@ -100,7 +97,6 @@ services:
       context: atomic/GeoAlgo/.
       dockerfile: dockerfile.geoalgo
     image: GrabOrgan/geoalgo:1.0
-    # restart: always
     container_name: geoalgo_service
     ports:
       - "5006:5006"
@@ -116,7 +112,6 @@ services:
       - ./secrets/LabInfo/Lab_Info_Key.json:/usr/src/app/Lab_Info_Key.json:ro
     environment:
       - LABINFO_DB_KEY=/usr/src/app/Lab_Info_Key.json
-    # restart: always
     container_name: lab_info_service
     ports:
       - "5007:5007"
@@ -131,7 +126,6 @@ services:
       - ./secrets/Match/Match_Key.json:/usr/src/app/Match_Key.json:ro
     environment:
       - MATCH_DB_KEY=/usr/src/app/Match_Key.json
-    # restart: always
     container_name: match_service
     ports:
       - "5008:5008"
@@ -147,7 +141,6 @@ services:
       - ./secrets/order/Order_Key.json:/usr/src/app/Order_Key.json:ro
     environment:
       - ORDER_DB_KEY=/usr/src/app/Order_Key.json
-    # restart: always
     container_name: order_service
     ports:
       - "5009:5009"
@@ -166,7 +159,6 @@ services:
     ports:
       - "5010:5010"
     container_name: organ_service
-    # restart: always
     networks:
       - grabOrgan-net
 
@@ -179,7 +171,6 @@ services:
       - ./secrets/PersonalData/PersonalData_Key.json:/usr/src/app/PersonalData_Key.json:ro
     environment:
       - PERSONAL_DATA_DB_KEY=/usr/src/app/PersonalData_Key.json
-    # restart: always
     container_name: personal_data_service
     ports:
       - "5011:5011"
@@ -191,7 +182,6 @@ services:
       context: atomic/Pseudonym/.
       dockerfile: Dockerfile.pseudonym
     image: GrabOrgan/pseudonym:1.0
-    # restart: always
     container_name: pseudonym_service
     ports:
       - "5012:5012"
@@ -210,6 +200,5 @@ services:
     ports:
       - "5013:5013"
     container_name: recipient_service
-    # restart: always
     networks:
       - grabOrgan-net

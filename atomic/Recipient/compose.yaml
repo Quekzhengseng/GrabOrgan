@@ -5,12 +5,11 @@ services:
     build:
       context: ./
       dockerfile: Dockerfile.recipient
-    image: graborgan/recipient:1.0
+    image: GrabOrgan/recipient:1.0
     volumes:
-      - ./secrets/recipient_Key.json:/usr/src/app/secrets/recipient_Key.json:ro
+      - ./secrets/recipient_Key.json:/usr/src/app/recipient_Key.json:ro
     environment:
-      - RECIPIENT_DB_KEY=/usr/src/app/secrets/recipient_Key.json
+      - RECIPIENT_DB_KEY=/usr/src/app/recipient_Key.json
     ports:
       - "5013:5013"
     container_name: recipient_service
-    restart: always

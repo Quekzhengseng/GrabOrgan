@@ -10,7 +10,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Load Firebase credentials
-key_path = os.getenv("RECIPIENT_DB_KEY", "/usr/src/app/secrets/recipient_Key.json") 
+key_path = os.getenv("RECIPIENT_DB_KEY") 
 
 if not key_path or not os.path.isfile(key_path):
     raise FileNotFoundError(f"Could not find the Firebase JSON at {key_path}")
@@ -31,7 +31,8 @@ class Recipient:
     def __init__(self, recipient_id, first_name, last_name, date_of_birth,
                  gender, blood_type, organs_needed, medical_history, allergies, nok_contact):
         self.recipient_id = recipient_id
-        self.name = {"firstName": first_name, "lastName": last_name}
+        self.first_name = first_name
+        self.last_name = last_name
         self.date_of_birth = date_of_birth
         self.gender = gender
         self.blood_type = blood_type
@@ -43,7 +44,8 @@ class Recipient:
     def to_dict(self):
         """Convert the object to a Firestore-compatible dictionary."""
         return {
-            "name": self.name,
+            "firstName": self.first_name,
+            "lastName": self.last_name,
             "dateOfBirth": self.date_of_birth,
             "gender": self.gender,
             "bloodType": self.blood_type,
@@ -58,15 +60,15 @@ class Recipient:
         """Create a Recipient object from Firestore document data."""
         return Recipient(
             recipient_id=recipient_id,
-            first_name=data["first_name"],
-            last_name=data["last_name"],
-            date_of_birth=data["date_of_birth"],
+            first_name=data["firstName"],
+            last_name=data["lastName"],
+            date_of_birth=data["dateOfBirth"],
             gender=data["gender"],
-            blood_type=data["blood_type"],
-            organs_needed=data["organs_needed"],
-            medical_history=data["medical_history"],
+            blood_type=data["bloodType"],
+            organs_needed=data["organsNeeded"],
+            medical_history=data["medicalHistory"],
             allergies=data["allergies"],
-            nok_contact=data["nok_contact"]
+            nok_contact=data["nokContact"]
         )
 
 @app.route("/recipient", methods=['GET'])
@@ -75,14 +77,14 @@ def get_all():
     try:
         recipient_ref = db.collection("recipients")
         docs = recipient_ref.get()
-        recipient_list = []
+        recipients = {}
 
         for doc in docs:
             recipient_data = doc.to_dict()
-            recipient_data["recipientID"] = doc.id  # Add Firestore document ID
-            recipient_list.append(recipient_data)
+            recipient_data["recipientId"] = doc.id  # Add Firestore document ID
+            recipients[doc.id] = recipient_data
 
-        return jsonify({"code": 200, "data": recipient_list}), 200
+        return jsonify({"code": 200, "data": recipients}), 200
 
     except Exception as e:
         return jsonify({"code": 500, "message": str(e)}), 500
@@ -188,55 +190,47 @@ def create_recipient():
     try:
         data = request.get_json()
 
-        required_fields = [
-            "first_name", "last_name", "date_of_birth", "gender",
-            "blood_type", "organs_needed", "medical_history", "nok_contact"
-        ]
+        # Ensure donorId is provided in the request
+        recipient_id = data.get("recipientId")
+        if not recipient_id:
+            return jsonify({
+                "code": 400,
+                "data": {},
+                "message": "Recipient ID is required."
+            }), 400
 
-        # Check if all required fields are present
-        missing_fields = [field for field in required_fields if field not in data]
-        if missing_fields:
-            return jsonify(
-                {
-                    "code": 400,
-                    "message": f"Missing required fields: {', '.join(missing_fields)}"
-                }
-            ), 400
-        # Generate a unique recipient ID
-        recipient_id = str(uuid.uuid4())
+        # Reference to the donor document in Firestore
+        recipient_ref = db.collection("recipients").document(recipient_id)
+        if recipient_ref.get().exists:
+            return jsonify({
+                "code": 409,
+                "data": {"recipientId": recipient_id},
+                "message": "Recipient already exists."
+            }), 409
 
         # Create a new recipient object
-        recipient = {
-            "recipient_id": recipient_id,
-            "name": {
-                "firstName": data["first_name"],
-                "lastName": data["last_name"]
-            },
-            "dateOfBirth": data["date_of_birth"],
-            "gender": data["gender"],
-            "bloodType": data["blood_type"],
-            "medicalHistory": data["medical_history"],  # Now an array of maps
-            "organsNeeded": data["organs_needed"],  # An array of organs
-            "nokContact": data["nok_contact"]  # Map containing contact details
-        }
+        new_recipient = Recipient(
+            recipient_id=recipient_id,
+            first_name=data["firstName"],
+            last_name=data["lastName"],
+            date_of_birth=data["dateOfBirth"],
+            gender=data["gender"],
+            blood_type=data["bloodType"],
+            medical_history=data["medicalHistory"],
+            organs_needed=data["organsNeeded"],
+            allergies=data["allergies"],
+            nok_contact= data["nokContact"],
+            )
+        
 
         # Store the recipient data in Firestore
-        recipient_ref = db.collection("recipients").document(str(recipient_id))
-        recipient_ref.set(recipient)
+        recipient_ref = db.collection("recipients").document(recipient_id)
+        recipient_ref.set(new_recipient.to_dict())
 
         return jsonify(
             {
                 "code": 201,
-                "data": {
-                    "recipientId": recipient_id,
-                    "name": recipient["name"],
-                    "dateOfBirth": recipient["dateOfBirth"],
-                    "gender": recipient["gender"],
-                    "bloodType": recipient["bloodType"],
-                    "medicalHistory": recipient["medicalHistory"],
-                    "organsNeeded": recipient["organsNeeded"],
-                    "nokContact": recipient["nokContact"]
-                },
+                "data": new_recipient.to_dict(),
                 "message": "Recipient successfully created."
             }
         ), 201

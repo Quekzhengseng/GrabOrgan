@@ -7,4 +7,4 @@ services:
     # restart: always
     container_name: pseudonym_service
     ports:
-      - "5007:5007"
+      - "5012:5012"
