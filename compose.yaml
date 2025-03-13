@@ -19,9 +19,6 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - grabOrgan-net
-    # environment:
-    #   - RABBITMQ_DEFAULT_USER=guest
-    #   - RABBITMQ_DEFAULT_PASS=guest
   activity_log:
     build:
       context: .
