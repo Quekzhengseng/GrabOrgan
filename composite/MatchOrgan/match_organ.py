@@ -15,7 +15,14 @@ CORS(app)
 recipient_URL = "http://localhost:5013/recipient" #localhost if match_organ service is not dockerised
 # shipping_record_URL = "http://shipping_record:5002/shipping_record" # only for full deployment for docker containers to communicate
 donor_URL = "http://localhost:5003/donor" # localhost if match_organ service is not dockerised
-recipient_id = "117787a6-3e9b-4e28-84ca-2164a8d1e3ce"
+"""
+for testing:
+routing_key = match.request
+amqp message:
+{
+recipientId : "5RWWwCxq2M2eoXX91Z5BBsONTLs="
+}
+"""
 
 # RabbitMQ
 # rabbit_host = "rabbitmq" # if dockerised
