@@ -199,3 +199,33 @@ services:
     container_name: recipient_service
     networks:
       - grabOrgan-net
+
+  createDelivery:
+    build:
+      context: ./composite/createDelivery/.
+      dockerfile: dockerfile.createdelivery
+    image: GrabOrgan/createdelivery:1.0
+    # restart: always
+    container_name: createDelivery
+    ports:
+      - "5026:5000"
+
+  selectDriver:
+    build:
+      context: ./composite/selectDriver/.
+      dockerfile: dockerfile.selectDriver
+    image: GrabOrgan/selecdriver:1.0
+    # restart: always
+    container_name: selectDriver
+    ports:
+      - "5024:5000"
+
+  trackDelivery:
+    build:
+      context: ./composite/trackDelivery/.
+      dockerfile: dockerfile.trackDelivery
+    image: GrabOrgan/trackdelivery:1.0
+    # restart: always
+    container_name: trackDelivery
+    ports:
+      - "5025:5002"

@@ -1,10 +1,10 @@
 services:
-  delivery_info:
+  trackDelivery:
     build:
       context: ./
       dockerfile: Dockerfile.trackDelivery
-    image: GrabOrgan/deliveryinfo:1.0
+    image: GrabOrgan/trackDelivery:1.0
     # restart: always
     container_name: trackDelivery
     ports:
-      - "5002:5002"
+      - "5025:5002"
