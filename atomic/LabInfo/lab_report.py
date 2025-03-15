@@ -39,7 +39,6 @@ def get_all_lab_reports():
             "message": "An error occurred while fetching lab reports"
         }), 500
 
-
 @app.route("/lab-reports/<string:uuid>", methods=['GET'])
 def get_lab_report(uuid):
     try:
@@ -66,7 +65,6 @@ def get_lab_report(uuid):
             "data": {"error": str(e)},
             "message": "An error occurred while fetching the lab report"
         }), 500
-
 
 @app.route("/lab-reports/<string:uuid>", methods=['PUT'])
 def update_lab_report(uuid):
@@ -102,6 +100,49 @@ def update_lab_report(uuid):
             "message": "An error occurred while updating the lab report"
         }), 500
 
+# New POST endpoint to create a lab report
+@app.route("/lab-reports", methods=['POST'])
+def create_lab_report():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                "code": 400,
+                "data": {},
+                "message": "Request body must be JSON"
+            }), 400
+        
+        # Ensure a UUID is provided
+        if "uuid" not in data:
+            return jsonify({
+                "code": 400,
+                "data": {},
+                "message": "UUID is required"
+            }), 400
+
+        # Check if a lab report with the provided UUID already exists
+        doc_ref = db.collection("lab_reports").document(data["uuid"])
+        if doc_ref.get().exists:
+            return jsonify({
+                "code": 409,
+                "data": {"uuid": data["uuid"]},
+                "message": "Lab report with this UUID already exists"
+            }), 409
+        
+        # Create the lab report in Firestore
+        doc_ref.set(data)
+        return jsonify({
+            "code": 201,
+            "data": data,
+            "message": "Lab report created successfully"
+        }), 201
+
+    except Exception as e:
+        return jsonify({
+            "code": 500,
+            "data": {"error": str(e)},
+            "message": "An error occurred while creating the lab report"
+        }), 500
 
 if __name__ == '__main__':
     print("This is Flask for " + os.path.basename(__file__) + ": manage lab reports ...")
