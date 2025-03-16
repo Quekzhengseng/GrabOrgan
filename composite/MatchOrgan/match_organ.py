@@ -28,6 +28,7 @@ amqp message:
 }
 
 routing_key = test.result
+amqp message:
 {
 "listOfMatchId" : ["015051e7-0c87-4c13-9bb0-dd5e7584aabc-heart-12", "015051e7-0c87-4c13-9bb0-dd5e7584aabc-heart-29", "015051e7-0c87-4c13-9bb0-dd5e7584aabc-heart-5"]
 }
@@ -263,24 +264,21 @@ def process_match_result(match_test_result_dict):
     if connection is None or not amqp_lib.is_connection_open(connection):
         connectAMQP()
     
-    # 2. Get specific recipient from DB
-    recipient_id = match_test_result_dict["recipientId"]
-    recipient_URL = RECIPIENT_URL +"/"+ recipient_id
     # Invoke the Recipient atomic service
-    print("Invoking recipient atomic service...")
-    recipient_result = invoke_http(recipient_URL, method="GET", json=match_request_dict) # need to see what match_request decodes to
+    print("Invoking match atomic service...")
+    match_result = invoke_http(MATCH_URL, method="GET", json=match_test_result_dict) # need to see what match_request decodes to
 
-    message = json.dumps(recipient_result)
+    message = json.dumps(match_result)
     # Check the recipient result; if a failure, send it to the error microservice.
-    code = recipient_result["code"]
+    code = match_result["code"]
     # publish_message("test_compatibility_exchange","test.compatibility",message, code)
 
     if code not in range(200, 300):
         # Inform the error microservice
-        print("Publish message with routing_key=match_request.error\n")
+        print("Publish message with routing_key=match_test_result.error\n")
         channel.basic_publish(
                 exchange="error_handling_exchange",
-                routing_key="match_request.error",
+                routing_key="match_test_result.error.error",
                 body=message,
                 properties=pika.BasicProperties(delivery_mode=2),
         )
@@ -290,9 +288,20 @@ def process_match_result(match_test_result_dict):
         # 7. Return error
         return {
             "code": 500,
-            "data": {"recipient_result": recipient_result},
-            "message": "Faild to Get Recipients sent for error handling.",
+            "data": {"matches_result": match_result},
+            "message": "Faild to Get All Matches sent for error handling.",
         }
+    # print(f"match_results: {match_result["data"]}")
+
+    match_data = match_result["data"]
+
+    match_test_result = []
+
+    for match in match_data:
+        if match["matchId"] in match_test_result_dict["listOfMatchId"]:
+            match_test_result.append(match)
+
+    print(f"match_details: {match_test_result}")
 
 
 # Execute this program if it is run as a main script (not by 'import')
