@@ -133,51 +133,32 @@ def process_pii(data):
 def pseudonymise_service():
     try:
         data = request.get_json()
-        """
-        Takes in 
-        {
-        "donorid-1234": {
-                "firstName": "isaiah",
-                "lastName": "chia",
-                "age": "72",
-                "datetimeOfDeath": "2069-01-01T24:12:34+00:00",
-                "gender": "Male",
-                "bloodType": "O+",
-                "organs": ["organId1", "organId2", "organId3"],
-                "medicalHistory": [],
-                "allergies": ["nuts", "GPD", "aspirin"],
-                "nokContact": {
-                    "firstName": "First name of the patient.",
-                    "lastName": "Last name of the patient.",
-                    "relationship": "Spouse",
-                    "phone": "54326789"
-                },
-                "dateOfBirth": "1953-01-08"
-        }
-        }
-        """
         if not data:
             return jsonify({"message": "No data provided"}), 400
 
         # Assume the JSON contains a single record keyed by an ID.
         record_id, record_data = list(data.items())[0]
 
+        # Determine which identifier to use.
+        # If record_data contains a "recipientId", then use that; otherwise, use record_id as donorId.
+        if "recipientId" in record_data:
+            id_field = "recipientId"
+        else:
+            id_field = "donorId"
+
         # Process the data to pseudonymise/mask PII fields.
         masked_data = process_pii(record_data)
-        # Add the required ID field to the masked data.
-        masked_data["donorId"] = record_id
+        masked_data[id_field] = record_id
 
-        # Build the Personal Data block from the original data.
+        # Build the personal data block.
         personal_data = {
-            "personId": record_id,
+            id_field: record_id,
             "firstName": record_data.get("firstName", ""),
             "lastName": record_data.get("lastName", ""),
             "dateOfBirth": record_data.get("dateOfBirth", ""),
             "nokContact": record_data.get("nokContact", {})
         }
 
-        # Return a JSON with two blocks: one for the masked donor data (keyed under "person")
-        # and one for the personal data (keyed under "personalData").
         response = {
             "maskedData": { record_id: masked_data },
             "personalData": personal_data
@@ -186,15 +167,14 @@ def pseudonymise_service():
     except Exception as e:
         record_id, record_data = list(data.items())[0]
         print("Error: {}".format(str(e)))
-        return jsonify(
-            {
-                "code": 500,
-                "data": {
-                    "personId": record_id
-                },
-                "message": "An error occurred while updating the donor information. " + str(e)
-            }
-        ), 500
+        return jsonify({
+            "code": 500,
+            "data": {
+                "id": record_id
+            },
+            "message": "An error occurred while updating the information. " + str(e)
+        }), 500
+
 """
 returns
 {
