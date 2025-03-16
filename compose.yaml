@@ -208,7 +208,9 @@ services:
     # restart: always
     container_name: createDelivery
     ports:
-      - "5026:5000"
+      - "5026:5026"
+    networks:
+      - grabOrgan-net
 
   selectDriver:
     build:
@@ -218,7 +220,9 @@ services:
     # restart: always
     container_name: selectDriver
     ports:
-      - "5024:5000"
+      - "5024:5024"
+    networks:
+      - grabOrgan-net
 
   trackDelivery:
     build:
@@ -228,4 +232,6 @@ services:
     # restart: always
     container_name: trackDelivery
     ports:
-      - "5025:5002"
+      - "5025:5025"
+    networks:
+      - grabOrgan-net
