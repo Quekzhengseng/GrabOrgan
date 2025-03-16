@@ -12,16 +12,24 @@ app = Flask(__name__)
 
 CORS(app)
 
-# order_URL = "http://order:5001/order" # if dockerised
+# export PYTHONPATH=$PYTHONPATH:/path/to/GrabOrgan (do this in local env for "common" package)
+# RECIPIENT_URL = "http://recipient:5013/recipient" # only for full deployment for docker containers to communicate
+# DONOR_URL = "http://donor:5003/donor" # only for full deployment for docker containers to communicate
 RECIPIENT_URL = "http://localhost:5013/recipient" #localhost if match_organ service is not dockerised
-# shipping_record_URL = "http://shipping_record:5002/shipping_record" # only for full deployment for docker containers to communicate
 DONOR_URL = "http://localhost:5003/donor" # localhost if match_organ service is not dockerised
+ORGAN_URL = "http://localhost:5010/organ" # localhost if match_organ service is not dockerised
+MATCH_URL = "http://localhost:5008/matches" # localhost if match_organ service is not dockerised
 """
 for testing:
 routing_key = match.request
 amqp message:
 {
 "recipientId" : "5RWWwCxq2M2eoXX91Z5BBsONTLs="
+}
+
+routing_key = test.result
+{
+"listOfMatchId" : ["015051e7-0c87-4c13-9bb0-dd5e7584aabc-heart-12", "015051e7-0c87-4c13-9bb0-dd5e7584aabc-heart-29", "015051e7-0c87-4c13-9bb0-dd5e7584aabc-heart-5"]
 }
 """
 
@@ -100,7 +108,7 @@ def handle_message(ch, method, properties, body):
         ch.basic_ack(delivery_tag=method.delivery_tag)  # <-- Manually acknowledge
         # publish_message("test_compatibility_exchange", "test.compatibility", match_request)
     if method.routing_key == "test.result":
-        print("yes")
+        match_test_result = process_match_result(decoded_msg_to_dict)
         ch.basic_ack(delivery_tag=method.delivery_tag)  # <-- Manually acknowledge
 
 
@@ -118,22 +126,34 @@ def start_consuming():
     else:
         print("❌ Error: AMQP channel not available.")
 
+def is_compatible(recipient_bloodType, donor_bloodType):
+    # Blood transfusion compatibility rules
+    blood_transfusion_rules = {
+        "O-": {"O-"},
+        "O+": {"O-", "O+"},
+        "A-": {"O-", "A-"},
+        "A+": {"O-", "O+", "A-", "A+"},
+        "B-": {"O-", "B-"},
+        "B+": {"O-", "O+", "B-", "B+"},
+        "AB-": {"O-", "A-", "B-", "AB-"},
+        "AB+": {"O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"}
+    }
+    """Checks if a donor's blood type is compatible with the recipient."""
+    return donor_bloodType in blood_transfusion_rules[recipient_bloodType]
 
-def process_match_request(match_request_dict)->dict:
+def process_match_request(match_request_dict):
     if connection is None or not amqp_lib.is_connection_open(connection):
         connectAMQP()
     
     # 2. Get specific recipient from DB
     recipient_id = match_request_dict["recipientId"]
     recipient_URL = RECIPIENT_URL +"/"+ recipient_id
-    # Invoke the order microservice
-    print("Invoking recipient microservice...")
+    # Invoke the Recipient atomic service
+    print("Invoking recipient atomic service...")
     recipient_result = invoke_http(recipient_URL, method="GET", json=match_request_dict) # need to see what match_request decodes to
-    print(f"recipient_result: { recipient_result}\n")
 
     message = json.dumps(recipient_result)
-
-    # Check the order result; if a failure, send it to the error microservice.
+    # Check the recipient result; if a failure, send it to the error microservice.
     code = recipient_result["code"]
     # publish_message("test_compatibility_exchange","test.compatibility",message, code)
 
@@ -141,7 +161,7 @@ def process_match_request(match_request_dict)->dict:
         # Inform the error microservice
         print("Publish message with routing_key=match_request.error\n")
         channel.basic_publish(
-                exchange="match.request",
+                exchange="error_handling_exchange",
                 routing_key="match_request.error",
                 body=message,
                 properties=pika.BasicProperties(delivery_mode=2),
@@ -157,6 +177,122 @@ def process_match_request(match_request_dict)->dict:
         }
     # print("Publish message with routing_key=\n")
 
+    # print(f"recipient_result: {recipient_result}\n")
+    recipient_data = recipient_result["data"]
+    recipient_bloodType = recipient_data["bloodType"] # A-, O+ ...
+    recipient_organsNeeded = recipient_data["organsNeeded"] # ["cornea", "lungs", "liver"]
+    print(recipient_bloodType)
+    print(recipient_organsNeeded)
+
+    # 3. Get All Organs 
+    # Invoke the Organ atomic service
+    print("Invoking organ atomic service...")
+    organ_result = invoke_http(ORGAN_URL, method="GET", json=match_request_dict) # need to see what match_request decodes to
+
+    message = json.dumps(organ_result)
+    # Check the recipient result; if a failure, send it to the error microservice.
+    code = organ_result["code"]
+    # publish_message("test_compatibility_exchange","test.compatibility",message, code)
+
+    if code not in range(200, 300):
+        # Inform the error microservice
+        print("Publish message with routing_key=match_request.error\n")
+        channel.basic_publish(
+                exchange="error_handling_exchange",
+                routing_key="match_request.error",
+                body=message,
+                properties=pika.BasicProperties(delivery_mode=2),
+        )
+        # make message persistent within the matching queues until it is received by some receiver
+        # (the matching queues have to exist and be durable and bound to the exchange)
+
+        # 7. Return error
+        return {
+            "code": 500,
+            "data": {"organ_result": organ_result},
+            "message": "Failed to Get Recipients sent for error handling.",
+        }
+
+    # print(f"organ_result: {organ_result}\n")
+    organ_data = organ_result["data"]
+    organList = []
+
+
+    for organ in organ_data:
+        if is_compatible(recipient_bloodType, organ["bloodType"]) and organ["organType"] in recipient_organsNeeded:
+            organList.append(organ["organId"])
+
+    print(f"Compatible Donor Organes: {organList}")
+
+    message=json.dumps({
+        "recipientId": recipient_id,
+        "listOfOrganId" : organList
+        
+        })
+    # if there are no compatible donors
+    if len(organList) == 0:
+        print("Publish message with routing_key=match_request.info\n")
+        channel.basic_publish(
+                exchange="activity_log_exchange",
+                routing_key="match_request.info",
+                body="No matches available",
+                properties=pika.BasicProperties(delivery_mode=2),
+        )
+        # 7. Return error
+        return {
+            "code": 204,
+            "message": "No compatible matches found.",
+        }
+
+    print("Publish message with routing_key=match_request.info\n")
+    channel.basic_publish(
+            exchange="activity_log_exchange",
+            routing_key="match_request.info",
+            body=message,
+            properties=pika.BasicProperties(delivery_mode=2),
+    )
+    print("Publish message with routing_key=test.compatibility\n")
+    channel.basic_publish(
+            exchange="test_compatibility_exchange",
+            routing_key="test.compatibility",
+            body=message,
+            properties=pika.BasicProperties(delivery_mode=2),
+    )
+
+def process_match_result(match_test_result_dict):
+    if connection is None or not amqp_lib.is_connection_open(connection):
+        connectAMQP()
+    
+    # 2. Get specific recipient from DB
+    recipient_id = match_test_result_dict["recipientId"]
+    recipient_URL = RECIPIENT_URL +"/"+ recipient_id
+    # Invoke the Recipient atomic service
+    print("Invoking recipient atomic service...")
+    recipient_result = invoke_http(recipient_URL, method="GET", json=match_request_dict) # need to see what match_request decodes to
+
+    message = json.dumps(recipient_result)
+    # Check the recipient result; if a failure, send it to the error microservice.
+    code = recipient_result["code"]
+    # publish_message("test_compatibility_exchange","test.compatibility",message, code)
+
+    if code not in range(200, 300):
+        # Inform the error microservice
+        print("Publish message with routing_key=match_request.error\n")
+        channel.basic_publish(
+                exchange="error_handling_exchange",
+                routing_key="match_request.error",
+                body=message,
+                properties=pika.BasicProperties(delivery_mode=2),
+        )
+        # make message persistent within the matching queues until it is received by some receiver
+        # (the matching queues have to exist and be durable and bound to the exchange)
+
+        # 7. Return error
+        return {
+            "code": 500,
+            "data": {"recipient_result": recipient_result},
+            "message": "Faild to Get Recipients sent for error handling.",
+        }
 
 
 # Execute this program if it is run as a main script (not by 'import')
