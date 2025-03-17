@@ -26,13 +26,23 @@ services:
     build:
       context: .
       dockerfile: atomic/ActivityLog/Dockerfile.activity.log
+    image: GrabOrgan/activity_log:1.0
+
     ports:
       - "5001:5001"
     environment:
-      # - AMQP_URL=amqp://rabbitmq:5672/ if dockerised
       - AMQP_URL=amqp://rabbitmq:5672/
       - PYTHONPATH=/app:/app/common
+      - rabbit_host=rabbitmq # The name of the RabbitMQ container defined in the RabbitMQ compose file
+      - rabbit_port=5672
+      - exchange_name=activity_log_exchange
+      - exchange_type=topic
+      - queue_name=activity_log_queue
+      - PYTHONUNBUFFERED=1
     command: ["python", "activity_log.py"]
+    depends_on:
+      - rabbitmq
+    restart: always
     networks:
       - grabOrgan-net
   delivery_info:
@@ -82,13 +92,24 @@ services:
     build:
       context: .
       dockerfile: atomic/Error/Dockerfile.error
+    image: GrabOrgan/error:1.0
+
     container_name: error_service
     ports:
       - "5005:5005"
     environment:
       - AMQP_URL=amqp://rabbitmq:5672/
       - PYTHONPATH=/app:/app/common
+      - rabbit_host=rabbitmq # The name of the RabbitMQ container defined in the RabbitMQ compose file
+      - rabbit_port=5672
+      - exchange_name=error_handling_exchange
+      - exchange_type=topic
+      - queue_name=error_queue
+      - PYTHONUNBUFFERED=1
     command: ["python", "error.py"]
+    depends_on:
+      - rabbitmq
+    restart: always
     networks:
       - grabOrgan-net
 
@@ -151,7 +172,7 @@ services:
     build:
       context: atomic/Organ/.
       dockerfile: Dockerfile.organ
-    image: graborgan/organ:1.0
+    image: GrabOrgan/organ:1.0
     volumes:
       - ./secrets/organ/organ_Key.json:/usr/src/app/secrets/organ_Key.json:ro
     environment:
@@ -192,7 +213,7 @@ services:
     build:
       context: atomic/Recipient/.
       dockerfile: Dockerfile.recipient
-    image: graborgan/recipient:1.0
+    image: GrabOrgan/recipient:1.0
     volumes:
       - ./secrets/recipient/recipient_Key.json:/usr/src/app/secrets/recipient_Key.json:ro
     environment:
@@ -202,3 +223,32 @@ services:
     container_name: recipient_service
     networks:
       - grabOrgan-net
+  match_organ:
+    build:
+      context: .
+      dockerfile: composite/MatchOrgan/Dockerfile.match.organ
+    image: GrabOrgan/match_organ:1.0
+    environment:
+      - AMQP_URL=amqp://rabbitmq:5672/
+      - rabbit_host=rabbitmq # The name of the RabbitMQ container defined in the RabbitMQ compose file
+      - rabbit_port=5672
+      - RECIPIENT_URL=http://recipient:5013/recipient
+      - DONOR_URL=http://donor:5003/donor
+      - ORGAN_URL=http://organ:5010/organ
+      - MATCH_URL=http://match:5008/matches
+      - PYTHONPATH=/app:/app/common # Equivalent to export PYTHONPATH
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "5020:5020"
+    depends_on:
+      - rabbitmq
+      - activity_log
+      - error
+      - recipient
+      - donor
+      - match
+      - organ
+    container_name: match_organ_service
+    networks:
+      - grabOrgan-net
+    command: ["python", "match_organ.py"]
