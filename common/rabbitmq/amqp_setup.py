@@ -5,11 +5,12 @@ A standalone script to create multiple exchanges and queues on RabbitMQ.
 """
 
 import pika
+from os import environ
 
 # RabbitMQ connection details
-# amqp_host = "localhost"
-amqp_host = "rabbitmq"
-amqp_port = 5672
+amqp_host = environ.get("rabbitmq_host") or "localhost"
+# amqp_host = "rabbitmq"
+amqp_port = environ.get("rabbitmq_port") or 5672
 
 # Define exchanges and their types
 EXCHANGES = {

@@ -37,7 +37,8 @@ def connect(hostname, port, exchange_name, exchange_type, max_retries=12, retry_
                 channel.exchange_declare(
                      exchange=exchange_name,
                      exchange_type=exchange_type,
-                     passive=True,
+                     passive=False,
+                     durable=True
                 )
                 # passive=True: If exchange does not exist, raise an error.
 
@@ -81,6 +82,10 @@ def start_consuming(
                      exchange_name=exchange_name,
                      exchange_type=exchange_type,
                 )
+
+                # Actively declare the queue (this will create it if it doesn't exist)
+                print(f"Declaring queue: {queue_name}")
+                channel.queue_declare(queue=queue_name, durable=True, passive=False)
 
                 print(f"Consuming from queue: {queue_name}")
                 channel.basic_consume(
