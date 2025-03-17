@@ -84,7 +84,7 @@ def on_channel_open(ch):
         ch.basic_consume(
             queue=queue["name"],
             on_message_callback=handle_message,
-            auto_ack=False
+            auto_ack=True
         )
     print("Consumers are set up. Waiting for messages...")
 
@@ -123,6 +123,11 @@ def run_async_consumer():
         except Exception as e:
             print(f"Unexpected error: {e}. Retrying in 5 seconds...")
             time.sleep(5)
+
+def ensure_exchange_exists(channel, exchange, exchange_type):
+    # Declare the exchange (it will only create it if it does not already exist)
+    channel.exchange_declare(exchange=exchange, exchange_type=exchange_type, durable=True)
+
 
 def is_compatible(recipient_bloodType, donor_bloodType):
     blood_transfusion_rules = {

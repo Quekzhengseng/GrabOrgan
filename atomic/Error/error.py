@@ -21,7 +21,7 @@ def callback(channel, method, properties, body):
         print(f"Unable to parse JSON: {e=}")
         print(f"Message: {body}")
     print()
-    channel.basic_ack(delivery_tag=method.delivery_tag)  # Ensure message is acknowledged
+    # channel.basic_ack(delivery_tag=method.delivery_tag)  # Ensure message is acknowledged
 
 if __name__ == "__main__":
     print(f"This is {os.path.basename(__file__)} - amqp consumer (Error)...")

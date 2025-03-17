@@ -19,7 +19,6 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - grabOrgan-net
-
   activity_log:
     build:
       context: .
@@ -29,20 +28,19 @@ services:
     ports:
       - "5001:5001"
     environment:
-      - AMQP_URL=amqp://rabbitmq:5672/
-      - PYTHONPATH=/app:/app/common
       - rabbit_host=rabbitmq # The name of the RabbitMQ container defined in the RabbitMQ compose file
       - rabbit_port=5672
       - exchange_name=activity_log_exchange
       - exchange_type=topic
       - queue_name=activity_log_queue
+      - routing_key=*.info
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/usr/src/app:/usr/src/app/common # Equivalent to export PYTHONPATH
-    command: ["python", "activity_log.py"]
     depends_on:
       - rabbitmq
     networks:
       - grabOrgan-net
+    command: ["python", "activity_log.py"]
     restart: always
 
   delivery_info:
@@ -101,8 +99,6 @@ services:
     ports:
       - "5005:5005"
     environment:
-      - AMQP_URL=amqp://rabbitmq:5672/
-      - PYTHONPATH=/app:/app/common
       - rabbit_host=rabbitmq # The name of the RabbitMQ container defined in the RabbitMQ compose file
       - rabbit_port=5672
       - exchange_name=error_handling_exchange
@@ -110,11 +106,11 @@ services:
       - queue_name=error_queue
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/usr/src/app:/usr/src/app/common # Equivalent to export PYTHONPATH
-    command: ["python", "error.py"]
     depends_on:
       - rabbitmq
     networks:
       - grabOrgan-net
+    command: ["python", "error.py"]
     restart: always
 
   geoalgo:
