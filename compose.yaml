@@ -19,9 +19,7 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - grabOrgan-net
-    # environment:
-    #   - RABBITMQ_DEFAULT_USER=guest
-    #   - RABBITMQ_DEFAULT_PASS=guest
+
   activity_log:
     build:
       context: .
@@ -43,9 +41,10 @@ services:
     command: ["python", "activity_log.py"]
     depends_on:
       - rabbitmq
-    restart: always
     networks:
       - grabOrgan-net
+    restart: always
+
   delivery_info:
     build:
       context: atomic/Delivery/.
@@ -60,6 +59,8 @@ services:
       - "5002:5002"
     networks:
       - grabOrgan-net
+    # restart: always
+
   donor:
     build:
       context: atomic/Donor/.
@@ -74,6 +75,7 @@ services:
       - "5003:5003"
     networks:
       - grabOrgan-net
+    # restart: always
 
   driverInfo:
     build:
@@ -111,9 +113,9 @@ services:
     command: ["python", "error.py"]
     depends_on:
       - rabbitmq
-    restart: always
     networks:
       - grabOrgan-net
+    restart: always
 
   geoalgo:
     build:
@@ -125,6 +127,7 @@ services:
       - "5006:5006"
     networks:
       - grabOrgan-net
+    # restart: always
 
   labInfo:
     build:
@@ -140,6 +143,8 @@ services:
       - "5007:5007"
     networks:
       - grabOrgan-net
+    # restart: always
+
   match:
     build:
       context: atomic/Match/.
@@ -154,6 +159,7 @@ services:
       - "5008:5008"
     networks:
       - grabOrgan-net
+    # restart: always
 
   order:
     build:
@@ -169,6 +175,7 @@ services:
       - "5009:5009"
     networks:
       - grabOrgan-net
+    # restart: always
 
   organ:
     build:
@@ -184,6 +191,7 @@ services:
     container_name: organ_service
     networks:
       - grabOrgan-net
+    # restart: always
 
   personalData:
     build:
@@ -199,6 +207,7 @@ services:
       - "5011:5011"
     networks:
       - grabOrgan-net
+    # restart: always
 
   pseudonym:
     build:
@@ -210,6 +219,7 @@ services:
       - "5012:5012"
     networks:
       - grabOrgan-net
+    # restart: always
 
   recipient:
     build:
@@ -225,6 +235,8 @@ services:
     container_name: recipient_service
     networks:
       - grabOrgan-net
+    # restart: always
+
   match_organ:
     build:
       context: .
