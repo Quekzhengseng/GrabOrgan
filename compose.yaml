@@ -236,7 +236,7 @@ services:
       - DONOR_URL=http://donor:5003/donor
       - ORGAN_URL=http://organ:5010/organ
       - MATCH_URL=http://match:5008/matches
-      - PYTHONPATH=/app:/app/common # Equivalent to export PYTHONPATH
+      - PYTHONPATH=/usr/src/app:/usr/src/app/common # Equivalent to export PYTHONPATH
       - PYTHONUNBUFFERED=1
     ports:
       - "5020:5020"
@@ -251,4 +251,5 @@ services:
     container_name: match_organ_service
     networks:
       - grabOrgan-net
+    # restart: always
     command: ["python", "match_organ.py"]

@@ -4,6 +4,7 @@ import json
 import pika
 import sys, os
 import ast
+from os import environ
 
 from common import amqp_lib
 from common.invokes import invoke_http
@@ -13,12 +14,10 @@ app = Flask(__name__)
 CORS(app)
 
 # export PYTHONPATH=$PYTHONPATH:/path/to/GrabOrgan (do this in local env for "common" package)
-# RECIPIENT_URL = "http://recipient:5013/recipient" # only for full deployment for docker containers to communicate
-# DONOR_URL = "http://donor:5003/donor" # only for full deployment for docker containers to communicate
-RECIPIENT_URL = "http://localhost:5013/recipient" #localhost if match_organ service is not dockerised
-DONOR_URL = "http://localhost:5003/donor" # localhost if match_organ service is not dockerised
-ORGAN_URL = "http://localhost:5010/organ" # localhost if match_organ service is not dockerised
-MATCH_URL = "http://localhost:5008/matches" # localhost if match_organ service is not dockerised
+RECIPIENT_URL = environ.get("RECIPIENT_URL") or "http://localhost:5013/recipient"
+DONOR_URL = environ.get("DONOR_URL") or "http://localhost:5003/donor"
+ORGAN_URL = environ.get("ORGAN_URL") or "http://localhost:5010/organ"
+MATCH_URL = environ.get("MATCH_URL") or "http://localhost:5008/matches"
 """
 for testing:
 routing_key = match.request
@@ -36,8 +35,9 @@ amqp message:
 
 # RabbitMQ
 # rabbit_host = "rabbitmq" # if dockerised
-rabbit_host = "localhost" #localhost if match_organ service is not dockerised
-rabbit_port = 5672
+rabbit_host = os.environ.get("rabbit_host", "localhost")
+rabbit_port = int(os.environ.get("rabbit_port", "5672"))
+
 
 
 EXCHANGES = {
@@ -48,8 +48,8 @@ EXCHANGES = {
 }
 
 SUBSCRIBE_QUEUES = [
-    {"name": "match_request_queue", "exchange": "request_organ_exchange", "routing_key": "match.request" },
-    {"name": "match_test_result_queue", "exchange": "test_result_exchange", "routing_key": "test.result" },
+    {"name": "match_request_queue", "exchange": "request_organ_exchange", "routing_key": "match.request", "type": "direct" },
+    {"name": "match_test_result_queue", "exchange": "test_result_exchange", "routing_key": "test.result", "type": "direct" },
 ]
 
 
@@ -72,6 +72,7 @@ def connectAMQP():
         # Subscribe to queues (declaration already done in setup script)
         for queue in SUBSCRIBE_QUEUES:
             print(f"Subscribing to queue: {queue['name']}")
+            # amqp_lib.start_consuming(rabbit_host,rabbit_port, exchange_name=queue["exchange"], queue_name=queue["name"], exchange_type=queue["type"] ,callback=handle_message)
             channel.basic_consume(queue=queue["name"], on_message_callback=handle_message, auto_ack=False)
         print("AMQP Connection Established!")
         print("Waiting for messages...")
@@ -113,19 +114,13 @@ def handle_message(ch, method, properties, body):
         ch.basic_ack(delivery_tag=method.delivery_tag)  # <-- Manually acknowledge
 
 
-
-    # Example: If this is a test result, send a final match result
-    # if method.routing_key == "test.result":
-    #     match_result = process_test_result(body.decode())  # Custom logic
-    #     publish_message("match_result_exchange", "match.result", match_result)
-
 def start_consuming():
     """Start consuming messages from subscribed queues."""
     if channel:
-        print("📡 Waiting for messages...")
+        print("Waiting for messages...")
         channel.start_consuming()
     else:
-        print("❌ Error: AMQP channel not available.")
+        print("Error: AMQP channel not available.")
 
 def is_compatible(recipient_bloodType, donor_bloodType):
     # Blood transfusion compatibility rules
