@@ -39,6 +39,7 @@ services:
       - exchange_type=topic
       - queue_name=activity_log_queue
       - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/usr/src/app:/usr/src/app/common # Equivalent to export PYTHONPATH
     command: ["python", "activity_log.py"]
     depends_on:
       - rabbitmq
@@ -106,6 +107,7 @@ services:
       - exchange_type=topic
       - queue_name=error_queue
       - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/usr/src/app:/usr/src/app/common # Equivalent to export PYTHONPATH
     command: ["python", "error.py"]
     depends_on:
       - rabbitmq
