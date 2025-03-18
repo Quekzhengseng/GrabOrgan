@@ -84,7 +84,7 @@ services:
       LAB_REPORT_URL: "http://lab_report_service:5007/lab-reports"
       RABBITMQ_HOST: "rabbitmq"
       RABBITMQ_PORT: "5672"
-      RABBITMQ_EXCHANGE: "order_topic"
+      RABBITMQ_EXCHANGE: "request_organ_exchange"
       RABBITMQ_ROUTING_KEY: "recipient.registered"
     depends_on:
       - personal_data_service
