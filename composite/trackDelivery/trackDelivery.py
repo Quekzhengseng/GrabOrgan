@@ -7,9 +7,9 @@ import requests
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
-DeliveryEndpoint = "http://127.0.0.1:5002"
-DriverInfoEndpoint = "http://127.0.0.1:5020"
-GeoAlgoEndpoint = "http://127.0.0.1:5000"
+DeliveryEndpoint = "http://delivery_service:5002"
+DriverInfoEndpoint = "http://driverInfo_service:5004"
+GeoAlgoEndpoint = "http://geoalgo_service:5006"
 LocationEndpoint = "https://zsq.outsystemscloud.com/Location/rest/Location/"
 DriverEndpoint = ""
 headers = {'Content-Type': 'application/json'}
@@ -21,7 +21,7 @@ def updateDelivery():
     
     Expects JSON data with format: 
     {
-        "deliveryID" : String,
+        "deliveryId" : String,
         "driverCoord": String
     }
     
@@ -45,6 +45,7 @@ def updateDelivery():
         deliveryId = data.get("deliveryId")
         driverCoord = data.get("driverCoord")
 
+        #NUMBER 1
         #Get the polyline via delivery api call
         DriverResponse = requests.get(DeliveryEndpoint + "/deliveryinfo/" + deliveryId)
 
@@ -67,14 +68,14 @@ def updateDelivery():
         if DeviationResponse.status_code == 200:
             DeviationResponse_data = DeviationResponse.json()  # Parse the JSON response
             try:
-                DeviationSuccess = DeviationResponse_data.get("Success")
+                DeviationSuccess = DeviationResponse_data["data"]["deviate"]
                 print(f"Delivery Response: {DeviationResponse_data}")
             except KeyError as e:
                 print(f"KeyError: Missing expected key {e}")
 
         if (DeviationSuccess):
             #Retrieve coordinates of destination via address
-            Destination_address = DriverResponse_data["data"]["endHospital"]
+            Destination_address = DriverResponse_data["data"]["destination"]
 
             Destination_PlaceToCoordJson = {
                     "long_name": Destination_address
@@ -97,8 +98,8 @@ def updateDelivery():
 
             #Retreive Polyline
             LocationJson = {
-                        "routingPreference": "",
-                        "travelMode": "",
+                        "routingPreference": "TRAFFIC_AWARE",
+                        "travelMode": "DRIVE",
                         "computeAlternativeRoutes": False,
                         "destination": {
                             "location": {
@@ -131,6 +132,7 @@ def updateDelivery():
             else:
                 print(f"Error: {LocationResponse.status_code}")  # Handle errors
 
+            #NUMBER 2
             #Send the new polyline into delivery api
             updateJson = {
                 "polyline" : encoded_polyline,
@@ -153,11 +155,25 @@ def updateDelivery():
 
             updateResponse = requests.put(DeliveryEndpoint + "/deliveryinfo/" + deliveryId,
                                             json=updateJson)
-            
+
             if updateResponse.status_code == 200:
                 print("Success in updating delivery")
             else:
                 print(f"Error: {LocationResponse.status_code}")  # Handle errors
+
+        # At the end of your function, after all the processing:
+        return jsonify({
+            "code": 200,
+            "message": "Tracking updated successfully",
+            "data": {
+                "polyline": encoded_polyline if DeviationSuccess else polyline,
+                "deviation" : DeviationSuccess
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
     #update the deliveryId with new polyline and driverCoord
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -168,4 +184,4 @@ def health_check():
     return jsonify({"status": "healthy"})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5005)
+    app.run(host='0.0.0.0', port=5025)

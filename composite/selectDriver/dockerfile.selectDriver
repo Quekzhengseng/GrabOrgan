@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY selectDriver.py .
 
 # Expose the port the app runs on
-EXPOSE 5005
+EXPOSE 5024
 
 # Command to run the application
 CMD ["python", "selectDriver.py"]

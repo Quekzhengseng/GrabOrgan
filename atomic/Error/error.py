@@ -1,41 +1,30 @@
 #!/usr/bin/env python3
 import os
-from common import amqp_lib
 import json
-import pika  # or your preferred AMQP library
+from common import amqp_lib
+import pika
+from os import environ
 
-# # # Retrieve the connection URL from the environment, with a fallback if needed.
-# # amqp_url = os.environ.get("AMQP_URL", "amqp://rabbitmq:5672/")
-# AMQP_URL = os.getenv("AMQP_URL", "amqp://localhost:5672/")
-# # # Use amqp_url to establish the connection
-# parameters = pika.URLParameters(AMQP_URL)
-# connection = pika.BlockingConnection(parameters)
-# channel = connection.channel()
-
-
-# rabbit_host = "localhost" #localhost if not dockerised
-rabbit_host = "rabbitmq" # if dockerised
-rabbit_port = 5672
-queue_name = "error_queue"
-exchange_name = "error_handling_exchange"
-exchange_type = "topic"
-
+# Retrieve connection parameters from the environment if available.
+rabbit_host = environ.get("rabbit_host") or "localhost"
+rabbit_port = environ.get("rabbit_port") or 5672
+exchange_name = environ.get("exchange_name") or "error_handling_exchange"
+exchange_type = environ.get("exchange_type") or "topic"
+queue_name = environ.get("queue_name") or "error_queue"
 
 def callback(channel, method, properties, body):
-     # required signature for the callback; no return
-    """Handles incoming messages from RabbitMQ."""
+    # required signature for the callback; no return
     try:
-        log_entry = json.loads(body)
-        print(f"Received Log Entry: {log_entry}")
-    except json.JSONDecodeError:
-        print(f"Unable to parse JSON: {body}")
-    
+        error = json.loads(body)
+        print(f"JSON: {error}")
+    except Exception as e:
+        print(f"Unable to parse JSON: {e=}")
+        print(f"Message: {body}")
     print()
-    channel.basic_ack(delivery_tag=method.delivery_tag)  # Ensure message is acknowledged
-
+    # channel.basic_ack(delivery_tag=method.delivery_tag)  # Ensure message is acknowledged
 
 if __name__ == "__main__":
-    print(f"This is {os.path.basename(__file__)} - amqp consumer (Error_Log)...")
+    print(f"This is {os.path.basename(__file__)} - amqp consumer (Error)...")
     try:
         amqp_lib.start_consuming(
             rabbit_host, rabbit_port, exchange_name, exchange_type ,queue_name, callback

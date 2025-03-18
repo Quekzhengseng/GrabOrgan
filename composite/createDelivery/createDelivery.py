@@ -7,11 +7,11 @@ import requests
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
-DeliveryEndpoint = "http://127.0.0.1:5002"
-DriverInfoEndpoint = "http://127.0.0.1:5020"
-GeoAlgoEndpoint = "http://127.0.0.1:5000"
+DeliveryEndpoint = "http://delivery_service:5002"
+GeoAlgoEndpoint = "http://geoalgo_service:5006"
+DriverEndpoint = "http://driverInfo_service:5004"
+MatchDriverEndpoint = "http://selectDriver:5024"
 LocationEndpoint = "https://zsq.outsystemscloud.com/Location/rest/Location/"
-DriverEndpoint = ""
 headers = {'Content-Type': 'application/json'}
 
 @app.route('/createDelivery', methods=['POST'])
@@ -22,13 +22,13 @@ def createDelivery():
     
     Expects JSON data with format: 
     {
-        OrganType: 
-        Status: (Scheduled, On Delivery, Delivered)
-        transplantDateTime: DateTime,
-        startHospital: String,
-        endHospital: String
-        matchId: String,
-        Remarks: String
+        Status: (Scheduled, On Delivery, Delivered) => Not used
+        transplantDateTime: DateTime, => Required
+        startHospital: String, => Required
+        endHospital: String, => Required
+        doctorId: String, => Required
+        matchId: String, => Not used
+        Remarks: String => Not used
     }
 
     Returns:
@@ -52,6 +52,7 @@ def createDelivery():
         Origin_address = data.get("startHospital")
         Destination_address = data.get("endHospital")
         DoctorId = data.get("DoctorId")
+        destinationTime = data.get("transplantDateTime")
 
         Origin_PlaceToCoordJson = {
                                     "long_name": Origin_address
@@ -84,8 +85,8 @@ def createDelivery():
 
         #Retreive Polyline
         LocationJson = {
-                    "routingPreference": "",
-                    "travelMode": "",
+                    "routingPreference": "TRAFFIC_AWARE",
+                    "travelMode": "DRIVE",
                     "computeAlternativeRoutes": False,
                     "destination": {
                         "location": {
@@ -118,15 +119,31 @@ def createDelivery():
             print(f"Error: {LocationResponse.status_code}")  # Handle errors
 
         #Get a suitable Driver via matchDriver Composite
-        DriverRequestJson = {}
+        MatchDriverRequestJson = {
+            "transplantDateTime" : destinationTime,
+            "startHospital": Origin_address,
+            "endHospital": Destination_address
+        }
 
-        DriverResponse = requests.post(DriverEndpoint + "", headers=headers, data=json.dumps(DriverRequestJson))
+        MatchDriverResponse = requests.post(MatchDriverEndpoint + "/selectDriver", headers=headers, data=json.dumps(MatchDriverRequestJson))
+
+        if MatchDriverResponse.status_code == 200:
+            MatchDriverResponse_data = MatchDriverResponse.json()  # Parse the JSON response
+            try:
+                driverId = MatchDriverResponse_data["data"]["DriverId"]
+                print(f"Driver Found")
+            except Exception as e:
+                print(f"Cannot fetch a driver: {e}")
+        else:
+            print(f"Error: {MatchDriverResponse.status_code}")  # Handle errors
+
+        #Get the driver details
+        DriverResponse = requests.get(DriverEndpoint + "/drivers/" + driverId)
 
         if DriverResponse.status_code == 200:
             DriverResponse_data = DriverResponse.json()  # Parse the JSON response
             try:
-                driverId = DriverResponse_data["data"]["DriverId"]
-                driverAddress = DriverResponse_data["data"]["DriverAddress"]
+                driverAddress = DriverResponse_data["stationed_hospital"]
                 print(f"Driver Found")
             except Exception as e:
                 print(f"Cannot fetch a driver: {e}")
@@ -153,31 +170,32 @@ def createDelivery():
         else:
             print(f"Error: {Driver_PlaceToCoordResponse.status_code}")  # Handle errors
 
+        #NUMBER 1
         #Create a new delivery json with driverID, DoctorID, originCoord, DestinationCoord, EndTime, polyline, status
         DeliveryJson = {
-                    "polyline" : encoded_polyline,
-                    "pickup" : Origin_address,
-                    "pickup_time" : 0000,
-                    "destination" : Destination_address,
-                    "destination_time" : 0000,
-                    "status" : "Assigned",
-                    "driverCoord": DriverCoord,
-                    "driverId" : driverId,
-                    "doctorId" : DoctorId,
+            "pickup": Origin_address,
+            "pickup_time": "20250315 10:30:00 AM",
+            "destination": Destination_address,
+            "destination_time": "20250315 11:30:00 AM",  # One hour later
+            "status": "Assigned",
+            "polyline": encoded_polyline,
+            "driverCoord": DriverCoord,
+            "driverID": driverId,
+            "doctorID": DoctorId,
         }
 
         #Connect to delivery API and create delivery
         DeliveryResponse = requests.post(DeliveryEndpoint + "/deliveryinfo", headers=headers, data=json.dumps(DeliveryJson))
 
-        if DeliveryResponse.status_code == 200:
+        if DeliveryResponse.status_code == 201:
             DeliveryResponse_data = DeliveryResponse.json()  # Parse the JSON response
             try:
-                DeliveryId = DeliveryResponse_data["data"]["DeliveryId"]
+                DeliveryId = DeliveryResponse_data["data"]["orderID"]
                 print(f"Delivery Response: {DeliveryResponse_data}")
             except KeyError as e:
                 print(f"KeyError: Missing expected key {e}")
         else:
-            print(f"Error: {DeliveryResponse.status_code}")  # Handle errors
+            print(f"Error: {DeliveryResponse}")  # Handle errors
 
         return jsonify({"message": "Delivery successfully created", "data": {
             "DeliveryId" : DeliveryId
@@ -193,4 +211,4 @@ def health_check():
     return jsonify({"status": "healthy"})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5005)
+    app.run(host='0.0.0.0', port=5026)
