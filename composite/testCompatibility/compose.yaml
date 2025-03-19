@@ -1,19 +1,18 @@
 version: "3.8"
 
 services:
-  rabbitmq:
-    image: "rabbitmq:3-management"
-    container_name: "rabbitmq"
-    ports:
-      - "5672:5672"  # AMQP
-      - "15672:15672"  # RabbitMQ Management UI
-
   test-compatibility:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.testCompatibility
     container_name: "test-compatibility"
-    depends_on:
-      - rabbitmq
     environment:
       - RABBITMQ_HOST=rabbitmq
+    networks:
+      - grabOrgan-net
     ports:
       - "5022:5022"
+
+networks:
+  grabOrgan-net:
+    external: true
