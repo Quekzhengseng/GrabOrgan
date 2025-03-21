@@ -52,6 +52,7 @@ services:
       - ./secrets/delivery/delivery_Key.json:/usr/src/app/delivery_Key.json:ro
     environment:
       - DELIVERY_DB_KEY=/usr/src/app/delivery_Key.json
+      - PYTHONUNBUFFERED=1
     container_name: delivery_service
     ports:
       - "5002:5002"
@@ -271,6 +272,8 @@ services:
     image: GrabOrgan/createdelivery:1.0
     # restart: always
     container_name: createDelivery
+    environment:
+      - PYTHONUNBUFFERED=1
     ports:
       - "5026:5026"
     networks:

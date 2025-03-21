@@ -151,7 +151,6 @@ def get_delivery(order_id):
         return jsonify({"code": 500, "message": str(e)}), 500
 
 
-# 📌 Route: Create a new delivery order (Auto-Generated Order ID)
 @app.route("/deliveryinfo", methods=["POST"])
 def create_delivery():
     try:
@@ -160,51 +159,50 @@ def create_delivery():
         
         if not all(field in data for field in required_fields):
             return jsonify({"code": 400, "message": "Missing required fields"}), 400
-
-        # # Format and validate pickup_time
-        # formatted_pickup_time, pickup_dt = format_datetime(data["pickup_time"])
-        # if not pickup_dt:
-        #     return jsonify({"code": 400, "message": "Invalid pickup_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
-
-        # # Format and validate destination_time
-        # formatted_destination_time, destination_dt = None, None
-        # if data["destination_time"] is not None:
-        #     formatted_destination_time, destination_dt = format_datetime(data["destination_time"])
-        #     if not destination_dt:
-        #         return jsonify({"code": 400, "message": "Invalid destination_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
             
-        #     if destination_dt <= pickup_dt:
-        #         return jsonify({"code": 400, "message": "destination_time must be after pickup_time."}), 400
-
-        # # Validate status constraints
-        # if not is_valid_status(data["status"], formatted_destination_time):
-        #     return jsonify({"code": 400, "message": "destination_time should be empty if status is 'Awaiting pickup' or 'In progress'."}), 400
-
-        # Generate Order ID
-        # order_id = generate_order_id(data["pickup"], pickup_dt)
-
-        # Create Firestore document
+        # Prepare delivery data
         delivery_data = {
-            # "orderID": order_id,
             "status": data["status"],
             "pickup": data["pickup"],
-            # "pickup_time": formatted_pickup_time,
             "pickup_time": data["pickup_time"],
             "destination": data["destination"],
-            # "destination_time": formatted_destination_time,
             "destination_time": data["destination_time"],
             "polyline": data["polyline"],
             "driverCoord": data["driverCoord"],
             "driverID": data["driverID"],
             "doctorID": data["doctorID"]
         }
-
-        # db.collection(DELIVERY_COLLECTION).document(order_id).set(delivery_data)
-        db.collection(DELIVERY_COLLECTION).add(delivery_data)
-
-        # return jsonify({"code": 201, "message": "Delivery order created successfully", "data": {"orderID": order_id}}), 201
-        return jsonify({"code": 201, "message": "Delivery order created successfully"}), 201
+        
+        # Add document to Firestore with auto-generated ID
+        try:
+            # Method 1: For google-cloud-firestore client library
+            doc_ref = db.collection(DELIVERY_COLLECTION).add(delivery_data)
+            if hasattr(doc_ref, 'id'):
+                delivery_id = doc_ref.id
+            elif isinstance(doc_ref, tuple) and len(doc_ref) > 0:
+                delivery_id = doc_ref[0].id
+            else:
+                # Fallback method - create with random ID
+                import uuid
+                delivery_id = str(uuid.uuid4())
+                db.collection(DELIVERY_COLLECTION).document(delivery_id).set(delivery_data)
+        except Exception as db_error:
+            # Method 2: Alternative approach if the first method fails
+            import uuid
+            delivery_id = str(uuid.uuid4())
+            db.collection(DELIVERY_COLLECTION).document(delivery_id).set(delivery_data)
+            print(f"Used alternative method due to: {str(db_error)}")
+        
+        print(f"Created delivery with ID: {delivery_id}")
+        
+        return jsonify({
+            "code": 201, 
+            "message": "Delivery order created successfully", 
+            "data": {"deliveryId": delivery_id}
+        }), 201
+        
     except Exception as e:
+        print(f"Error creating delivery: {str(e)}")
         return jsonify({"code": 500, "message": str(e)}), 500
 
 
