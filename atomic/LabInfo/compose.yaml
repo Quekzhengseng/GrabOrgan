@@ -6,11 +6,16 @@ services:
       context: .
       dockerfile: Dockerfile.lab_report
     image: GrabOrgan/labinfo:1.0
+    container_name: lab_info_service
     volumes:
       - ./secrets/Lab_Info_Key.json:/usr/src/app/Lab_Info_Key.json:ro
     environment:
       - LABINFO_DB_KEY=/usr/src/app/Lab_Info_Key.json
-    # restart: always
-    container_name: lab_info_service
     ports:
       - "5007:5007"
+    networks:
+      - grabOrgan-net
+
+networks:
+  grabOrgan-net:
+    external: true

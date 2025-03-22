@@ -10,3 +10,9 @@ services:
       - MATCH_DB_KEY=/app/secrets/Match_Key.json
     ports:
       - "5008:5008"
+    networks:
+      - grabOrgan-net
+
+networks:
+  grabOrgan-net:
+    external: true

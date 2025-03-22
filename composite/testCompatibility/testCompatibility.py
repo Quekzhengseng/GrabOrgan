@@ -1,12 +1,11 @@
-#call atomic and match from testcompatibility.py
 from flask import Flask, jsonify
 import pika
 import json
 import requests
 import os
 import threading
-import firebase_admin
-from firebase_admin import credentials, firestore
+from datetime import datetime
+import sys
 
 app = Flask(__name__)
 
@@ -20,42 +19,38 @@ TEST_COMPATIBILITY_ROUTING_KEY = "test.compatibility"
 MATCH_TEST_RESULT_ROUTING_KEY = "test.result"
 
 # Lab Info & Match Atomic Service URLs
-LAB_INFO_URL = os.getenv("LAB_INFO_URL", "http://lab-info-service:5007/lab-reports")
+LAB_INFO_URL = os.getenv("LAB_INFO_URL", "http://lab_info_service:5007/lab-reports")
 MATCH_SERVICE_URL = os.getenv("MATCH_SERVICE_URL", "http://match-service:5008/matches")
 
 def connect_rabbitmq():
+    print(f"🔌 Trying to connect to RabbitMQ at host '{RABBITMQ_HOST}'...")
     try:
-        print(f"🔌 Trying to connect to RabbitMQ at host '{RABBITMQ_HOST}'...")
         connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
         channel = connection.channel()
         channel.exchange_declare(exchange=TEST_COMPATIBILITY_EXCHANGE, exchange_type="direct", durable=True)
         channel.exchange_declare(exchange=MATCH_TEST_RESULT_EXCHANGE, exchange_type="direct", durable=True)
         print("✅ Connected to RabbitMQ and declared exchanges.")
+        sys.stdout.flush()
         return connection, channel
     except Exception as e:
         print(f"❌ Failed to connect to RabbitMQ at host '{RABBITMQ_HOST}': {e}")
         return None, None
+
 @app.route("/")
 def health_check():
     """Health check endpoint."""
     return jsonify({"code": 200, "message": "Test Compatibility Service Running"}), 200
 
 def fetch_lab_info(uuid):
-    """Fetch donor's lab report from Lab Info Atomic using UUID."""
+    """Fetch a lab report (donor or recipient) from Lab Info Atomic using UUID."""
     try:
         response = requests.get(f"{LAB_INFO_URL}/{uuid}")
         if response.status_code == 200:
             lab_data = response.json().get("data", {})
-
-            # ✅ Extract relevant matching fields from results
             results = lab_data.get("results", {})
-            return {
-                "uuid": uuid,
-                "tissueType": results.get("tissueType", ""),
-                "antibodyScreen": results.get("antibodyScreen", ""),
-                "crossMatch": results.get("crossMatch", ""),
-                "organ_donated": lab_data.get("organ_donated", "")
-            }
+            # Combine data from the report and the results map.
+            lab_data.update(results)
+            return lab_data
         elif response.status_code == 404:
             print(f"⚠️ Lab report for UUID {uuid} not found.")
             return None
@@ -67,99 +62,110 @@ def fetch_lab_info(uuid):
         return None
 
 def fetch_recipient_lab_report(recipient_uuid):
-    """Fetch recipient's lab report from Firestore using UUID."""
+    """Fetch recipient's lab report from Lab Info Atomic using UUID."""
+    return fetch_lab_info(recipient_uuid)  # assuming same endpoint and format
+
+def post_matches_to_match_service(matches):
+    """POST valid matches to Match Atomic Service (HTTP)."""
+    payload = {"matches": matches}
     try:
-        doc_ref = db.collection("matches").where("recipientId", "==", recipient_uuid).get()
-        if doc_ref:
-            recipient_data = doc_ref[0].to_dict()
-            results = recipient_data.get("results", {})
-            return {
-                "uuid": recipient_uuid,
-                "tissueType": results.get("tissueType", ""),
-                "organ_needed": recipient_data.get("organ_needed", "")
-            }
+        response = requests.post(MATCH_SERVICE_URL, json=payload)
+        if response.status_code == 201:
+            print(f"✅ Matches posted successfully to Match Service: {json.dumps(payload)}")
         else:
-            print(f"⚠️ No recipient data found in Firestore for {recipient_uuid}")
-            return None
-    except Exception as e:
-        print(f"❌ Error fetching recipient lab report: {str(e)}")
-        return None
+            print(f"⚠️ Failed to post matches. Response: {response.text}")
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Error posting matches: {str(e)}")
+    sys.stdout.flush()
 
 def process_message(body):
-    """Process an organ matching request from RabbitMQ."""
+    """Process an HLA matching request from RabbitMQ."""
     data = json.loads(body)
     recipient_uuid = data.get("recipientId")
-    organ_uuids = data.get("listOfOrganId")  # ✅ Expecting UUIDs for donor organs
+    organ_uuids = data.get("listOfOrganId")  # Still using the same field for donor IDs
 
     if not organ_uuids:
         print("⚠️ No organs specified in request.")
         return {"listOfMatchId": []}
 
-    matched_ids = []
-
-    # Fetch recipient's lab report from Firestore
+    # Fetch recipient's lab report
     recipient_data = fetch_recipient_lab_report(recipient_uuid)
     if not recipient_data:
         return {"listOfMatchId": []}
 
-    recipient_tissue_type = recipient_data.get("tissueType", "")
-    recipient_organ_type = recipient_data.get("organ_needed")
+    # Get the recipient's HLA score (or default to 0 if not available)
+    recipient_hla = recipient_data.get("hlaScore", 0)
+
+    # List to hold match records (dictionaries)
+    matches = []
+
+    # Define your HLA threshold (for example, donor's HLA must be >= 4)
+    HLA_THRESHOLD = 4
 
     for organ_uuid in organ_uuids:
-        donor_data = fetch_lab_info(organ_uuid)  # ✅ Now using UUID to fetch Lab Info
+        donor_data = fetch_lab_info(organ_uuid)  # Fetch donor lab report
         if not donor_data:
-            continue  # Skip if donor data is missing
-
-        donor_tissue_type = donor_data.get("tissueType", "")
-        donor_organ_type = donor_data.get("organ_donated")
-
-        # ✅ Organ Type Must Match
-        if recipient_organ_type != donor_organ_type:
-            print(f"⚠️ Organ type mismatch: {recipient_organ_type} vs {donor_organ_type}")
             continue
 
-        # ✅ Check Tissue Type Compatibility
-        if recipient_tissue_type != donor_tissue_type:
-            print(f"⚠️ Tissue type mismatch: {recipient_tissue_type} vs {donor_tissue_type}")
+        # Get the donor's HLA score
+        donor_hla = donor_data.get("hlaScore", 0)
+
+        # Check HLA compatibility: here we assume donor_hla must be at least the threshold.
+        if donor_hla < HLA_THRESHOLD:
+            print(f"⚠️ HLA mismatch: donor HLA {donor_hla} is below threshold {HLA_THRESHOLD}")
             continue
 
-        # ✅ Use correct matchId format: <UUID>-<OrganType>-<RecipientUUID>
-        match_id = f"{organ_uuid}-{donor_organ_type}-{recipient_uuid}"
-        matched_ids.append(match_id)
+        # Create a match id using the donor and recipient UUIDs
+        match_id = f"{organ_uuid}-{recipient_uuid}"
+        
+        # Build a match record with HLA-based data
+        match_record = {
+            "OrganId": donor_data.get("uuid"),  # Here you might not need to combine with organ type
+            "Test_DateTime": datetime.now().isoformat(),
+            "donorId": donor_data.get("uuid"),
+            "donor_details": {
+                "blood_type": donor_data.get("blood_type", "B+"),
+                "first_name": donor_data.get("first_name", "Chartreuse"),
+                "gender": donor_data.get("gender", "Male"),
+                "last_name": donor_data.get("last_name", "Lavender")
+            },
+            "matchId": match_id,
+            "numOfHLA": donor_hla,  # This can be used to indicate the donor's HLA score
+            "recipientId": recipient_uuid,
+            "recipient_details": {
+                "blood_type": recipient_data.get("blood_type", "AB+"),
+                "first_name": recipient_data.get("first_name", "Nicholas"),
+                "gender": recipient_data.get("gender", "Female"),
+                "last_name": recipient_data.get("last_name", "Lam")
+            }
+        }
+        matches.append(match_record)
 
-    # ✅ Post Matches to Match Service (HTTP)
-    if matched_ids:
-        post_matches_to_match_service(matched_ids)
+    # Post valid matches if any match records were built.
+    if matches:
+        post_matches_to_match_service(matches)
 
+    # Return just the list of match IDs for logging or further processing.
+    matched_ids = [m["matchId"] for m in matches]
     return {"listOfMatchId": matched_ids}
-
-def post_matches_to_match_service(matched_ids):
-    """POST valid matches to Match Atomic Service (HTTP)."""
-    match_payload = {"matches": [{"matchId": match_id} for match_id in matched_ids]}
-
-    try:
-        response = requests.post(MATCH_SERVICE_URL, json=match_payload)
-        if response.status_code == 201:
-            print(f"✅ Matches posted successfully to Match Service: {matched_ids}")
-        else:
-            print(f"⚠️ Failed to post matches. Response: {response.text}")
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Error posting matches: {str(e)}")
 
 def callback(ch, method, properties, body):
     """RabbitMQ message consumer callback."""
-    print("📩 Received Organ Matching Request")
+    print("📩 Received a message in callback!")
+    print("Message body:", body)
+    sys.stdout.flush()
+    
     response = process_message(body)
-
-    # ✅ Publish results to MatchOrgan
+    
     print("📬 Sending results to MatchOrgan...")
-    ch.basic_publish(  # 🔧 FIXED: changed from 'channel' to 'ch'
+    ch.basic_publish(
         exchange=MATCH_TEST_RESULT_EXCHANGE,
         routing_key=MATCH_TEST_RESULT_ROUTING_KEY,
         body=json.dumps(response),
         properties=pika.BasicProperties(delivery_mode=2)
     )
     print(f"✅ Match results sent: {response}")
+    sys.stdout.flush()
 
 def start_rabbitmq_listener():
     print("🧪 Attempting to start RabbitMQ listener...")
@@ -183,13 +189,17 @@ def start_rabbitmq_listener():
             auto_ack=True
         )
         channel.start_consuming()
-    
+
     except Exception as e:
         print(f"❌ Unexpected error in listener thread: {e}")
 
 # Run RabbitMQ listener in a background thread
 threading.Thread(target=start_rabbitmq_listener, daemon=True).start()
 
-# Start Flask on port 5022
+# Start Flask on port 5022 with proper reloader check for debug mode
 if __name__ == "__main__":
+    import os
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        # Listener already started above in this process.
+        pass
     app.run(host="0.0.0.0", port=5022, debug=True)
