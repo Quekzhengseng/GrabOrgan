@@ -1,187 +1,138 @@
-# app.py
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import json
 import requests
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+CORS(app)
 
-DeliveryEndpoint = "http://delivery_service:5002"
-DriverInfoEndpoint = "http://driverInfo_service:5004"
-GeoAlgoEndpoint = "http://geoalgo_service:5006"
-LocationEndpoint = "https://zsq.outsystemscloud.com/Location/rest/Location/"
-DriverEndpoint = ""
-headers = {'Content-Type': 'application/json'}
+# Define service endpoints
+SERVICE_URLS = {
+    "delivery": "http://delivery_service:5002",
+    "driver": "http://driver_service:5003",
+    "driver_info": "http://driverInfo_service:5004",
+    "geo_algo": "http://geoalgo_service:5006",
+    "location": "https://zsq.outsystemscloud.com/Location/rest/Location"
+}
+
+HEADERS = {'Content-Type': 'application/json'}
+
+def addressToCoord(address):
+    """Convert an address to latitude/longitude coordinates."""
+    try:
+        response = requests.post(f"{SERVICE_URLS['location']}/PlaceToCoord", headers=HEADERS, json={"long_name": address}, timeout=5)
+        response.raise_for_status()
+        data = response.json()
+        return {"lat": data.get("latitude"), "lng": data.get("longitude")}
+    except requests.exceptions.RequestException as e:
+        print(f"Error in addressToCoord: {e}")
+        return None
+
+def retrievePolyline(coord1, coord2):
+    """Retrieve a polyline route between two coordinates."""
+    payload = {
+        "routingPreference": "TRAFFIC_AWARE",
+        "travelMode": "DRIVE",
+        "computeAlternativeRoutes": False,
+        "destination": {"location": {"latLng": {"latitude": coord2['lat'], "longitude": coord2['lng']}}},
+        "origin": {"location": {"latLng": {"latitude": coord1['lat'], "longitude": coord1['lng']}}}
+    }
+    try:
+        response = requests.post(f"{SERVICE_URLS['location']}/route", headers=HEADERS, json=payload, timeout=5)
+        response.raise_for_status()
+        return response.json().get("Route", [{}])[0].get("Polyline", {}).get("encodedPolyline")
+    except requests.exceptions.RequestException as e:
+        print(f"Error in retrievePolyline: {e}")
+        return None
+
+def getDelivery(deliveryId):
+    """Retrieve delivery information by ID."""
+    try:
+        response = requests.get(f"{SERVICE_URLS['delivery']}/deliveryinfo/{deliveryId}", timeout=5)
+        response.raise_for_status()
+        return response.json().get("data")
+    except requests.exceptions.RequestException as e:
+        print(f"Error in getDelivery: {e}")
+        return None
+
+def getDeviation(polyline, driverCoord):
+    """Check if the driver has deviated from the route."""
+    try:
+        response = requests.post(f"{SERVICE_URLS['geo_algo']}/deviate", headers=HEADERS, json={"polyline": polyline, "driverCoord": driverCoord}, timeout=5)
+        response.raise_for_status()
+        return response.json().get("data", {}).get("deviate")
+    except requests.exceptions.RequestException as e:
+        print(f"Error in getDeviation: {e}")
+        return None
+
+def updateDelivery(encoded_polyline, driverCoord, status, deliveryId):
+    """Update the delivery details."""
+    try:
+        response = requests.put(f"{SERVICE_URLS['delivery']}/deliveryinfo/{deliveryId}", json={"polyline": encoded_polyline, "driverCoord": driverCoord, "status": status}, timeout=5)
+        response.raise_for_status()
+        return True
+    except requests.exceptions.RequestException as e:
+        print(f"Error in updateDelivery: {e}")
+        return False
 
 @app.route('/trackDelivery', methods=['POST'])
-def updateDelivery():
-    """
-    API endpoint to decode a polyline
-    
-    Expects JSON data with format: 
-    {
-        "deliveryId" : String,
-        "driverCoord": String
-    }
-    
-    Returns:
-    {
-        "Code" : String
-        "data" : {
-            "Polyline" : String
-            },
-        "message" : String
-    }
-    """
-    
-    #Draw the delivery with deliveryId
+def updateDeliveryComposite():
+    """Update delivery tracking information, handling deviations if necessary."""
     try:
         data = request.get_json()
-
         if not data:
-            return jsonify({"error": "No json data received"}), 400
-        
+            return jsonify({"error": "No JSON data received"}), 400
+
         deliveryId = data.get("deliveryId")
         driverCoord = data.get("driverCoord")
 
-        #NUMBER 1
-        #Get the polyline via delivery api call
-        DriverResponse = requests.get(DeliveryEndpoint + "/deliveryinfo/" + deliveryId)
+        if not (deliveryId and driverCoord):
+            return jsonify({"error": "Missing required fields"}), 400
 
-        if DriverResponse.status_code == 200:
-            DriverResponse_data = DriverResponse.json()  # Parse the JSON response
-            try:
-                polyline = DriverResponse_data["data"]["polyline"]
-                print(f"Delivery Response: {DriverResponse_data}")
-            except Exception as e:
-                print(f"Unable to fetch delivery: {e}")
+        # Retrieve delivery information
+        deliveryData = getDelivery(deliveryId)
+        if not deliveryData:
+            return jsonify({"error": "Failed to retrieve delivery"}), 500
 
-        #Check for deviation given driverCoord
-        DeviationJson = {
-                "polyline": polyline,
-                "driverCoord": {"lat": driverCoord["lat"], "lng": driverCoord["lng"]}
-                }
+        polyline = deliveryData.get("polyline")
+        if not polyline:
+            return jsonify({"error": "Missing polyline in delivery data"}), 500
 
-        DeviationResponse = requests.post(GeoAlgoEndpoint + "/deviate", headers=headers, data=json.dumps(DeviationJson))
+        # Check if the driver has deviated
+        deviation = getDeviation(polyline, driverCoord)
+        if deviation is None:
+            return jsonify({"error": "Failed to check deviation"}), 500
 
-        if DeviationResponse.status_code == 200:
-            DeviationResponse_data = DeviationResponse.json()  # Parse the JSON response
-            try:
-                DeviationSuccess = DeviationResponse_data["data"]["deviate"]
-                print(f"Delivery Response: {DeviationResponse_data}")
-            except KeyError as e:
-                print(f"KeyError: Missing expected key {e}")
+        if deviation:
+            # Retrieve new polyline if deviation occurs
+            destination = addressToCoord(deliveryData.get("destination"))
+            if not destination:
+                return jsonify({"error": "Failed to retrieve destination coordinates"}), 500
 
-        if (DeviationSuccess):
-            #Retrieve coordinates of destination via address
-            Destination_address = DriverResponse_data["data"]["destination"]
+            new_polyline = retrievePolyline(driverCoord, destination)
+            if not new_polyline:
+                return jsonify({"error": "Failed to retrieve new polyline"}), 500
 
-            Destination_PlaceToCoordJson = {
-                    "long_name": Destination_address
-            }
-
-            Destination_PlaceToCoordResponse = requests.post(LocationEndpoint + "/PlaceToCoord", headers=headers, data=json.dumps(Destination_PlaceToCoordJson))
-
-            if  Destination_PlaceToCoordResponse.status_code == 200:
-                Destination_PlaceToCoordResponse_data = Destination_PlaceToCoordResponse.json()  # Parse the JSON response
-                try:
-                    DestinationCoord = {
-                        "lat" : Destination_PlaceToCoordResponse_data["latitude"],
-                        "lng" : Destination_PlaceToCoordResponse_data["longitude"]
-                    }
-                    print(f"Coordinates Received")
-                except Exception as e:
-                    print(f"Error in fetching coordinates: {e}")
-            else:
-                print(f"Error: {Destination_PlaceToCoordResponse.status_code}")  # Handle errors
-
-            #Retreive Polyline
-            LocationJson = {
-                        "routingPreference": "TRAFFIC_AWARE",
-                        "travelMode": "DRIVE",
-                        "computeAlternativeRoutes": False,
-                        "destination": {
-                            "location": {
-                            "latLng": {
-                                "latitude": DestinationCoord["lat"],
-                                "longitude": DestinationCoord["lng"]
-                            }
-                            }
-                        },
-                        "origin": {
-                            "location": {
-                            "latLng": {
-                                "latitude": driverCoord["lat"],
-                                "longitude": driverCoord["lng"]
-                            }
-                            }
-                        }
-                        }
-            
-
-            LocationResponse = requests.post(LocationEndpoint + "/route", headers=headers, data=json.dumps(LocationJson))
-
-            if LocationResponse.status_code == 200:
-                LocationResponse_data = LocationResponse.json()  # Parse the JSON response
-                try:
-                    encoded_polyline = LocationResponse_data["Route"][0]["Polyline"]["encodedPolyline"]
-                    print(f"Encoded Polyline: {encoded_polyline}")
-                except KeyError as e:
-                    print(f"KeyError: Missing expected key {e}")
-            else:
-                print(f"Error: {LocationResponse.status_code}")  # Handle errors
-
-            #NUMBER 2
-            #Send the new polyline into delivery api
-            updateJson = {
-                "polyline" : encoded_polyline,
-                "driverCoord" : driverCoord
-            }
-
-            updateResponse = requests.put(DeliveryEndpoint + "/deliveryinfo/" + deliveryId,
-                                            json=updateJson)
-            
-            if updateResponse.status_code == 200:
-                print("Success in updating delivery")
-            else:
-                print(f"Error: {LocationResponse.status_code}")  # Handle errors
+            success = updateDelivery(new_polyline, driverCoord, "In Progress", deliveryId)
+            if not success:
+                return jsonify({"error": "Failed to update delivery"}), 500
         else:
-            #Send the current polyline into delivery api
-            updateJson = {
-                "polyline" : polyline,
-                "driverCoord" : driverCoord
-            }
+            success = updateDelivery(polyline, driverCoord, "In Progress", deliveryId)
+            if not success:
+                return jsonify({"error": "Failed to update delivery"}), 500
 
-            updateResponse = requests.put(DeliveryEndpoint + "/deliveryinfo/" + deliveryId,
-                                            json=updateJson)
-
-            if updateResponse.status_code == 200:
-                print("Success in updating delivery")
-            else:
-                print(f"Error: {LocationResponse.status_code}")  # Handle errors
-
-        # At the end of your function, after all the processing:
         return jsonify({
             "code": 200,
             "message": "Tracking updated successfully",
-            "data": {
-                "polyline": encoded_polyline if DeviationSuccess else polyline,
-                "deviation" : DeviationSuccess
-            }
+            "data": {"polyline": new_polyline if deviation else polyline, "deviation": deviation}
         }), 200
-        
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
-    #update the deliveryId with new polyline and driverCoord
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Simple health check endpoint"""
-    return jsonify({"status": "healthy"})
+    """Simple health check endpoint."""
+    return jsonify({"status": "healthy"}), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5025)

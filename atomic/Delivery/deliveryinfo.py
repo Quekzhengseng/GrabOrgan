@@ -4,6 +4,7 @@ from flask_cors import CORS
 import firebase_admin
 from firebase_admin import credentials, firestore
 import os
+import uuid
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -174,24 +175,8 @@ def create_delivery():
         }
         
         # Add document to Firestore with auto-generated ID
-        try:
-            # Method 1: For google-cloud-firestore client library
-            doc_ref = db.collection(DELIVERY_COLLECTION).add(delivery_data)
-            if hasattr(doc_ref, 'id'):
-                delivery_id = doc_ref.id
-            elif isinstance(doc_ref, tuple) and len(doc_ref) > 0:
-                delivery_id = doc_ref[0].id
-            else:
-                # Fallback method - create with random ID
-                import uuid
-                delivery_id = str(uuid.uuid4())
-                db.collection(DELIVERY_COLLECTION).document(delivery_id).set(delivery_data)
-        except Exception as db_error:
-            # Method 2: Alternative approach if the first method fails
-            import uuid
-            delivery_id = str(uuid.uuid4())
-            db.collection(DELIVERY_COLLECTION).document(delivery_id).set(delivery_data)
-            print(f"Used alternative method due to: {str(db_error)}")
+        delivery_id = str(uuid.uuid4())
+        db.collection(DELIVERY_COLLECTION).document(delivery_id).set(delivery_data)
         
         print(f"Created delivery with ID: {delivery_id}")
         

@@ -11,6 +11,8 @@ import {
   Calendar,
   Clock,
   ChevronRight,
+  Search,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -18,9 +20,12 @@ import DeliveryMapbox from "@/components/DeliveryMapbox"; // Import the map comp
 
 export default function DeliveryOrdersPage() {
   const [deliveries, setDeliveries] = useState([]);
+  const [filteredDeliveries, setFilteredDeliveries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedDelivery, setSelectedDelivery] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState("Assigned");
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -43,6 +48,7 @@ export default function DeliveryOrdersPage() {
           // Convert the object of deliveries into an array
           const deliveryArray = Object.values(data.data);
           setDeliveries(deliveryArray);
+          setFilteredDeliveries(deliveryArray);
 
           // If we have an orderId in the URL, find and select that delivery
           if (orderIdParam) {
@@ -66,6 +72,34 @@ export default function DeliveryOrdersPage() {
 
     fetchDeliveries();
   }, [orderIdParam]);
+
+  // Apply filters when search term or filter status changes
+  useEffect(() => {
+    if (!deliveries.length) return;
+
+    let filtered = [...deliveries];
+
+    // Filter by status
+    if (filterStatus !== "All") {
+      filtered = filtered.filter(
+        (delivery) => delivery.status === filterStatus
+      );
+    }
+
+    // Filter by search term
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter(
+        (delivery) =>
+          delivery.orderID?.toLowerCase().includes(searchLower) ||
+          delivery.pickup?.toLowerCase().includes(searchLower) ||
+          delivery.destination?.toLowerCase().includes(searchLower) ||
+          delivery.driverID?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    setFilteredDeliveries(filtered);
+  }, [searchTerm, filterStatus, deliveries]);
 
   // Helper function to get status badge color
   const getStatusColor = (status) => {
@@ -96,13 +130,6 @@ export default function DeliveryOrdersPage() {
     return `${year}-${month}-${day} ${timePart} ${ampm}`;
   };
 
-  // Handle click on a delivery to view details
-  const handleDeliveryClick = (delivery) => {
-    setSelectedDelivery(delivery);
-    // Update URL with orderId but without refreshing the page
-    router.push(`/delivery?orderId=${delivery.orderID}`, { scroll: false });
-  };
-
   // Handle track delivery button click
   const handleTrackDelivery = (delivery, e) => {
     e.stopPropagation(); // Prevent triggering the card click
@@ -115,6 +142,50 @@ export default function DeliveryOrdersPage() {
   const handleBackClick = () => {
     setSelectedDelivery(null);
     router.push("/delivery", { scroll: false });
+  };
+
+  const handleDeliveryDelete = async (delivery, e) => {
+    e.stopPropagation(); // Prevent triggering the card click
+    try {
+      console.log(delivery.orderID);
+      const response = await fetch(
+        `http://localhost:5002/deliveryinfo/${delivery.orderID}`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ status: "Deleted" }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to update delivery status");
+      }
+
+      alert("Delivery deleted successfully!");
+      // Remove the deleted delivery from the list
+      const updatedDeliveries = deliveries.filter(
+        (d) => d.orderID !== delivery.orderID
+      );
+      setDeliveries(updatedDeliveries);
+      setFilteredDeliveries(updatedDeliveries);
+    } catch (error) {
+      console.error("Error deleting delivery:", error);
+      alert("Error deleting delivery.");
+    }
+  };
+
+  // Get unique statuses for the filter dropdown
+  const getStatusOptions = () => {
+    if (!deliveries.length) return ["All"];
+    const statuses = deliveries.map((delivery) => delivery.status);
+    return ["All", ...new Set(statuses)];
+  };
+
+  // Clear search field
+  const clearSearch = () => {
+    setSearchTerm("");
   };
 
   // Render map view when a delivery is selected
@@ -232,6 +303,59 @@ export default function DeliveryOrdersPage() {
         </Link>
       </div>
 
+      {/* Search and Filter Section */}
+      <div className="mb-6 bg-white rounded-lg shadow p-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Search Box */}
+          <div className="relative">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Search Box
+            </label>
+            <input
+              type="text"
+              placeholder="Search by order ID, location, driver..."
+              className="block w-full pl-10 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            {searchTerm && (
+              <button
+                onClick={clearSearch}
+                className="absolute  inset-y-0 right-0 pr-3 flex items-center"
+              >
+                <X className="h-5 w-5 text-gray-400 hover:text-gray-600 relative top-[-10px]" />
+              </button>
+            )}
+          </div>
+
+          {/* Status Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Filter by Status
+            </label>
+            <select
+              className="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+            >
+              {getStatusOptions().map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Results Summary */}
+          <div className="flex items-end">
+            <p className="text-gray-600">
+              Showing {filteredDeliveries.length} of {deliveries.length}{" "}
+              deliveries
+            </p>
+          </div>
+        </div>
+      </div>
+
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-green-500" />
@@ -242,17 +366,30 @@ export default function DeliveryOrdersPage() {
           <p className="font-bold">Error</p>
           <p>{error}</p>
         </div>
-      ) : deliveries.length === 0 ? (
+      ) : filteredDeliveries.length === 0 ? (
         <div className="bg-gray-100 p-6 text-center rounded">
-          <p className="text-gray-700">No delivery orders found.</p>
+          <p className="text-gray-700">
+            No delivery orders found matching your criteria.
+          </p>
+          {(searchTerm || filterStatus !== "All") && (
+            <button
+              onClick={() => {
+                setSearchTerm("");
+                setFilterStatus("All");
+              }}
+              className="mt-2 text-green-600 hover:text-green-800"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {deliveries.map((delivery, index) => (
+          {filteredDeliveries.map((delivery, index) => (
             <div
               key={delivery.orderID || index}
               className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer overflow-hidden"
-              onClick={() => handleDeliveryClick(delivery)}
+              onClick={(e) => handleTrackDelivery(delivery, e)}
             >
               <div className="p-5">
                 <div className="flex justify-between items-start mb-3">
@@ -292,13 +429,17 @@ export default function DeliveryOrdersPage() {
                 </div>
               </div>
 
-              <div
-                className="border-t px-5 py-3 bg-gray-50 flex justify-end items-center"
-                onClick={(e) => handleTrackDelivery(delivery, e)}
-              >
-                <span className="text-green-600 text-sm font-medium flex items-center">
-                  Track delivery <ChevronRight className="h-4 w-4 ml-1" />
-                </span>
+              <div className="border-t px-5 py-3 bg-gray-50 flex justify-between items-center">
+                <div onClick={(e) => handleDeliveryDelete(delivery, e)}>
+                  <span className="text-red-600 text-sm font-medium flex items-center">
+                    Delete Delivery
+                  </span>
+                </div>
+                <div onClick={(e) => handleTrackDelivery(delivery, e)}>
+                  <span className="text-green-600 text-sm font-medium flex items-center">
+                    Track delivery <ChevronRight className="h-4 w-4 ml-1" />
+                  </span>
+                </div>
               </div>
             </div>
           ))}

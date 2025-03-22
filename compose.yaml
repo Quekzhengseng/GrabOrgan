@@ -286,6 +286,8 @@ services:
     image: GrabOrgan/selecdriver:1.0
     # restart: always
     container_name: selectDriver
+    environment:
+      - PYTHONUNBUFFERED=1
     ports:
       - "5024:5024"
     networks:
@@ -298,6 +300,8 @@ services:
     image: GrabOrgan/trackdelivery:1.0
     # restart: always
     container_name: trackDelivery
+    environment:
+    - PYTHONUNBUFFERED=1
     ports:
       - "5025:5025"
     networks:

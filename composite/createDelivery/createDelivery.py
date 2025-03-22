@@ -7,210 +7,158 @@ import requests
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
-DeliveryEndpoint = "http://delivery_service:5002"
-GeoAlgoEndpoint = "http://geoalgo_service:5006"
-DriverEndpoint = "http://driverInfo_service:5004"
-MatchDriverEndpoint = "http://selectDriver:5024"
-LocationEndpoint = "https://zsq.outsystemscloud.com/Location/rest/Location/"
-headers = {'Content-Type': 'application/json'}
+# Service Endpoints
+SERVICE_URLS = {
+    "delivery": "http://delivery_service:5002",
+    "geoalgo": "http://geoalgo_service:5006",
+    "driver": "http://driverInfo_service:5004",
+    "match_driver": "http://selectDriver:5024",
+    "location": "https://zsq.outsystemscloud.com/Location/rest/Location/"
+}
+
+HEADERS = {'Content-Type': 'application/json'}
+TIMEOUT = 10  # API timeout for requests
+
+
+def make_request(url, method="POST", payload=None):
+    """ Helper function to send HTTP requests with error handling. """
+    try:
+        if method == "POST":
+            response = requests.post(url, headers=HEADERS, json=payload, timeout=TIMEOUT)
+        else:  # GET request
+            response = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"HTTP Request failed: {e}")
+        return None
+
+
+def address_to_coord(address):
+    """ Convert an address to latitude and longitude coordinates. """
+    payload = {"long_name": address}
+    response = make_request(SERVICE_URLS["location"] + "/PlaceToCoord", payload=payload)
+    
+    if response:
+        return {"lat": response.get("latitude"), "lng": response.get("longitude")}
+    return None
+
+
+def retrieve_polyline(coord1, coord2):
+    """ Retrieve a polyline route between two coordinates. """
+    payload = {
+        "routingPreference": "TRAFFIC_AWARE",
+        "travelMode": "DRIVE",
+        "computeAlternativeRoutes": False,
+        "destination": {"location": {"latLng": {"latitude": coord2["lat"], "longitude": coord2["lng"]}}},
+        "origin": {"location": {"latLng": {"latitude": coord1["lat"], "longitude": coord1["lng"]}}}
+    }
+    response = make_request(SERVICE_URLS["location"] + "/route", payload=payload)
+
+    if response:
+        return response.get("Route", [{}])[0].get("Polyline", {}).get("encodedPolyline")
+    return None
+
+
+def match_driver(destination_time, origin, destination):
+    """ Match a driver for the given route and time. """
+    payload = {"transplantDateTime": destination_time, "startHospital": origin, "endHospital": destination}
+    response = make_request(SERVICE_URLS["match_driver"] + "/selectDriver", payload=payload)
+
+    if response:
+        return response.get("data", {}).get("DriverId")
+    return None
+
+
+def get_driver(driver_id):
+    """ Get the driver's stationed hospital. """
+    if not driver_id:
+        return None
+
+    response = make_request(f"{SERVICE_URLS['driver']}/drivers/{driver_id}", method="GET")
+
+    if response:
+        return response.get("stationed_hospital")
+    return None
+
+
+def create_delivery(origin, destination, polyline, driver_coord, driver_id, doctor_id):
+    """ Create a new delivery entry. """
+    payload = {
+        "pickup": origin,
+        "pickup_time": "20250315 10:30:00 AM",
+        "destination": destination,
+        "destination_time": "20250315 11:30:00 AM",
+        "status": "Assigned",
+        "polyline": polyline,
+        "driverCoord": driver_coord,
+        "driverID": driver_id,
+        "doctorID": doctor_id,
+    }
+    
+    response = make_request(SERVICE_URLS["delivery"] + "/deliveryinfo", payload=payload)
+
+    if response:
+        return response.get("data", {}).get("deliveryId")
+    return None
+
 
 @app.route('/createDelivery', methods=['POST'])
-def createDelivery():
-
-    """
-    API endpoint to decode a polyline
-    
-    Expects JSON data with format: 
-    {
-        Status: (Scheduled, On Delivery, Delivered) => Not used
-        transplantDateTime: DateTime, => Required
-        startHospital: String, => Required
-        endHospital: String, => Required
-        DoctorId: String, => Required
-        matchId: String, => Not used
-        Remarks: String => Not used
-    }
-
-    Returns:
-    {
-        "code" : int,
-        "message" : String
-        "data" : {
-            "deliveryId" : String
-        }
-    }
-    """
-
-    #Retrieve the information from the post
+def create_delivery_composite():
+    """ API endpoint to create a delivery. """
     try:
         data = request.get_json()
-
         if not data:
-            return jsonify({"error": "No json data received"}), 400
+            return jsonify({"error": "No JSON data received"}), 400
+
+        origin_address = data.get("startHospital")
+        destination_address = data.get("endHospital")
+        doctor_id = data.get("DoctorId")
+        destination_time = data.get("transplantDateTime")
+
+        # Convert addresses to coordinates
+        origin_coord = address_to_coord(origin_address)
+        destination_coord = address_to_coord(destination_address)
         
-        #Retrieve DoctorID, originCoord, DestinationCoord, EndTime
-        Origin_address = data.get("startHospital")
-        Destination_address = data.get("endHospital")
-        DoctorId = data.get("DoctorId")
-        destinationTime = data.get("transplantDateTime")
+        if not origin_coord or not destination_coord:
+            return jsonify({"error": "Failed to convert addresses to coordinates"}), 400
 
-        Origin_PlaceToCoordJson = {
-                                    "long_name": Origin_address
-                            }
-        
-        Destination_PlaceToCoordJson = {
-                            "long_name": Destination_address
-                    }
+        # Get polyline route
+        encoded_polyline = retrieve_polyline(origin_coord, destination_coord)
+        if not encoded_polyline:
+            return jsonify({"error": "Failed to retrieve polyline"}), 400
 
-        Origin_PlaceToCoordResponse = requests.post(LocationEndpoint + "/PlaceToCoord", headers=headers, data=json.dumps(Origin_PlaceToCoordJson))
-        Destination_PlaceToCoordResponse = requests.post(LocationEndpoint + "/PlaceToCoord", headers=headers, data=json.dumps(Destination_PlaceToCoordJson))
+        # Match a driver
+        driver_id = match_driver(destination_time, origin_address, destination_address)
+        if not driver_id:
+            return jsonify({"error": "No matching driver found"}), 400
 
-        if Origin_PlaceToCoordResponse.status_code == 200 and Destination_PlaceToCoordResponse.status_code == 200:
-            Origin_PlaceToCoordResponse_data = Origin_PlaceToCoordResponse.json()  # Parse the JSON response
-            Destination_PlaceToCoordResponse_data = Destination_PlaceToCoordResponse.json()  # Parse the JSON response
-            try:
-                OriginCoord = {
-                    "lat" : Origin_PlaceToCoordResponse_data["latitude"],
-                    "lng" : Origin_PlaceToCoordResponse_data["longitude"]
-                }
-                DestinationCoord = {
-                    "lat" : Destination_PlaceToCoordResponse_data["latitude"],
-                    "lng" : Destination_PlaceToCoordResponse_data["longitude"]
-                }
-                print(f"Coordinates Received")
-            except Exception as e:
-                print(f"Error in fetching coordinates: {e}")
-        else:
-            print(f"Error: {Origin_PlaceToCoordResponse.status_code}")  # Handle errors
+        # Get driver’s stationed hospital
+        driver_address = get_driver(driver_id)
+        if not driver_address:
+            return jsonify({"error": "Failed to retrieve driver information"}), 400
 
-        #Retreive Polyline
-        LocationJson = {
-                    "routingPreference": "TRAFFIC_AWARE",
-                    "travelMode": "DRIVE",
-                    "computeAlternativeRoutes": False,
-                    "destination": {
-                        "location": {
-                        "latLng": {
-                            "latitude": DestinationCoord["lat"],
-                            "longitude": DestinationCoord["lng"]
-                        }
-                        }
-                    },
-                    "origin": {
-                        "location": {
-                        "latLng": {
-                            "latitude": OriginCoord["lat"],
-                            "longitude": OriginCoord["lng"]
-                        }
-                        }
-                    }
-                    }
+        # Convert driver’s address to coordinates
+        driver_coord = address_to_coord(driver_address)
+        if not driver_coord:
+            return jsonify({"error": "Failed to retrieve driver coordinates"}), 400
 
-        LocationResponse = requests.post(LocationEndpoint + "/route", headers=headers, data=json.dumps(LocationJson))
+        # Create delivery
+        delivery_id = create_delivery(origin_address, destination_address, encoded_polyline, driver_coord, driver_id, doctor_id)
+        if not delivery_id:
+            return jsonify({"error": "Failed to create delivery"}), 400
 
-        if LocationResponse.status_code == 200:
-            LocationResponse_data = LocationResponse.json()  # Parse the JSON response
-            try:
-                encoded_polyline = LocationResponse_data["Route"][0]["Polyline"]["encodedPolyline"]
-                print(f"Encoded Polyline: {encoded_polyline}")
-            except KeyError as e:
-                print(f"Location KeyError: Missing expected key {e}")
-        else:
-            print(f"Location Error: {LocationResponse.status_code}")  # Handle errors
-
-        #Get a suitable Driver via matchDriver Composite
-        MatchDriverRequestJson = {
-            "transplantDateTime" : destinationTime,
-            "startHospital": Origin_address,
-            "endHospital": Destination_address
-        }
-
-        MatchDriverResponse = requests.post(MatchDriverEndpoint + "/selectDriver", headers=headers, data=json.dumps(MatchDriverRequestJson))
-
-        if MatchDriverResponse.status_code == 200:
-            MatchDriverResponse_data = MatchDriverResponse.json()  # Parse the JSON response
-            try:
-                driverId = MatchDriverResponse_data["data"]["DriverId"]
-                print(f"Driver Found")
-            except Exception as e:
-                print(f"Cannot fetch a driver: {e}")
-        else:
-            print(f"Match Driver Error: {MatchDriverResponse.status_code}")  # Handle errors
-
-        #Get the driver details
-        DriverResponse = requests.get(DriverEndpoint + "/drivers/" + str(driverId))
-
-        if DriverResponse.status_code == 200:
-            DriverResponse_data = DriverResponse.json()  # Parse the JSON response
-            try:
-                driverAddress = DriverResponse_data["stationed_hospital"]
-                print(f"Driver Found")
-            except Exception as e:
-                print(f"Cannot fetch a driver: {e}")
-        else:
-            print(f"Driver Error: {DriverResponse.status_code}")  # Handle errors
-
-        #Convert driver address to coordinates
-        Driver_PlaceToCoordJson = {
-                            "long_name": driverAddress
-                    }
-
-        Driver_PlaceToCoordResponse = requests.post(LocationEndpoint + "/PlaceToCoord", headers=headers, data=json.dumps(Driver_PlaceToCoordJson))
-
-        if Driver_PlaceToCoordResponse.status_code == 200:
-            Driver_PlaceToCoordResponse_data = Driver_PlaceToCoordResponse.json()  # Parse the JSON response
-            try:
-                DriverCoord = {
-                    "lat" : Driver_PlaceToCoordResponse_data["latitude"],
-                    "lng" : Driver_PlaceToCoordResponse_data["longitude"]
-                }
-                print(f"Driver Coordinates Received")
-            except Exception as e:
-                print(f"Error in fetching Driver coordinates: {e}")
-        else:
-            print(f"Place to Coord Error: {Driver_PlaceToCoordResponse.status_code}")  # Handle errors
-
-        #NUMBER 1
-        #Create a new delivery json with driverID, DoctorID, originCoord, DestinationCoord, EndTime, polyline, status
-        DeliveryJson = {
-            "pickup": Origin_address,
-            "pickup_time": "20250315 10:30:00 AM",
-            "destination": Destination_address,
-            "destination_time": "20250315 11:30:00 AM",  # One hour later
-            "status": "Assigned",
-            "polyline": encoded_polyline,
-            "driverCoord": DriverCoord,
-            "driverID": driverId,
-            "doctorID": DoctorId,
-        }
-
-        print(json.dumps(DeliveryJson, indent=4))
-
-        #Connect to delivery API and create delivery
-        DeliveryResponse = requests.post(DeliveryEndpoint + "/deliveryinfo", headers=headers, data=json.dumps(DeliveryJson))
-
-        if DeliveryResponse.status_code == 201:
-            DeliveryResponse_data = DeliveryResponse.json()  # Parse the JSON response
-            try:
-                DeliveryId = DeliveryResponse_data["data"]["deliveryId"]
-                print(f"Delivery Response: {DeliveryResponse_data}")
-            except KeyError as e:
-                print(f"Delivery KeyError: Missing expected key {e}")
-        else:
-            print(f"Delivery Error: {DeliveryResponse}")  # Handle errors
-
-        return jsonify({"message": "Delivery successfully created", "data": {
-            "DeliveryId" : DeliveryId
-        }}), 200
+        return jsonify({"message": "Delivery successfully created", "data": {"DeliveryId": delivery_id}}), 200
     except Exception as e:
-        return jsonify({"code": 500,
-                        "message": f"{e}"}), 500
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Simple health check endpoint"""
+    """ Health check endpoint. """
     return jsonify({"status": "healthy"})
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5026)
