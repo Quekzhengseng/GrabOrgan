@@ -23,15 +23,26 @@ services:
     build:
       context: .
       dockerfile: atomic/ActivityLog/Dockerfile.activity.log
+    image: GrabOrgan/activity_log:1.0
+
     ports:
       - "5001:5001"
     environment:
-      # - AMQP_URL=amqp://rabbitmq:5672/ if dockerised
-      - AMQP_URL=amqp://rabbitmq:5672/
-      - PYTHONPATH=/app:/app/common
-    command: ["python", "activity_log.py"]
+      - rabbit_host=rabbitmq # The name of the RabbitMQ container defined in the RabbitMQ compose file
+      - rabbit_port=5672
+      - exchange_name=activity_log_exchange
+      - exchange_type=topic
+      - queue_name=activity_log_queue
+      - routing_key=*.info
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/usr/src/app:/usr/src/app/common # Equivalent to export PYTHONPATH
+    depends_on:
+      - rabbitmq
     networks:
       - grabOrgan-net
+    command: ["python", "activity_log.py"]
+    restart: always
+
   delivery_info:
     build:
       context: atomic/Delivery/.
@@ -41,11 +52,14 @@ services:
       - ./secrets/delivery/delivery_Key.json:/usr/src/app/delivery_Key.json:ro
     environment:
       - DELIVERY_DB_KEY=/usr/src/app/delivery_Key.json
+      - PYTHONUNBUFFERED=1
     container_name: delivery_service
     ports:
       - "5002:5002"
     networks:
       - grabOrgan-net
+    # restart: always
+
   donor:
     build:
       context: atomic/Donor/.
@@ -60,6 +74,7 @@ services:
       - "5003:5003"
     networks:
       - grabOrgan-net
+    # restart: always
 
   driverInfo:
     build:
@@ -79,15 +94,25 @@ services:
     build:
       context: .
       dockerfile: atomic/Error/Dockerfile.error
+    image: GrabOrgan/error:1.0
+
     container_name: error_service
     ports:
       - "5005:5005"
     environment:
-      - AMQP_URL=amqp://rabbitmq:5672/
-      - PYTHONPATH=/app:/app/common
-    command: ["python", "error.py"]
+      - rabbit_host=rabbitmq # The name of the RabbitMQ container defined in the RabbitMQ compose file
+      - rabbit_port=5672
+      - exchange_name=error_handling_exchange
+      - exchange_type=topic
+      - queue_name=error_queue
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/usr/src/app:/usr/src/app/common # Equivalent to export PYTHONPATH
+    depends_on:
+      - rabbitmq
     networks:
       - grabOrgan-net
+    command: ["python", "error.py"]
+    restart: always
 
   geoalgo:
     build:
@@ -99,6 +124,7 @@ services:
       - "5006:5006"
     networks:
       - grabOrgan-net
+    # restart: always
 
   labInfo:
     build:
@@ -114,6 +140,8 @@ services:
       - "5007:5007"
     networks:
       - grabOrgan-net
+    # restart: always
+
   match:
     build:
       context: atomic/Match/.
@@ -128,6 +156,7 @@ services:
       - "5008:5008"
     networks:
       - grabOrgan-net
+    # restart: always
 
   order:
     build:
@@ -143,12 +172,13 @@ services:
       - "5009:5009"
     networks:
       - grabOrgan-net
+    # restart: always
 
   organ:
     build:
       context: atomic/Organ/.
       dockerfile: Dockerfile.organ
-    image: graborgan/organ:1.0
+    image: GrabOrgan/organ:1.0
     volumes:
       - ./secrets/organ/organ_Key.json:/usr/src/app/secrets/organ_Key.json:ro
     environment:
@@ -158,6 +188,7 @@ services:
     container_name: organ_service
     networks:
       - grabOrgan-net
+    # restart: always
 
   personalData:
     build:
@@ -173,6 +204,7 @@ services:
       - "5011:5011"
     networks:
       - grabOrgan-net
+    # restart: always
 
   pseudonym:
     build:
@@ -184,12 +216,13 @@ services:
       - "5012:5012"
     networks:
       - grabOrgan-net
+    # restart: always
 
   recipient:
     build:
       context: atomic/Recipient/.
       dockerfile: Dockerfile.recipient
-    image: graborgan/recipient:1.0
+    image: GrabOrgan/recipient:1.0
     volumes:
       - ./secrets/recipient/recipient_Key.json:/usr/src/app/secrets/recipient_Key.json:ro
     environment:
@@ -199,6 +232,38 @@ services:
     container_name: recipient_service
     networks:
       - grabOrgan-net
+    # restart: always
+
+  match_organ:
+    build:
+      context: .
+      dockerfile: composite/MatchOrgan/Dockerfile.match.organ
+    image: GrabOrgan/match_organ:1.0
+    environment:
+      - AMQP_URL=amqp://rabbitmq:5672/
+      - rabbit_host=rabbitmq # The name of the RabbitMQ container defined in the RabbitMQ compose file
+      - rabbit_port=5672
+      - RECIPIENT_URL=http://recipient:5013/recipient
+      - DONOR_URL=http://donor:5003/donor
+      - ORGAN_URL=http://organ:5010/organ
+      - MATCH_URL=http://match:5008/matches
+      - PYTHONPATH=/usr/src/app:/usr/src/app/common # Equivalent to export PYTHONPATH
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "5020:5020"
+    depends_on:
+      - rabbitmq
+      - activity_log
+      - error
+      - recipient
+      - donor
+      - match
+      - organ
+    container_name: match_organ_service
+    networks:
+      - grabOrgan-net
+    # restart: always
+    command: ["python", "match_organ.py"]
 
   createDelivery:
     build:
@@ -207,6 +272,8 @@ services:
     image: GrabOrgan/createdelivery:1.0
     # restart: always
     container_name: createDelivery
+    environment:
+      - PYTHONUNBUFFERED=1
     ports:
       - "5026:5026"
     networks:

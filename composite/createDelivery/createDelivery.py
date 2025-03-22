@@ -26,7 +26,7 @@ def createDelivery():
         transplantDateTime: DateTime, => Required
         startHospital: String, => Required
         endHospital: String, => Required
-        doctorId: String, => Required
+        DoctorId: String, => Required
         matchId: String, => Not used
         Remarks: String => Not used
     }
@@ -114,9 +114,9 @@ def createDelivery():
                 encoded_polyline = LocationResponse_data["Route"][0]["Polyline"]["encodedPolyline"]
                 print(f"Encoded Polyline: {encoded_polyline}")
             except KeyError as e:
-                print(f"KeyError: Missing expected key {e}")
+                print(f"Location KeyError: Missing expected key {e}")
         else:
-            print(f"Error: {LocationResponse.status_code}")  # Handle errors
+            print(f"Location Error: {LocationResponse.status_code}")  # Handle errors
 
         #Get a suitable Driver via matchDriver Composite
         MatchDriverRequestJson = {
@@ -135,10 +135,10 @@ def createDelivery():
             except Exception as e:
                 print(f"Cannot fetch a driver: {e}")
         else:
-            print(f"Error: {MatchDriverResponse.status_code}")  # Handle errors
+            print(f"Match Driver Error: {MatchDriverResponse.status_code}")  # Handle errors
 
         #Get the driver details
-        DriverResponse = requests.get(DriverEndpoint + "/drivers/" + driverId)
+        DriverResponse = requests.get(DriverEndpoint + "/drivers/" + str(driverId))
 
         if DriverResponse.status_code == 200:
             DriverResponse_data = DriverResponse.json()  # Parse the JSON response
@@ -148,7 +148,7 @@ def createDelivery():
             except Exception as e:
                 print(f"Cannot fetch a driver: {e}")
         else:
-            print(f"Error: {DriverResponse.status_code}")  # Handle errors
+            print(f"Driver Error: {DriverResponse.status_code}")  # Handle errors
 
         #Convert driver address to coordinates
         Driver_PlaceToCoordJson = {
@@ -168,7 +168,7 @@ def createDelivery():
             except Exception as e:
                 print(f"Error in fetching Driver coordinates: {e}")
         else:
-            print(f"Error: {Driver_PlaceToCoordResponse.status_code}")  # Handle errors
+            print(f"Place to Coord Error: {Driver_PlaceToCoordResponse.status_code}")  # Handle errors
 
         #NUMBER 1
         #Create a new delivery json with driverID, DoctorID, originCoord, DestinationCoord, EndTime, polyline, status
@@ -184,18 +184,20 @@ def createDelivery():
             "doctorID": DoctorId,
         }
 
+        print(json.dumps(DeliveryJson, indent=4))
+
         #Connect to delivery API and create delivery
         DeliveryResponse = requests.post(DeliveryEndpoint + "/deliveryinfo", headers=headers, data=json.dumps(DeliveryJson))
 
         if DeliveryResponse.status_code == 201:
             DeliveryResponse_data = DeliveryResponse.json()  # Parse the JSON response
             try:
-                DeliveryId = DeliveryResponse_data["data"]["orderID"]
+                DeliveryId = DeliveryResponse_data["data"]["deliveryId"]
                 print(f"Delivery Response: {DeliveryResponse_data}")
             except KeyError as e:
-                print(f"KeyError: Missing expected key {e}")
+                print(f"Delivery KeyError: Missing expected key {e}")
         else:
-            print(f"Error: {DeliveryResponse}")  # Handle errors
+            print(f"Delivery Error: {DeliveryResponse}")  # Handle errors
 
         return jsonify({"message": "Delivery successfully created", "data": {
             "DeliveryId" : DeliveryId

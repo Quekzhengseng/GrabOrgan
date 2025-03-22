@@ -25,50 +25,50 @@ db = firestore.client()
 # Firestore collection for delivery orders
 DELIVERY_COLLECTION = "delivery_orders"
 
-# Function to generate unique orderID
-def generate_order_id(pickup_location, pickup_date):
-    """Generates a unique Order ID in the format: <pickup_location><pickup_date><4-digit_increment>"""
-    pickup_date_str = pickup_date.strftime("%Y%m%d")  # ✅ Correct format YYYYMMDD
-    prefix = f"{pickup_location}{pickup_date_str}"
+# # Function to generate unique orderID
+# def generate_order_id(pickup_location, pickup_date):
+#     """Generates a unique Order ID in the format: <pickup_location><pickup_date><4-digit_increment>"""
+#     pickup_date_str = pickup_date.strftime("%Y%m%d")  # ✅ Correct format YYYYMMDD
+#     prefix = f"{pickup_location}{pickup_date_str}"
     
-    # Reference to the counter document
-    counter_ref = db.collection("counters").document(prefix)
+#     # Reference to the counter document
+#     counter_ref = db.collection("counters").document(prefix)
     
-    # Define transaction operation
-    @firestore.transactional
-    def update_in_transaction(transaction, counter_ref):
-        counter_doc = counter_ref.get(transaction=transaction)
-        if counter_doc.exists:
-            current_count = counter_doc.to_dict().get('count', 0) + 1
-        else:
-            current_count = 1
+#     # Define transaction operation
+#     @firestore.transactional
+#     def update_in_transaction(transaction, counter_ref):
+#         counter_doc = counter_ref.get(transaction=transaction)
+#         if counter_doc.exists:
+#             current_count = counter_doc.to_dict().get('count', 0) + 1
+#         else:
+#             current_count = 1
             
-        transaction.set(counter_ref, {'count': current_count})
-        return current_count
+#         transaction.set(counter_ref, {'count': current_count})
+#         return current_count
     
-    # Execute the transaction
-    count = update_in_transaction(db.transaction(), counter_ref)
+#     # Execute the transaction
+#     count = update_in_transaction(db.transaction(), counter_ref)
     
-    # Return the formatted ID
-    print(f"{prefix}{count:04d}")
-    return f"{prefix}{count:04d}"  # 4-digit incremental value
+#     # Return the formatted ID
+#     print(f"{prefix}{count:04d}")
+#     return f"{prefix}{count:04d}"  # 4-digit incremental value
 
-def format_datetime(dt_str):
-    """Convert a datetime string to Firestore-compatible format with YYYYMMDD date."""
-    try:
-        # Try parsing the new YYYYMMDD format first
-        dt = datetime.strptime(dt_str, "%Y%m%d %I:%M:%S %p")
-        formatted_date = dt.strftime("%Y%m%d")  # Convert to YYYYMMDD
-        formatted_time = dt.strftime("%I:%M:%S %p")  # Keep HH:MM:SS AM/PM
-        return f"{formatted_date} {formatted_time}", dt
-    except ValueError:
-        return None, None
+# def format_datetime(dt_str):
+#     """Convert a datetime string to Firestore-compatible format with YYYYMMDD date."""
+#     try:
+#         # Try parsing the new YYYYMMDD format first
+#         dt = datetime.strptime(dt_str, "%Y%m%d %I:%M:%S %p")
+#         formatted_date = dt.strftime("%Y%m%d")  # Convert to YYYYMMDD
+#         formatted_time = dt.strftime("%I:%M:%S %p")  # Keep HH:MM:SS AM/PM
+#         return f"{formatted_date} {formatted_time}", dt
+#     except ValueError:
+#         return None, None
 
-def is_valid_status(status, destination_time):
-    """Ensure that 'Awaiting pickup' and 'In progress' statuses have no destination_time."""
-    if status in ["Awaiting pickup", "In progress"] and destination_time is not None:
-        return False
-    return True
+# def is_valid_status(status, destination_time):
+#     """Ensure that 'Awaiting pickup' and 'In progress' statuses have no destination_time."""
+#     if status in ["Awaiting pickup", "In progress"] and destination_time is not None:
+#         return False
+#     return True
 
 # DeliveryInfo Class
 class DeliveryInfo:
@@ -151,7 +151,6 @@ def get_delivery(order_id):
         return jsonify({"code": 500, "message": str(e)}), 500
 
 
-# 📌 Route: Create a new delivery order (Auto-Generated Order ID)
 @app.route("/deliveryinfo", methods=["POST"])
 def create_delivery():
     try:
@@ -160,47 +159,50 @@ def create_delivery():
         
         if not all(field in data for field in required_fields):
             return jsonify({"code": 400, "message": "Missing required fields"}), 400
-
-        # Format and validate pickup_time
-        formatted_pickup_time, pickup_dt = format_datetime(data["pickup_time"])
-        if not pickup_dt:
-            return jsonify({"code": 400, "message": "Invalid pickup_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
-
-        # Format and validate destination_time
-        formatted_destination_time, destination_dt = None, None
-        if data["destination_time"] is not None:
-            formatted_destination_time, destination_dt = format_datetime(data["destination_time"])
-            if not destination_dt:
-                return jsonify({"code": 400, "message": "Invalid destination_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
             
-            if destination_dt <= pickup_dt:
-                return jsonify({"code": 400, "message": "destination_time must be after pickup_time."}), 400
-
-        # Validate status constraints
-        if not is_valid_status(data["status"], formatted_destination_time):
-            return jsonify({"code": 400, "message": "destination_time should be empty if status is 'Awaiting pickup' or 'In progress'."}), 400
-
-        # Generate Order ID
-        order_id = generate_order_id(data["pickup"], pickup_dt)
-
-        # Create Firestore document
+        # Prepare delivery data
         delivery_data = {
-            "orderID": order_id,
             "status": data["status"],
             "pickup": data["pickup"],
-            "pickup_time": formatted_pickup_time,
+            "pickup_time": data["pickup_time"],
             "destination": data["destination"],
-            "destination_time": formatted_destination_time,
+            "destination_time": data["destination_time"],
             "polyline": data["polyline"],
             "driverCoord": data["driverCoord"],
             "driverID": data["driverID"],
             "doctorID": data["doctorID"]
         }
-
-        db.collection(DELIVERY_COLLECTION).document(order_id).set(delivery_data)
-
-        return jsonify({"code": 201, "message": "Delivery order created successfully", "data": {"orderID": order_id}}), 201
+        
+        # Add document to Firestore with auto-generated ID
+        try:
+            # Method 1: For google-cloud-firestore client library
+            doc_ref = db.collection(DELIVERY_COLLECTION).add(delivery_data)
+            if hasattr(doc_ref, 'id'):
+                delivery_id = doc_ref.id
+            elif isinstance(doc_ref, tuple) and len(doc_ref) > 0:
+                delivery_id = doc_ref[0].id
+            else:
+                # Fallback method - create with random ID
+                import uuid
+                delivery_id = str(uuid.uuid4())
+                db.collection(DELIVERY_COLLECTION).document(delivery_id).set(delivery_data)
+        except Exception as db_error:
+            # Method 2: Alternative approach if the first method fails
+            import uuid
+            delivery_id = str(uuid.uuid4())
+            db.collection(DELIVERY_COLLECTION).document(delivery_id).set(delivery_data)
+            print(f"Used alternative method due to: {str(db_error)}")
+        
+        print(f"Created delivery with ID: {delivery_id}")
+        
+        return jsonify({
+            "code": 201, 
+            "message": "Delivery order created successfully", 
+            "data": {"deliveryId": delivery_id}
+        }), 201
+        
     except Exception as e:
+        print(f"Error creating delivery: {str(e)}")
         return jsonify({"code": 500, "message": str(e)}), 500
 
 
@@ -226,31 +228,31 @@ def update_delivery(order_id):
         # Retrieve existing data
         existing_data = doc.to_dict()
 
-        # Validate pickup_time (only if it exists)
-        pickup_dt = None
-        if "pickup_time" in filtered_data and filtered_data["pickup_time"]:
-            formatted_pickup_time, pickup_dt = format_datetime(filtered_data["pickup_time"])
-            if not pickup_dt:
-                return jsonify({"code": 400, "message": "Invalid pickup_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
-            filtered_data["pickup_time"] = formatted_pickup_time
+        # # Validate pickup_time (only if it exists)
+        # pickup_dt = None
+        # if "pickup_time" in filtered_data and filtered_data["pickup_time"]:
+        #     formatted_pickup_time, pickup_dt = format_datetime(filtered_data["pickup_time"])
+        #     if not pickup_dt:
+        #         return jsonify({"code": 400, "message": "Invalid pickup_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
+        #     filtered_data["pickup_time"] = formatted_pickup_time
 
-        # Validate destination_time (only if it exists)
-        destination_dt = None
-        if "destination_time" in filtered_data and filtered_data["destination_time"]:
-            formatted_destination_time, destination_dt = format_datetime(filtered_data["destination_time"])
-            if not destination_dt:
-                return jsonify({"code": 400, "message": "Invalid destination_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
+        # # Validate destination_time (only if it exists)
+        # destination_dt = None
+        # if "destination_time" in filtered_data and filtered_data["destination_time"]:
+        #     formatted_destination_time, destination_dt = format_datetime(filtered_data["destination_time"])
+        #     if not destination_dt:
+        #         return jsonify({"code": 400, "message": "Invalid destination_time format. Expected 'YYYYMMDD HH:MM:SS AM/PM'"}), 400
             
-            # Ensure destination_time is after pickup_time
-            if pickup_dt and destination_dt and destination_dt <= pickup_dt:
-                return jsonify({"code": 400, "message": "destination_time must be after pickup_time."}), 400
+        #     # Ensure destination_time is after pickup_time
+        #     if pickup_dt and destination_dt and destination_dt <= pickup_dt:
+        #         return jsonify({"code": 400, "message": "destination_time must be after pickup_time."}), 400
 
-            filtered_data["destination_time"] = formatted_destination_time
+        #     filtered_data["destination_time"] = formatted_destination_time
         
-        # Validate status constraints
-        if "status" in filtered_data:
-            if not is_valid_status(filtered_data["status"], filtered_data.get("destination_time")):
-                return jsonify({"code": 400, "message": "destination_time should be empty if status is 'Awaiting pickup' or 'In progress'."}), 400
+        # # Validate status constraints
+        # if "status" in filtered_data:
+        #     if not is_valid_status(filtered_data["status"], filtered_data.get("destination_time")):
+        #         return jsonify({"code": 400, "message": "destination_time should be empty if status is 'Awaiting pickup' or 'In progress'."}), 400
 
         # Update Firestore document
         db.collection(DELIVERY_COLLECTION).document(order_id).set(filtered_data, merge=True)
