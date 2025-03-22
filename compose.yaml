@@ -302,3 +302,30 @@ services:
       - "5025:5025"
     networks:
       - grabOrgan-net
+
+  request_organ:
+    build:
+      context: ./composite/requestOrgan
+      dockerfile: Dockerfile
+    image: GrabOrgan/requestorgan:1.0
+    container_name: request_organ_service
+    ports:
+      - "5021:5021"
+    environment:
+      PERSONAL_DATA_URL: "http://personalData:5011/person"
+      PSEUDONYM_URL: "http://pseudonym:5012/pseudonymise"
+      RECIPIENT_URL: "http://recipient:5013/recipient"
+      LAB_REPORT_URL: "http://labInfo:5007/lab-reports"
+      RABBITMQ_HOST: "rabbitmq"
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_EXCHANGE: "request_organ_exchange"
+      RABBITMQ_ROUTING_KEY: "recipient.registered"
+      PYTHONUNBUFFERED: 1
+    depends_on:
+      - personalData
+      - pseudonym
+      - recipient
+      - labInfo
+      - rabbitmq
+    networks:
+      - grabOrgan-net
