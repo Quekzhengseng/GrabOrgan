@@ -1,6 +1,6 @@
 version: "3.8"
 services:
-  app:
+  match-service:
     build:
       context: .
       dockerfile: Dockerfile.match # Specify the custom Dockerfile

@@ -67,39 +67,36 @@ def get_match_by_id(match_id):
             "message": "An error occurred while fetching the match"
         }), 500
 
-#no puts cos matches shouldnt be edited?
-# @app.route("/matches/<string:match_id>", methods=['PUT'])
-# def update_match(match_id):
-#     try:
-#         update_data = request.get_json()
+@app.route("/matches", methods=['POST'])
+def create_matches():
+    try:
+        data = request.get_json()
+        matches = data.get("matches", [])
 
-#         # Prevent updating the matchId field
-#         if "matchId" in update_data:
-#             update_data.pop("matchId")
+        if not isinstance(matches, list) or not matches:
+            return jsonify({
+                "code": 400,
+                "data": data,
+                "message": "Invalid matches format. Must be a non-empty list."
+            }), 400
 
-#         match_ref = db.collection("matches").document(match_id)
-#         doc = match_ref.get()
+        for match in matches:
+            match_id = match.get("matchId")
+            if not match_id:
+                continue
+            db.collection("matches").document(match_id).set(match)
 
-#         if doc.exists:
-#             match_ref.update(update_data)
-#             return jsonify({
-#                 "code": 200,
-#                 "data": {"match_id": match_id},
-#                 "message": "Match updated successfully"
-#             }), 200
-#         else:
-#             return jsonify({
-#                 "code": 404,
-#                 "data": {"match_id": match_id},
-#                 "message": "Match not found"
-#             }), 404
+        return jsonify({
+            "code": 201,
+            "data": {"order_id": matches[0]["recipientId"] if matches else None},
+            "message": "Simulated success in shipping record creation!"
+        }), 201
 
-#     except Exception as e:
-#         return jsonify({
-#             "code": 500,
-#             "data": {"error": str(e)},
-#             "message": "An error occurred while updating the match"
-#         }), 500
+    except Exception as e:
+        return jsonify({
+            "code": 500,
+            "message": f"Internal server error: {str(e)}"
+        }), 500
 
 
 if __name__ == '__main__':

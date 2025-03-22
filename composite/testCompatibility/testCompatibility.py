@@ -1,3 +1,4 @@
+#call atomic and match from testcompatibility.py
 from flask import Flask, jsonify
 import pika
 import json
@@ -23,13 +24,17 @@ LAB_INFO_URL = os.getenv("LAB_INFO_URL", "http://lab-info-service:5007/lab-repor
 MATCH_SERVICE_URL = os.getenv("MATCH_SERVICE_URL", "http://match-service:5008/matches")
 
 def connect_rabbitmq():
-    """Connect to RabbitMQ and declare the exchange."""
-    connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
-    channel = connection.channel()
-    channel.exchange_declare(exchange=TEST_COMPATIBILITY_EXCHANGE, exchange_type="direct", durable=True)
-    channel.exchange_declare(exchange=MATCH_TEST_RESULT_EXCHANGE, exchange_type="direct", durable=True)
-    return connection, channel
-
+    try:
+        print(f"🔌 Trying to connect to RabbitMQ at host '{RABBITMQ_HOST}'...")
+        connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
+        channel = connection.channel()
+        channel.exchange_declare(exchange=TEST_COMPATIBILITY_EXCHANGE, exchange_type="direct", durable=True)
+        channel.exchange_declare(exchange=MATCH_TEST_RESULT_EXCHANGE, exchange_type="direct", durable=True)
+        print("✅ Connected to RabbitMQ and declared exchanges.")
+        return connection, channel
+    except Exception as e:
+        print(f"❌ Failed to connect to RabbitMQ at host '{RABBITMQ_HOST}': {e}")
+        return None, None
 @app.route("/")
 def health_check():
     """Health check endpoint."""
@@ -146,9 +151,9 @@ def callback(ch, method, properties, body):
     print("📩 Received Organ Matching Request")
     response = process_message(body)
 
-    # ✅ Publish results to matchOrgan
+    # ✅ Publish results to MatchOrgan
     print("📬 Sending results to MatchOrgan...")
-    channel.basic_publish(
+    ch.basic_publish(  # 🔧 FIXED: changed from 'channel' to 'ch'
         exchange=MATCH_TEST_RESULT_EXCHANGE,
         routing_key=MATCH_TEST_RESULT_ROUTING_KEY,
         body=json.dumps(response),
@@ -157,16 +162,30 @@ def callback(ch, method, properties, body):
     print(f"✅ Match results sent: {response}")
 
 def start_rabbitmq_listener():
-    """Start RabbitMQ listener in a separate thread."""
-    connection, channel = connect_rabbitmq()
-    channel.queue_declare(queue="test_compatibility_queue", durable=True)
-    channel.queue_bind(
-        exchange=TEST_COMPATIBILITY_EXCHANGE, queue="test_compatibility_queue", routing_key=TEST_COMPATIBILITY_ROUTING_KEY
-    )
+    print("🧪 Attempting to start RabbitMQ listener...")
+    try:
+        connection, channel = connect_rabbitmq()
+        if not connection or not channel:
+            print("❌ Could not start listener due to RabbitMQ connection failure.")
+            return
 
-    print("🐇 Listening for messages on test_compatibility_queue...")
-    channel.basic_consume(queue="test_compatibility_queue", on_message_callback=callback, auto_ack=True)
-    channel.start_consuming()
+        channel.queue_declare(queue="test_compatibility_queue", durable=True)
+        channel.queue_bind(
+            exchange=TEST_COMPATIBILITY_EXCHANGE,
+            queue="test_compatibility_queue",
+            routing_key=TEST_COMPATIBILITY_ROUTING_KEY
+        )
+
+        print("🐇 Listening for messages on test_compatibility_queue...")
+        channel.basic_consume(
+            queue="test_compatibility_queue",
+            on_message_callback=callback,
+            auto_ack=True
+        )
+        channel.start_consuming()
+    
+    except Exception as e:
+        print(f"❌ Unexpected error in listener thread: {e}")
 
 # Run RabbitMQ listener in a background thread
 threading.Thread(target=start_rabbitmq_listener, daemon=True).start()

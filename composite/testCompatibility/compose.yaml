@@ -6,8 +6,9 @@ services:
       context: .
       dockerfile: Dockerfile.testCompatibility
     container_name: "test-compatibility"
+    #volumes map to secret key 
     environment:
-      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_HOST=common-rabbitmq-1
     networks:
       - grabOrgan-net
     ports:
