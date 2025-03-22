@@ -1,0 +1,100 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3.9-management
+    container_name: rabbitmq
+    ports:
+      - "5673:5672"
+      - "15673:15672"  # Changed host port to avoid conflicts if needed
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - graborgan-net
+
+  personal_data_service:
+    build:
+      context: ../../atomic/PersonalData
+      dockerfile: Dockerfile.personal.data
+    container_name: personal_data_service
+    hostname: personal_data_service
+    ports:
+      - "5011:5011"
+    environment:
+      PERSONAL_DATA_DB_KEY: "/usr/src/app/PersonalData_Key.json"
+    volumes:
+      - ../../secrets/PersonalData/PersonalData_Key.json:/usr/src/app/PersonalData_Key.json
+    networks:
+      - graborgan-net
+
+
+  pseudonym_service:
+    build:
+      context: ../../atomic/Pseudonym
+      dockerfile: Dockerfile.pseudonym
+    container_name: pseudonym_service
+    ports:
+      - "5012:5012"
+    networks:
+      - graborgan-net
+
+  recipient_service:
+    build:
+      context: ../../atomic/Recipient
+      dockerfile: Dockerfile.recipient
+    container_name: recipient_service
+    hostname: recipient_service
+    ports:
+      - "5013:5013"
+    environment:
+      # Set the key file path if needed by your recipient service;
+      # adjust the variable name if your recipient code expects something different.
+      RECIPIENT_DB_KEY: "/usr/src/app/recipient_Key.json"
+    volumes:
+      - ../../secrets/recipient/recipient_Key.json:/usr/src/app/recipient_Key.json
+    networks:
+      - graborgan-net
+
+  lab_report_service:
+    build:
+      context: ../../atomic/LabInfo
+      dockerfile: Dockerfile.lab_report
+    container_name: lab_report_service
+    hostname: lab_report_service
+    ports:
+      - "5007:5007"
+    environment:
+      LABINFO_DB_KEY: "/usr/src/app/Lab_Info_Key.json"
+    volumes:
+      - ../../secrets/LabInfo/Lab_Info_Key.json:/usr/src/app/Lab_Info_Key.json
+    networks:
+      - graborgan-net
+
+
+  composite_service:
+    build:
+      context: ../../composite/requestOrgan
+      dockerfile: Dockerfile
+    container_name: composite_service
+    ports:
+      - "5021:5021"
+    environment:
+      PERSONAL_DATA_URL: "http://personal_data_service:5011/person"
+      PSEUDONYM_URL: "http://pseudonym_service:5012/pseudonymise"
+      RECIPIENT_URL: "http://recipient_service:5013/recipient"
+      LAB_REPORT_URL: "http://lab_report_service:5007/lab-reports"
+      RABBITMQ_HOST: "rabbitmq"
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_EXCHANGE: "request_organ_exchange"
+      RABBITMQ_ROUTING_KEY: "recipient.registered"
+    depends_on:
+      - personal_data_service
+      - pseudonym_service
+      - recipient_service
+      - lab_report_service
+      - rabbitmq
+    networks:
+      - graborgan-net
+
+networks:
+  graborgan-net:
+    driver: bridge
