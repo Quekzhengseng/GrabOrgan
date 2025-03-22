@@ -1,42 +1,39 @@
-// File: app/delivery/page.js
+// File: app/doctor/page.js
 "use client";
 
 import { useState, useEffect } from "react";
 import {
   Loader2,
-  Truck,
-  ArrowLeft,
-  Package,
-  MapPin,
   Calendar,
-  Clock,
-  ChevronRight,
-  Search,
-  X,
+  User,
+  Heart,
+  ArrowLeft,
+  BadgeAlert,
+  Activity,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import DeliveryMapbox from "@/components/DeliveryMapbox"; // Import the map component from components directory
 
-export default function DeliveryOrdersPage() {
-  const [deliveries, setDeliveries] = useState([]);
-  const [filteredDeliveries, setFilteredDeliveries] = useState([]);
+export default function RecipientsDashboard() {
+  const [recipients, setRecipients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedDelivery, setSelectedDelivery] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState("Assigned");
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const [selectedRecipient, setSelectedRecipient] = useState(null);
+  const [labReports, setLabReports] = useState([]);
+  const [loadingLabReports, setLoadingLabReports] = useState(false);
 
-  // Check if we have an orderId in the URL to display details
-  const orderIdParam = searchParams?.get("orderId");
+  // Match and request organ states
+  const [matches, setMatches] = useState([]);
+  const [matchLoading, setMatchLoading] = useState(false);
+  const [matchError, setMatchError] = useState(null);
+  const [selectedMatch, setSelectedMatch] = useState(null);
+  const [requestLoading, setRequestLoading] = useState(false);
+  const [requestSuccess, setRequestSuccess] = useState(false);
 
   useEffect(() => {
-    async function fetchDeliveries() {
+    async function fetchRecipients() {
       try {
         setLoading(true);
-        const response = await fetch("http://localhost:5002/deliveryinfo");
+        const response = await fetch("http://localhost:5013/recipient");
 
         if (!response.ok) {
           throw new Error(`API request failed with status ${response.status}`);
@@ -45,256 +42,716 @@ export default function DeliveryOrdersPage() {
         const data = await response.json();
 
         if (data.code === 200 && data.data) {
-          // Convert the object of deliveries into an array
-          const deliveryArray = Object.values(data.data);
-          setDeliveries(deliveryArray);
-          setFilteredDeliveries(deliveryArray);
-
-          // If we have an orderId in the URL, find and select that delivery
-          if (orderIdParam) {
-            const selectedDelivery = deliveryArray.find(
-              (delivery) => delivery.orderID === orderIdParam
-            );
-            if (selectedDelivery) {
-              setSelectedDelivery(selectedDelivery);
-            }
-          }
+          // Convert the object of recipients into an array
+          const recipientsArray = Object.values(data.data);
+          setRecipients(recipientsArray);
         } else {
           throw new Error("Invalid response format");
         }
       } catch (err) {
-        console.error("Error fetching deliveries:", err);
+        console.error("Error fetching recipients:", err);
         setError(err.message);
       } finally {
         setLoading(false);
       }
     }
 
-    fetchDeliveries();
-  }, [orderIdParam]);
+    fetchRecipients();
+  }, []);
 
-  // Apply filters when search term or filter status changes
-  useEffect(() => {
-    if (!deliveries.length) return;
-
-    let filtered = [...deliveries];
-
-    // Filter by status
-    if (filterStatus !== "All") {
-      filtered = filtered.filter(
-        (delivery) => delivery.status === filterStatus
-      );
-    }
-
-    // Filter by search term
-    if (searchTerm.trim()) {
-      const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (delivery) =>
-          delivery.orderID?.toLowerCase().includes(searchLower) ||
-          delivery.pickup?.toLowerCase().includes(searchLower) ||
-          delivery.destination?.toLowerCase().includes(searchLower) ||
-          delivery.driverID?.toLowerCase().includes(searchLower)
-      );
-    }
-
-    setFilteredDeliveries(filtered);
-  }, [searchTerm, filterStatus, deliveries]);
-
-  // Helper function to get status badge color
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "Awaiting pickup":
-        return "bg-yellow-100 text-yellow-800";
-      case "In progress":
-        return "bg-blue-100 text-blue-800";
-      case "Completed":
-        return "bg-green-100 text-green-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  // Format date for display
-  const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
-
-    // Parse the date format "YYYYMMDD HH:MM:SS AM/PM"
-    const [datePart, timePart, ampm] = dateString.split(" ");
-
-    // Format YYYYMMDD to YYYY-MM-DD
-    const year = datePart.substring(0, 4);
-    const month = datePart.substring(4, 6);
-    const day = datePart.substring(6, 8);
-
-    return `${year}-${month}-${day} ${timePart} ${ampm}`;
-  };
-
-  // Handle track delivery button click
-  const handleTrackDelivery = (delivery, e) => {
-    e.stopPropagation(); // Prevent triggering the card click
-    setSelectedDelivery(delivery);
-    // Update URL with orderId but without refreshing the page
-    router.push(`/delivery?orderId=${delivery.orderID}`, { scroll: false });
-  };
-
-  // Go back to delivery list
-  const handleBackClick = () => {
-    setSelectedDelivery(null);
-    router.push("/delivery", { scroll: false });
-  };
-
-  const handleDeliveryDelete = async (delivery, e) => {
-    e.stopPropagation(); // Prevent triggering the card click
+  // Function to fetch lab reports for a specific recipient
+  const fetchLabReports = async (recipientId) => {
     try {
-      console.log(delivery.orderID);
-      const response = await fetch(
-        `http://localhost:5002/deliveryinfo/${delivery.orderID}`,
-        {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ status: "Deleted" }),
-        }
-      );
+      setLoadingLabReports(true);
+      const response = await fetch("http://localhost:5007/lab-reports");
 
       if (!response.ok) {
-        throw new Error("Failed to update delivery status");
+        throw new Error(`API request failed with status ${response.status}`);
       }
 
-      alert("Delivery deleted successfully!");
-      // Remove the deleted delivery from the list
-      const updatedDeliveries = deliveries.filter(
-        (d) => d.orderID !== delivery.orderID
-      );
-      setDeliveries(updatedDeliveries);
-      setFilteredDeliveries(updatedDeliveries);
-    } catch (error) {
-      console.error("Error deleting delivery:", error);
-      alert("Error deleting delivery.");
+      const data = await response.json();
+
+      if (data.code === 200 && data.data) {
+        // Filter lab reports for the selected recipient
+        const filteredReports = data.data.filter(
+          (report) =>
+            report.patientId === recipientId ||
+            report.recipientId === recipientId
+        );
+        setLabReports(filteredReports);
+      } else {
+        setLabReports([]);
+      }
+    } catch (err) {
+      console.error("Error fetching lab reports:", err);
+      setLabReports([]);
+    } finally {
+      setLoadingLabReports(false);
     }
   };
 
-  // Get unique statuses for the filter dropdown
-  const getStatusOptions = () => {
-    if (!deliveries.length) return ["All"];
-    const statuses = deliveries.map((delivery) => delivery.status);
-    return ["All", ...new Set(statuses)];
+  // Handle click on a recipient to view details
+  const handleRecipientClick = (recipient) => {
+    setSelectedRecipient(recipient);
+    setSelectedMatch(null);
+    setMatches([]);
+    setMatchError(null);
+    setRequestSuccess(false);
+    if (recipient.recipientId) {
+      fetchLabReports(recipient.recipientId);
+    }
   };
 
-  // Clear search field
-  const clearSearch = () => {
-    setSearchTerm("");
+  // Go back to recipient list
+  const handleBackClick = () => {
+    setSelectedRecipient(null);
+    setLabReports([]);
+    setMatches([]);
+    setSelectedMatch(null);
+    setRequestSuccess(false);
   };
 
-  // Render map view when a delivery is selected
-  if (selectedDelivery) {
+  // Find potential organ matches for a recipient
+  const handleFindMatches = async (recipientId) => {
+    if (!recipientId) return;
+
+    setMatchLoading(true);
+    setMatchError(null);
+    setSelectedMatch(null);
+
+    try {
+      // The match API is actually exposed through RabbitMQ, not a direct endpoint
+      // We need to use the request_for_organ endpoint with the match.request routing key
+      const response = await fetch("http://localhost:5021/request_for_organ", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          recipientId,
+          // Include other required fields for the request_for_organ API
+          firstName: selectedRecipient.firstName,
+          lastName: selectedRecipient.lastName,
+          dateOfBirth: selectedRecipient.dateOfBirth,
+          gender: selectedRecipient.gender,
+          bloodType: selectedRecipient.bloodType,
+          organsNeeded: selectedRecipient.organsNeeded,
+          nokContact: selectedRecipient.nokContact || {},
+          // Empty fields for lab report data
+          reportName: "",
+          testType: "",
+          dateOfReport: new Date().toISOString(),
+          results: {},
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Since this is a message queue-based system, we won't get immediate match results
+      // Instead, we'll simulate it with some sample data for the UI
+      // In a real implementation, you'd use websockets or polling to get the actual matches
+
+      // Simulate match response after a delay
+      setTimeout(() => {
+        const simulatedMatches = generateSimulatedMatches(selectedRecipient);
+        setMatches(simulatedMatches);
+        setMatchLoading(false);
+      }, 2000);
+    } catch (err) {
+      console.error("Error finding matches:", err);
+      setMatchError(err.message);
+      setMatches([]);
+      setMatchLoading(false);
+    }
+  };
+
+  // Generate simulated match data based on recipient
+  const generateSimulatedMatches = (recipient) => {
+    const organsNeeded = recipient.organsNeeded || ["heart"];
+    const matchCount = Math.floor(Math.random() * 3) + 1; // 1-3 matches
+
+    return Array.from({ length: matchCount }, (_, i) => {
+      const organType = organsNeeded[i % organsNeeded.length];
+      const donorId = `donor-${Math.floor(Math.random() * 10000)}`;
+
+      return {
+        matchId: `${donorId}-${organType}-${recipient.recipientId}`,
+        OrganId: `${donorId}-${organType}`,
+        donorId: donorId,
+        recipientId: recipient.recipientId,
+        numOfHLA: Math.floor(Math.random() * 3) + 4, // 4-6 HLA match
+        Test_DateTime: new Date().toISOString(),
+        donor_details: {
+          first_name: ["John", "Jane", "Michael", "Sarah", "David"][
+            Math.floor(Math.random() * 5)
+          ],
+          last_name: ["Smith", "Johnson", "Williams", "Brown", "Jones"][
+            Math.floor(Math.random() * 5)
+          ],
+          gender: Math.random() > 0.5 ? "Male" : "Female",
+          blood_type: ["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"][
+            Math.floor(Math.random() * 8)
+          ],
+        },
+        recipient_details: {
+          first_name: recipient.firstName,
+          last_name: recipient.lastName,
+          gender: recipient.gender,
+          blood_type: recipient.bloodType,
+        },
+      };
+    });
+  };
+
+  // Handle requesting an organ based on selected match
+  const handleRequestOrgan = async () => {
+    if (!selectedMatch || !selectedRecipient) return;
+
+    setRequestLoading(true);
+
+    try {
+      // Call the request organ API with the match data
+      const response = await fetch("http://localhost:5021/request_for_organ", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          recipientId: selectedRecipient.recipientId,
+          matchId: selectedMatch.matchId,
+          organId: selectedMatch.OrganId,
+          // Include required recipient data
+          firstName: selectedRecipient.firstName,
+          lastName: selectedRecipient.lastName,
+          dateOfBirth: selectedRecipient.dateOfBirth,
+          gender: selectedRecipient.gender,
+          bloodType: selectedRecipient.bloodType,
+          organsNeeded: selectedRecipient.organsNeeded,
+          nokContact: selectedRecipient.nokContact || {},
+          // Include lab report data that might be required
+          reportName: `Transplant Request for ${
+            selectedMatch.OrganId.split("-")[1] || "Organ"
+          }`,
+          testType: "Transplant Request",
+          dateOfReport: new Date().toISOString(),
+          results: {
+            hlaMatch: `${selectedMatch.numOfHLA}/6`,
+            bloodTypeCompatibility: "Compatible",
+            status: "Requested",
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("Organ request response:", data);
+
+      // Show success message
+      setRequestSuccess(true);
+    } catch (err) {
+      console.error("Error requesting organ:", err);
+      alert(`Failed to request organ: ${err.message}`);
+    } finally {
+      setRequestLoading(false);
+    }
+  };
+
+  // Function to format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return "Not specified";
+
+    try {
+      const options = { year: "numeric", month: "long", day: "numeric" };
+      return new Date(dateString).toLocaleDateString(undefined, options);
+    } catch (e) {
+      return dateString;
+    }
+  };
+
+  // Function to determine urgency color based on organs needed
+  const getUrgencyColor = (organsNeeded) => {
+    if (!organsNeeded || organsNeeded.length === 0)
+      return "bg-gray-100 text-gray-800";
+
+    const criticalOrgans = ["heart", "liver"];
+    const hasCriticalOrgan = organsNeeded.some((organ) =>
+      criticalOrgans.includes(organ.toLowerCase())
+    );
+
+    if (hasCriticalOrgan) {
+      return "bg-red-100 text-red-800";
+    } else if (organsNeeded.length > 1) {
+      return "bg-orange-100 text-orange-800";
+    } else {
+      return "bg-yellow-100 text-yellow-800";
+    }
+  };
+
+  // Render recipient detail view
+  if (selectedRecipient) {
     return (
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-8">
         <button
           onClick={handleBackClick}
           className="flex items-center text-green-600 hover:text-green-800 mb-6 transition-colors"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to all deliveries
+          Back to all recipients
         </button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-bold mb-4 text-gray-800">
-                Delivery Details
-              </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Recipient Information Panel */}
+          <div className="md:col-span-1">
+            <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+              <div className="bg-green-600 text-white p-6">
+                <h1 className="text-2xl font-bold">Recipient Profile</h1>
+                <p className="mt-2 flex items-center text-green-100">
+                  <User className="h-4 w-4 mr-2" />
+                  ID: {selectedRecipient.recipientId || "Not assigned"}
+                </p>
+              </div>
 
-              <div className="space-y-4">
-                <div>
-                  <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                      selectedDelivery.status
-                    )}`}
-                  >
-                    {selectedDelivery.status}
-                  </span>
-                </div>
-
-                <div className="flex items-start">
-                  <Package className="h-5 w-5 text-green-600 mr-3 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-gray-900">Order ID</p>
-                    <p className="text-gray-600">{selectedDelivery.orderID}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start">
-                  <MapPin className="h-5 w-5 text-green-600 mr-3 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-gray-900">Pickup Location</p>
-                    <p className="text-gray-600">{selectedDelivery.pickup}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start">
-                  <Calendar className="h-5 w-5 text-green-600 mr-3 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-gray-900">Pickup Time</p>
-                    <p className="text-gray-600">
-                      {formatDate(selectedDelivery.pickup_time)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start">
-                  <MapPin className="h-5 w-5 text-green-600 mr-3 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-gray-900">Destination</p>
-                    <p className="text-gray-600">
-                      {selectedDelivery.destination}
-                    </p>
-                  </div>
-                </div>
-
-                {selectedDelivery.destination_time && (
-                  <div className="flex items-start">
-                    <Clock className="h-5 w-5 text-green-600 mr-3 mt-0.5" />
+              <div className="p-6">
+                <div className="mb-6">
+                  <h2 className="text-xl font-bold mb-4 text-gray-800">
+                    Personal Information
+                  </h2>
+                  <div className="space-y-4">
                     <div>
-                      <p className="font-medium text-gray-900">
-                        Destination Time
+                      <p className="text-sm text-gray-500">Full Name</p>
+                      <p className="font-medium text-gray-800">
+                        {selectedRecipient.firstName}{" "}
+                        {selectedRecipient.lastName}
                       </p>
-                      <p className="text-gray-600">
-                        {formatDate(selectedDelivery.destination_time)}
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-gray-500">Date of Birth</p>
+                      <p className="font-medium text-gray-800">
+                        {formatDate(selectedRecipient.dateOfBirth)}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-gray-500">Gender</p>
+                      <p className="font-medium text-gray-800">
+                        {selectedRecipient.gender}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-gray-500">Blood Type</p>
+                      <p className="font-medium text-gray-800">
+                        {selectedRecipient.bloodType}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <h2 className="text-xl font-bold mb-4 text-gray-800">
+                    Medical Information
+                  </h2>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-sm text-gray-500">Organs Needed</p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {selectedRecipient.organsNeeded &&
+                        selectedRecipient.organsNeeded.length > 0 ? (
+                          selectedRecipient.organsNeeded.map((organ, index) => (
+                            <span
+                              key={index}
+                              className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs"
+                            >
+                              {organ}
+                            </span>
+                          ))
+                        ) : (
+                          <p className="text-gray-600">None specified</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-gray-500">Allergies</p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {selectedRecipient.allergies &&
+                        selectedRecipient.allergies.length > 0 ? (
+                          selectedRecipient.allergies.map((allergy, index) => (
+                            <span
+                              key={index}
+                              className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs"
+                            >
+                              {allergy}
+                            </span>
+                          ))
+                        ) : (
+                          <p className="text-gray-600">No known allergies</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-gray-500">Medical History</p>
+                      {selectedRecipient.medicalHistory &&
+                      selectedRecipient.medicalHistory.length > 0 ? (
+                        <ul className="mt-1 list-disc pl-5 text-gray-600">
+                          {selectedRecipient.medicalHistory.map(
+                            (item, index) => (
+                              <li key={index}>
+                                {typeof item === "object" ? (
+                                  <div className="py-1">
+                                    <p className="font-medium">
+                                      {item.description ||
+                                        item.condition ||
+                                        "Medical condition"}
+                                    </p>
+                                    {item.dateDiagnosed && (
+                                      <p className="text-xs text-gray-500">
+                                        Diagnosed:{" "}
+                                        {formatDate(item.dateDiagnosed)}
+                                      </p>
+                                    )}
+                                    {item.treatment && (
+                                      <p className="text-xs">
+                                        Treatment: {item.treatment}
+                                      </p>
+                                    )}
+                                  </div>
+                                ) : (
+                                  item
+                                )}
+                              </li>
+                            )
+                          )}
+                        </ul>
+                      ) : (
+                        <p className="text-gray-600">
+                          No medical history available
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {selectedRecipient.nokContact && (
+                  <div>
+                    <h2 className="text-xl font-bold mb-4 text-gray-800">
+                      Emergency Contact
+                    </h2>
+                    <div className="space-y-2 text-gray-600">
+                      <p>
+                        <span className="font-medium">Name:</span>{" "}
+                        {selectedRecipient.nokContact.firstName}{" "}
+                        {selectedRecipient.nokContact.lastName}
+                      </p>
+                      <p>
+                        <span className="font-medium">Relationship:</span>{" "}
+                        {selectedRecipient.nokContact.relationship}
+                      </p>
+                      <p>
+                        <span className="font-medium">Phone:</span>{" "}
+                        {selectedRecipient.nokContact.phone}
                       </p>
                     </div>
                   </div>
                 )}
-
-                <div className="flex items-start">
-                  <Truck className="h-5 w-5 text-green-600 mr-3 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-gray-900">Driver ID</p>
-                    <p className="text-gray-600">
-                      {selectedDelivery.driverID || "Not assigned"}
-                    </p>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
 
-          <div className="lg:col-span-2">
-            {/* Insert the map component with delivery data */}
-            <DeliveryMapbox deliveryData={selectedDelivery} />
+          {/* Lab Reports Section */}
+          <div className="md:col-span-2">
+            <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+              <div className="bg-green-600 text-white p-6">
+                <h2 className="text-2xl font-bold">Lab Reports</h2>
+              </div>
+
+              <div className="p-6">
+                {loadingLabReports ? (
+                  <div className="flex justify-center items-center h-64">
+                    <Loader2 className="h-8 w-8 animate-spin text-green-500" />
+                    <span className="ml-2 text-gray-600">
+                      Loading lab reports...
+                    </span>
+                  </div>
+                ) : labReports.length === 0 ? (
+                  <div className="bg-gray-100 p-6 text-center rounded">
+                    <p className="text-gray-700">
+                      No lab reports found for this recipient.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {labReports.map((report, index) => (
+                      <div
+                        key={report.uuid || index}
+                        className="border rounded-lg overflow-hidden"
+                      >
+                        <div className="bg-gray-50 px-4 py-3 border-b">
+                          <h3 className="font-bold text-lg text-gray-800">
+                            {report.reportName}
+                          </h3>
+                          <p className="text-sm text-gray-500">
+                            {formatDate(report.dateOfReport)}
+                          </p>
+                        </div>
+
+                        <div className="p-4">
+                          <div className="mb-4">
+                            <p className="font-medium text-gray-700">
+                              Test Type:
+                            </p>
+                            <p className="text-gray-600">
+                              {report.testType || "Not specified"}
+                            </p>
+                          </div>
+
+                          {report.results && (
+                            <div>
+                              <p className="font-medium text-gray-700 mb-2">
+                                Results:
+                              </p>
+                              <div className="bg-gray-50 rounded-lg p-4">
+                                {Object.entries(report.results).map(
+                                  ([key, value]) => (
+                                    <div
+                                      key={key}
+                                      className="grid grid-cols-2 mb-2 pb-2 border-b border-gray-200 last:border-0"
+                                    >
+                                      <span className="text-sm font-medium text-gray-500 capitalize">
+                                        {key}
+                                      </span>
+                                      <span className="text-gray-800">
+                                        {typeof value === "object"
+                                          ? JSON.stringify(value)
+                                          : value}
+                                      </span>
+                                    </div>
+                                  )
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {report.comments && (
+                            <div className="mt-4">
+                              <p className="font-medium text-gray-700">
+                                Comments:
+                              </p>
+                              <p className="text-gray-600">{report.comments}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Activity Timeline */}
+            {/* Match/Organ Section */}
+            <div className="bg-white rounded-lg shadow-lg overflow-hidden mt-6">
+              <div className="bg-green-600 text-white p-6 flex justify-between items-center">
+                <h2 className="text-2xl font-bold">Organ Matches</h2>
+                <button
+                  onClick={() =>
+                    handleFindMatches(selectedRecipient.recipientId)
+                  }
+                  className="px-4 py-2 bg-white text-green-600 rounded-md hover:bg-gray-100 transition-colors"
+                >
+                  Find Matches
+                </button>
+              </div>
+
+              <div className="p-6">
+                {matchLoading ? (
+                  <div className="flex justify-center items-center h-48">
+                    <Loader2 className="h-8 w-8 animate-spin text-green-500" />
+                    <span className="ml-2 text-gray-600">
+                      Finding potential matches...
+                    </span>
+                  </div>
+                ) : matchError ? (
+                  <div className="bg-red-100 p-4 rounded-md text-red-700">
+                    <p className="font-bold">Error finding matches</p>
+                    <p>{matchError}</p>
+                  </div>
+                ) : matches.length === 0 ? (
+                  <div className="bg-gray-100 p-6 text-center rounded">
+                    <p className="text-gray-700">
+                      No potential organ matches found. Click "Find Matches" to
+                      search for compatible donors.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    {requestSuccess && (
+                      <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+                        <p className="font-bold">Success!</p>
+                        <p>
+                          Organ transplant has been requested successfully. The
+                          medical team will be notified.
+                        </p>
+                      </div>
+                    )}
+
+                    <p className="text-gray-700 mb-4">
+                      Select a match to request organ transplant:
+                    </p>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {matches.map((match) => (
+                        <div
+                          key={match.matchId}
+                          className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                            selectedMatch &&
+                            selectedMatch.matchId === match.matchId
+                              ? "border-green-500 bg-green-50"
+                              : "border-gray-200 hover:border-green-300"
+                          }`}
+                          onClick={() => setSelectedMatch(match)}
+                        >
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="font-medium text-gray-800">
+                              {match.OrganId.split("-")[1] || "Organ"}
+                            </span>
+                            <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs">
+                              {match.numOfHLA}/6 HLA Match
+                            </span>
+                          </div>
+
+                          <div className="text-sm space-y-1 text-gray-600">
+                            <p>
+                              Donor ID:{" "}
+                              {match.donorId?.substring(0, 8) || "Unknown"}
+                            </p>
+                            <p>
+                              Donor:{" "}
+                              {match.donor_details?.first_name || "Unknown"}{" "}
+                              {match.donor_details?.last_name || ""}
+                              {match.donor_details?.gender &&
+                                ` (${match.donor_details.gender})`}
+                            </p>
+                            <p>
+                              Blood Type:{" "}
+                              {match.donor_details?.blood_type || "Unknown"}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Match Date: {formatDate(match.Test_DateTime)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {selectedMatch && (
+                      <div className="mt-6 flex justify-end">
+                        <button
+                          onClick={handleRequestOrgan}
+                          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center"
+                          disabled={requestLoading}
+                        >
+                          {requestLoading ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Processing Request...
+                            </>
+                          ) : (
+                            "Request Organ Transplant"
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Activity Timeline */}
+            <div className="bg-white rounded-lg shadow-lg overflow-hidden mt-6">
+              <div className="bg-green-600 text-white p-6">
+                <h2 className="text-2xl font-bold">Recipient Activity</h2>
+              </div>
+
+              <div className="p-6">
+                <div className="relative">
+                  <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+
+                  <div className="space-y-8">
+                    <div className="relative pl-10">
+                      <div className="absolute left-0 top-1 rounded-full bg-green-500 p-2">
+                        <Activity className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-800">
+                          Added to recipient list
+                        </p>
+                        <p className="text-sm text-gray-500">March 20, 2025</p>
+                      </div>
+                    </div>
+
+                    <div className="relative pl-10">
+                      <div className="absolute left-0 top-1 rounded-full bg-blue-500 p-2">
+                        <Activity className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-800">
+                          Lab tests completed
+                        </p>
+                        <p className="text-sm text-gray-500">March 21, 2025</p>
+                      </div>
+                    </div>
+
+                    <div className="relative pl-10">
+                      <div className="absolute left-0 top-1 rounded-full bg-yellow-500 p-2">
+                        <Activity className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-800">
+                          Added to donor match queue
+                        </p>
+                        <p className="text-sm text-gray-500">March 22, 2025</p>
+                      </div>
+                    </div>
+
+                    {requestSuccess && (
+                      <div className="relative pl-10">
+                        <div className="absolute left-0 top-1 rounded-full bg-red-500 p-2">
+                          <Activity className="h-4 w-4 text-white" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-800">
+                            Organ transplant requested
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {new Date().toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  // Render the list of deliveries (default view)
+  // Render the card list view (default)
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Delivery Orders</h1>
+        <h1 className="text-2xl font-bold text-gray-800">Organ Recipients</h1>
         <Link
           href="/"
           className="px-4 py-2 bg-gray-100 rounded-md text-gray-600 hover:bg-gray-200 transition-colors"
@@ -303,143 +760,93 @@ export default function DeliveryOrdersPage() {
         </Link>
       </div>
 
-      {/* Search and Filter Section */}
-      <div className="mb-6 bg-white rounded-lg shadow p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Search Box */}
-          <div className="relative">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Search Box
-            </label>
-            <input
-              type="text"
-              placeholder="Search by order ID, location, driver..."
-              className="block w-full pl-10 py-2 border border-gray-300 rounded-md focus:ring-green-500 focus:border-green-500"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            {searchTerm && (
-              <button
-                onClick={clearSearch}
-                className="absolute  inset-y-0 right-0 pr-3 flex items-center"
-              >
-                <X className="h-5 w-5 text-gray-400 hover:text-gray-600 relative top-[-10px]" />
-              </button>
-            )}
-          </div>
-
-          {/* Status Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Filter by Status
-            </label>
-            <select
-              className="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-            >
-              {getStatusOptions().map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Results Summary */}
-          <div className="flex items-end">
-            <p className="text-gray-600">
-              Showing {filteredDeliveries.length} of {deliveries.length}{" "}
-              deliveries
-            </p>
-          </div>
-        </div>
-      </div>
-
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-green-500" />
-          <span className="ml-2 text-gray-600">Loading deliveries...</span>
+          <span className="ml-2 text-gray-600">Loading recipients...</span>
         </div>
       ) : error ? (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
           <p className="font-bold">Error</p>
           <p>{error}</p>
         </div>
-      ) : filteredDeliveries.length === 0 ? (
+      ) : recipients.length === 0 ? (
         <div className="bg-gray-100 p-6 text-center rounded">
-          <p className="text-gray-700">
-            No delivery orders found matching your criteria.
-          </p>
-          {(searchTerm || filterStatus !== "All") && (
-            <button
-              onClick={() => {
-                setSearchTerm("");
-                setFilterStatus("All");
-              }}
-              className="mt-2 text-green-600 hover:text-green-800"
-            >
-              Clear filters
-            </button>
-          )}
+          <p className="text-gray-700">No recipients found.</p>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredDeliveries.map((delivery, index) => (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {recipients.map((recipient, index) => (
             <div
-              key={delivery.orderID || index}
+              key={recipient.recipientId || index}
               className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer overflow-hidden"
-              onClick={(e) => handleTrackDelivery(delivery, e)}
+              onClick={() => handleRecipientClick(recipient)}
             >
               <div className="p-5">
                 <div className="flex justify-between items-start mb-3">
                   <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                      delivery.status
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getUrgencyColor(
+                      recipient.organsNeeded
                     )}`}
                   >
-                    {delivery.status}
+                    {recipient.organsNeeded && recipient.organsNeeded.length > 0
+                      ? `Needs ${recipient.organsNeeded.length} organ${
+                          recipient.organsNeeded.length > 1 ? "s" : ""
+                        }`
+                      : "No organs listed"}
                   </span>
                   <span className="text-xs text-gray-500">
-                    {formatDate(delivery.pickup_time).split(" ")[0]}
+                    ID: {recipient.recipientId?.substring(0, 8) || "N/A"}
                   </span>
                 </div>
 
-                <h3 className="font-bold text-gray-800 mb-3 truncate">
-                  Order ID: {delivery.orderID}
+                <h3 className="font-bold text-gray-800 mb-3">
+                  {recipient.firstName} {recipient.lastName}
                 </h3>
 
                 <div className="space-y-2 text-sm text-gray-600">
                   <div className="flex items-center">
-                    <MapPin className="h-4 w-4 text-green-600 mr-2" />
-                    <span className="truncate">From: {delivery.pickup}</span>
+                    <Calendar className="h-4 w-4 text-green-600 mr-2" />
+                    <span>{formatDate(recipient.dateOfBirth)}</span>
                   </div>
 
                   <div className="flex items-center">
-                    <MapPin className="h-4 w-4 text-green-600 mr-2" />
-                    <span className="truncate">To: {delivery.destination}</span>
+                    <User className="h-4 w-4 text-green-600 mr-2" />
+                    <span>{recipient.gender || "Not specified"}</span>
                   </div>
 
-                  {delivery.driverID && (
-                    <div className="flex items-center">
-                      <Truck className="h-4 w-4 text-green-600 mr-2" />
-                      <span>Driver: {delivery.driverID}</span>
+                  <div className="flex items-center">
+                    <Heart className="h-4 w-4 text-green-600 mr-2" />
+                    <span>
+                      Blood Type: {recipient.bloodType || "Not specified"}
+                    </span>
+                  </div>
+                </div>
+
+                {recipient.organsNeeded &&
+                  recipient.organsNeeded.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-xs text-gray-500 mb-1">
+                        Needed Organs:
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {recipient.organsNeeded.map((organ, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-xs"
+                          >
+                            {organ}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   )}
-                </div>
               </div>
 
-              <div className="border-t px-5 py-3 bg-gray-50 flex justify-between items-center">
-                <div onClick={(e) => handleDeliveryDelete(delivery, e)}>
-                  <span className="text-red-600 text-sm font-medium flex items-center">
-                    Delete Delivery
-                  </span>
-                </div>
-                <div onClick={(e) => handleTrackDelivery(delivery, e)}>
-                  <span className="text-green-600 text-sm font-medium flex items-center">
-                    Track delivery <ChevronRight className="h-4 w-4 ml-1" />
-                  </span>
-                </div>
+              <div className="border-t px-5 py-3 bg-gray-50 flex justify-end items-center">
+                <span className="text-green-600 text-sm font-medium flex items-center">
+                  View details →
+                </span>
               </div>
             </div>
           ))}
