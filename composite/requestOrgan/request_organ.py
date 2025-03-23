@@ -1,5 +1,6 @@
 import os
 import json
+import uuid
 import requests
 import pika
 from flask import Flask, request, jsonify
@@ -9,7 +10,7 @@ app = Flask(__name__)
 rabbitmq_host = os.getenv("RABBITMQ_HOST", "rabbitmq")
 rabbitmq_port = int(os.getenv("RABBITMQ_PORT", "5672"))
 exchange = os.getenv("RABBITMQ_EXCHANGE", "request_organ_exchange")
-routing_key = os.getenv("RABBITMQ_ROUTING_KEY", "match.request")
+routing_key = os.getenv("RABBITMQ_ROUTING_KEY", "recipient.registered")
 PERSONAL_DATA_URL = os.getenv("PERSONAL_DATA_URL", "http://personal_data_service:5011/person")
 PSEUDONYM_URL = os.getenv("PSEUDONYM_URL", "http://pseudonym_service:5012/pseudonymise")
 RECIPIENT_URL = os.getenv("RECIPIENT_URL", "http://recipient_service:5013/recipient")
@@ -18,100 +19,135 @@ LAB_REPORT_URL = os.getenv("LAB_REPORT_URL", "http://lab_report_service:5007/lab
 
 
 def safe_json_response(resp):
-    """
-    Attempts to decode a JSON response.
-    If decoding fails, logs the raw response text and returns an error dict.
-    """
     try:
         return resp.json()
     except Exception:
         print("Failed to parse JSON from response:", resp.text)
         return {"error": "Invalid JSON", "raw": resp.text}
 
-def extract_recipient_data(data):
-    """
-    Extracts only the fields needed by the Recipient service.
-    We use "recipientId" as the unique identifier.
-    """
-    payload = {"recipientId": data.get("recipientId")}
-    keys = [
-        "firstName", "lastName", "dateOfBirth", "gender",
-        "bloodType", "organsNeeded", "medicalHistory", "allergies", "nokContact"
-    ]
-    for key in keys:
-        if key in data:
-            payload[key] = data.get(key)
-    return payload
 
-def extract_lab_report_data(data):
-    """Extracts only the fields needed by the Lab Report service."""
-    keys = ["reportName", "testType", "dateOfReport", "reportUrl", "results", "uuid"]
-    return {key: data.get(key) for key in keys if key in data}
-
-def extract_personal_data(data):
+def transform_recipient(recipient):
     """
-    Extracts only the fields needed by the Personal Data service.
-    Since personId and recipientId are the same, we use "recipientId" as the unique identifier.
+    Transform recipient keys from snake_case to camelCase.
+    Mapping:
+      first_name   -> firstName
+      last_name    -> lastName
+      date_of_birth -> dateOfBirth
+      blood_type   -> bloodType
+      organs_needed -> organsNeeded
+      medical_history -> medicalHistory
+      nok_contact  -> nokContact
+      gender       -> gender
+      allergies    -> allergies
     """
-    recipient_id = data.get("recipientId")
-    payload = {"personId": recipient_id}
-    keys = ["firstName", "lastName", "dateOfBirth", "nokContact"]
-    for key in keys:
-        if key in data:
-            payload[key] = data.get(key)
-    return payload
+    mapping = {
+        "first_name": "firstName",
+        "last_name": "lastName",
+        "date_of_birth": "dateOfBirth",
+        "blood_type": "bloodType",
+        "organs_needed": "organsNeeded",
+        "medical_history": "medicalHistory",
+        "nok_contact": "nokContact",
+        "gender": "gender",
+        "allergies": "allergies"
+    }
+    transformed = {}
+    for key, value in recipient.items():
+        new_key = mapping.get(key, key)
+        transformed[new_key] = value
+    return transformed
 
-@app.route('/request-for-organ', methods=['POST'])
+
+@app.route('/request_for_organ', methods=['POST'])
 def request_for_organ():
     """
-    Composite service that:
-      1. Receives a JSON payload.
-      2. Splits the composite payload into only the required fields for:
-         - Personal Data Service
-         - Pseudonym Service
-         - Recipient Service
-         - Lab Report Service
-      3. Publishes the original data to RabbitMQ for logging.
-      4. Returns a consolidated JSON response.
+    Composite service workflow:
+      1. Receives a JSON payload with structure:
+         {
+           "data": {
+             "recipient": { ... snake_case fields ... },
+             "labInfo": { ... already in camelCase ... }
+           }
+         }
+      2. Transforms recipient data from snake_case to camelCase.
+      3. Generates a new recipient ID and attaches it.
+      4. Builds a pseudonym payload and sends it to the Pseudonym service.
+      5. Prepares payloads for the Personal Data, Recipient, and Lab Report services.
+      6. Publishes a composite (flattened) payload to RabbitMQ for logging.
+      7. Returns a consolidated JSON response.
     """
-    composite_data = request.get_json() or {}
-    responses = {}
+    payload = request.get_json() or {}
+    data = payload.get("data", {})
+    recipient_data = data.get("recipient", {})
+    lab_info_data = data.get("labInfo", {})
 
-    # Extract minimal payloads for each atomic service
-    recipient_payload = extract_recipient_data(composite_data)
-    lab_payload = extract_lab_report_data(composite_data)
-    personal_payload = extract_personal_data(composite_data)
-    
-    # For the pseudonym service, wrap the personal data keyed by recipientId.
-    record_id = composite_data.get("recipientId", "unknown")
-    pseudonym_payload = { record_id: personal_payload }
+    # Transform recipient data from snake_case to camelCase
+    transformed_recipient = transform_recipient(recipient_data)
+    new_recipient_id = str(uuid.uuid4())
+    transformed_recipient["recipientId"] = new_recipient_id
 
+    # Build pseudonym payload (only includes fields needed for pseudonymisation)
+    pseudonym_payload = {
+        new_recipient_id: {
+            "recipientId": new_recipient_id,
+            "firstName": transformed_recipient.get("firstName"),
+            "lastName": transformed_recipient.get("lastName"),
+            "dateOfBirth": transformed_recipient.get("dateOfBirth"),
+            "nokContact": transformed_recipient.get("nokContact")
+        }
+    }
+
+    # Call the Pseudonym service
     try:
-        # Forward to Personal Data Service
-        personal_resp = requests.post(PERSONAL_DATA_URL, json=personal_payload)
-        print("Personal Service:", personal_resp.status_code, personal_resp.text)
-        responses["personal_data"] = safe_json_response(personal_resp)
-
-        # Forward to Pseudonym Service
         pseudonym_resp = requests.post(PSEUDONYM_URL, json=pseudonym_payload)
         print("Pseudonym Service:", pseudonym_resp.status_code, pseudonym_resp.text)
-        responses["pseudonym"] = safe_json_response(pseudonym_resp)
+    except Exception as e:
+        return jsonify({"error": "Error calling Pseudonym service", "details": str(e)}), 500
+    pseudonym_result = safe_json_response(pseudonym_resp)
+    # (Optionally, update transformed_recipient with masked fields from pseudonym_result)
 
-        # Forward to Recipient Service
+    # Prepare payloads for downstream services
+    personal_payload = {
+        "personId": new_recipient_id,
+        "firstName": transformed_recipient.get("firstName"),
+        "lastName": transformed_recipient.get("lastName"),
+        "dateOfBirth": transformed_recipient.get("dateOfBirth"),
+        "nokContact": transformed_recipient.get("nokContact")
+    }
+    recipient_payload = transformed_recipient
+    lab_payload = lab_info_data  # Assumed to already be in the proper format
+
+    responses = {}
+
+    # Forward data to Personal Data Service
+    try:
+        personal_resp = requests.post(PERSONAL_DATA_URL, json=personal_payload)
+        print("Personal Data Service:", personal_resp.status_code, personal_resp.text)
+        responses["personal_data"] = safe_json_response(personal_resp)
+    except Exception as e:
+        return jsonify({"error": "Error calling Personal Data service", "details": str(e)}), 500
+
+    # Forward data to Recipient Service
+    try:
         recipient_resp = requests.post(RECIPIENT_URL, json=recipient_payload)
         print("Recipient Service:", recipient_resp.status_code, recipient_resp.text)
         responses["recipient"] = safe_json_response(recipient_resp)
+    except Exception as e:
+        return jsonify({"error": "Error calling Recipient service", "details": str(e)}), 500
 
-        # Forward to Lab Report Service
+    # Forward data to Lab Report Service
+    try:
         lab_resp = requests.post(LAB_REPORT_URL, json=lab_payload)
         print("Lab Report Service:", lab_resp.status_code, lab_resp.text)
         responses["lab_report"] = safe_json_response(lab_resp)
-
     except Exception as e:
-        return jsonify({
-            "error": "Error calling atomic microservices",
-            "details": str(e)
-        }), 500
+        return jsonify({"error": "Error calling Lab Report service", "details": str(e)}), 500
+
+    # Prepare a flattened composite payload for logging
+    composite_for_logging = {}
+    composite_for_logging.update(transformed_recipient)
+    composite_for_logging.update(lab_info_data)
+    composite_for_logging["recipientId"] = new_recipient_id
 
     # Publish event to RabbitMQ for activity logging
     try:
@@ -123,17 +159,15 @@ def request_for_organ():
         channel.basic_publish(
             exchange=exchange,
             routing_key=routing_key,
-            body=json.dumps(composite_data)
+            body=json.dumps(composite_for_logging)
         )
         connection.close()
     except Exception as e:
-        return jsonify({
-            "error": "Error publishing message to RabbitMQ",
-            "details": str(e)
-        }), 500
+        return jsonify({"error": "Error publishing message to RabbitMQ", "details": str(e)}), 500
 
     responses["message"] = "Request processed and activity logged."
     return jsonify(responses), 201
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5021, debug=True)
