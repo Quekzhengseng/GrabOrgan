@@ -61,7 +61,7 @@ def extract_personal_data(data):
             payload[key] = data.get(key)
     return payload
 
-@app.route('/request_for_organ', methods=['POST'])
+@app.route('/request-for-organ', methods=['POST'])
 def request_for_organ():
     """
     Composite service that:
@@ -119,7 +119,7 @@ def request_for_organ():
             pika.ConnectionParameters(host=rabbitmq_host, port=rabbitmq_port)
         )
         channel = connection.channel()
-        channel.exchange_declare(exchange=exchange, exchange_type='topic', durable=True)
+        channel.exchange_declare(exchange=exchange, exchange_type='direct', durable=True)
         channel.basic_publish(
             exchange=exchange,
             routing_key=routing_key,
