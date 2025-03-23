@@ -285,8 +285,8 @@ services:
 
   request_organ:
     build:
-      context: ./composite/requestOrgan/.
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: composite/requestOrgan/Dockerfile
     image: GrabOrgan/request_organ:1.0
     container_name: request_organ_service
     ports:
