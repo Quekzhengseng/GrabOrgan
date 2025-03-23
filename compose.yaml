@@ -357,10 +357,12 @@ services:
       - rabbit_port=5672
       - LAB_INFO_URL=http://labInfo:5007/lab-reports
       - MATCH_SERVICE_URL=http://match:5008/matches
+      - RECIPIENT_URL=http://recipient:5013/recipient
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/usr/src/app
 
     depends_on:
+      - recipient
       - labInfo
       - match
       - match_organ

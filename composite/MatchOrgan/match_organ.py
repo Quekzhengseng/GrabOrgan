@@ -4,7 +4,7 @@ import json
 import ast
 import threading
 
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify
 from flask_cors import CORS
 import pika
 
