@@ -242,6 +242,88 @@ def process_match_result(match_test_result_dict):
         body=message,
         properties=pika.BasicProperties(delivery_mode=2),
     )
+    # Need to somehow notify the frontend that the matches found are done, then allow user to confirm match
+    # maybe it goes to a notification service?
+
+
+@app.route("/initiate-match/<string:recipientId>", methods=['POST'])
+def initiate_match(recipientId):
+    try:
+        recipient_URL = RECIPIENT_URL + "/" + recipientId
+        print("Invoking recipient atomic service...")
+        recipient_result = invoke_http(recipient_URL, method="GET")
+        message = json.dumps(recipient_result)
+        code = recipient_result["code"]
+
+        if code not in range(200, 300):
+            return jsonify({
+                "code": code,
+                "data": {"recipientId": recipientId},
+                "message": recipient_result["message"]
+            }), code 
+        else:
+            print("Publishing message with routing_key=", "match.request")
+            # Prepare the message as a JSON string
+            message_body = json.dumps({"recipientId": recipientId})
+            channel.basic_publish(
+                exchange="request_organ_exchange",
+                routing_key="match.request",
+                body=message_body,
+                properties=pika.BasicProperties(delivery_mode=2)  # make message persistent
+            )
+            # Return a response immediately
+            return jsonify({
+                "code": 202,
+                "message": "Match initiation request accepted. You will be notified once the match is completed."
+            }), 202
+
+    except Exception as e:
+        print("Error initiating match:", str(e))
+        return jsonify({
+            "code": 500,
+            "message": "An error occurred while initiating the match: " + str(e)
+        }), 500
+
+@app.route("/confirm-match/<string:matchId>", methods=['POST'])
+def confirm_match(matchId):
+
+    try:
+        # Extract recipientId from the JSON payload
+        print("Invoking match atomic service...")
+        match_url = MATCH_URL + "/" + matchId
+        match_result = invoke_http(match_url, method="GET")
+        message = json.dumps(match_result)
+        code = match_result["code"]
+
+        if code not in range(200, 300):
+            return jsonify({
+                "code": code,
+                "data": {"recipientId": matchId},
+                "message": match_result["message"]
+            }), code 
+        else:
+            print("Publishing message with routing_key=", "match.confirm")
+            # Prepare the message as a JSON string
+            message_body = json.dumps({"matchId": matchId})
+            channel.basic_publish(
+                exchange="confirm_match_exchange",
+                routing_key="match.confirm",
+                body=message_body,
+                properties=pika.BasicProperties(delivery_mode=2)  # make message persistent
+            )
+            # Return a response immediately
+            return jsonify({
+                "code": 202,
+                "message": "Match initiation request accepted. You will be notified once the match is completed."
+            }), 202
+
+    except Exception as e:
+        print("Error initiating match:", str(e))
+        return jsonify({
+            "code": 500,
+            "message": "An error occurred while initiating the match: " + str(e)
+        }), 500
+
 
 if __name__ == "__main__":
     print("This is flask " + os.path.basename(__file__) + " for matching an organ...")
