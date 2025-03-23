@@ -233,36 +233,36 @@ services:
       - grabOrgan-net
     # restart: always
 
-  # match_organ:
-  #   build:
-  #     context: .
-  #     dockerfile: composite/MatchOrgan/Dockerfile.match.organ
-  #   image: GrabOrgan/match_organ:1.0
-  #   environment:
-  #     - AMQP_URL=amqp://rabbitmq:5672/
-  #     - rabbit_host=rabbitmq # The name of the RabbitMQ container defined in the RabbitMQ compose file
-  #     - rabbit_port=5672
-  #     - RECIPIENT_URL=http://recipient:5013/recipient
-  #     - DONOR_URL=http://donor:5003/donor
-  #     - ORGAN_URL=http://organ:5010/organ
-  #     - MATCH_URL=http://match:5008/matches
-  #     - PYTHONPATH=/usr/src/app:/usr/src/app/common # Equivalent to export PYTHONPATH
-  #     - PYTHONUNBUFFERED=1
-  #   ports:
-  #     - "5020:5020"
-  #   depends_on:
-  #     - rabbitmq
-  #     - activity_log
-  #     - error
-  #     - recipient
-  #     - donor
-  #     - match
-  #     - organ
-  #   container_name: match_organ_service
-  #   networks:
-  #     - grabOrgan-net
-  #   # restart: always
-  #   command: ["python", "match_organ.py"]
+  match_organ:
+    build:
+      context: .
+      dockerfile: composite/MatchOrgan/Dockerfile.match.organ
+    image: GrabOrgan/match_organ:1.0
+    environment:
+      - AMQP_URL=amqp://rabbitmq:5672/
+      - rabbit_host=rabbitmq # The name of the RabbitMQ container defined in the RabbitMQ compose file
+      - rabbit_port=5672
+      - RECIPIENT_URL=http://recipient:5013/recipient
+      - DONOR_URL=http://donor:5003/donor
+      - ORGAN_URL=http://organ:5010/organ
+      - MATCH_URL=http://match:5008/matches
+      - PYTHONPATH=/usr/src/app:/usr/src/app/common # Equivalent to export PYTHONPATH
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "5020:5020"
+    depends_on:
+      - rabbitmq
+      - activity_log
+      - error
+      - recipient
+      - donor
+      - match
+      - organ
+    container_name: match_organ_service
+    networks:
+      - grabOrgan-net
+    # restart: always
+    command: ["python", "match_organ.py"]
 
   createDelivery:
     build:
