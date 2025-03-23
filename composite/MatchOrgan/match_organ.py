@@ -242,6 +242,10 @@ def process_match_result(match_test_result_dict):
         body=message,
         properties=pika.BasicProperties(delivery_mode=2),
     )
+    # Need to somehow notify the frontend that the matches found are done, then allow user to confirm match
+    # maybe it goes to a notification service?
+
+
 @app.route("/initiate-match/<string:recipientId>", methods=['POST'])
 def initiate_match(recipientId):
     try:
