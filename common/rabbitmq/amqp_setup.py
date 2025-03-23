@@ -19,7 +19,7 @@ EXCHANGES = {
     "test_result_exchange": "direct",
     "activity_log_exchange": "topic",
     "error_handling_exchange": "topic",
-    "match_result_exchange": "direct",
+    "confirm_match_exchange": "direct",
 }
 
 # Define queues and their respective exchange bindings
@@ -27,6 +27,7 @@ QUEUES = [
     {"name": "match_request_queue", "exchange": "request_organ_exchange", "routing_key": "match.request"},
     {"name": "test_compatibility_queue", "exchange": "test_compatibility_exchange", "routing_key": "test.compatibility"},
     {"name": "match_test_result_queue", "exchange": "test_result_exchange", "routing_key": "test.result"},
+    {"name": "confirm_match_queue", "exchange": "confirm_match_exchange", "routing_key": "match.confirm"},
     {"name": "activity_log_queue", "exchange": "activity_log_exchange", "routing_key": "*.info"},  # Topic exchange wildcard
     {"name": "error_queue", "exchange": "error_handling_exchange", "routing_key": "*.error"},  # Topic exchange pattern
 ]
