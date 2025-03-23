@@ -2,19 +2,42 @@ import os
 import json
 import requests
 import pika
+import uuid
 from flask import Flask, request, jsonify
+from common import amqp_lib  # Assumes your reusable AMQP functions are here
+from common.invokes import invoke_http
 
 app = Flask(__name__)
 
 rabbitmq_host = os.getenv("RABBITMQ_HOST", "rabbitmq")
 rabbitmq_port = int(os.getenv("RABBITMQ_PORT", "5672"))
-exchange = os.getenv("RABBITMQ_EXCHANGE", "request_organ_exchange")
+exchange_name = os.getenv("RABBITMQ_EXCHANGE", "request_organ_exchange")
 routing_key = os.getenv("RABBITMQ_ROUTING_KEY", "match.request")
 PERSONAL_DATA_URL = os.getenv("PERSONAL_DATA_URL", "http://personal_data_service:5011/person")
 PSEUDONYM_URL = os.getenv("PSEUDONYM_URL", "http://pseudonym_service:5012/pseudonymise")
 RECIPIENT_URL = os.getenv("RECIPIENT_URL", "http://recipient_service:5013/recipient")
 LAB_REPORT_URL = os.getenv("LAB_REPORT_URL", "http://lab_report_service:5007/lab-reports")
 
+connection = None 
+channel = None
+
+def connectAMQP():
+    # Use global variables to reduce number of reconnection to RabbitMQ
+    # There are better ways but this suffices for our lab
+    global connection
+    global channel
+
+    print("  Connecting to AMQP broker...")
+    try:
+        connection, channel = amqp_lib.connect(
+                hostname=rabbitmq_host,
+                port=rabbitmq_port,
+                exchange_name=exchange_name,
+                exchange_type="direct",
+        )
+    except Exception as exception:
+        print(f"  Unable to connect to RabbitMQ.\n     {exception=}\n")
+        exit(1) # terminate
 
 
 def safe_json_response(resp):
@@ -115,13 +138,8 @@ def request_for_organ():
 
     # Publish event to RabbitMQ for activity logging
     try:
-        connection = pika.BlockingConnection(
-            pika.ConnectionParameters(host=rabbitmq_host, port=rabbitmq_port)
-        )
-        channel = connection.channel()
-        channel.exchange_declare(exchange=exchange, exchange_type='direct', durable=True)
         channel.basic_publish(
-            exchange=exchange,
+            exchange=exchange_name,
             routing_key=routing_key,
             body=json.dumps(composite_data)
         )
@@ -136,4 +154,5 @@ def request_for_organ():
     return jsonify(responses), 201
 
 if __name__ == '__main__':
+    connectAMQP()
     app.run(host='0.0.0.0', port=5021, debug=True)
