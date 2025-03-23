@@ -11,10 +11,10 @@ rabbitmq_host = os.getenv("RABBITMQ_HOST", "rabbitmq")
 rabbitmq_port = int(os.getenv("RABBITMQ_PORT", "5672"))
 exchange = os.getenv("RABBITMQ_EXCHANGE", "request_organ_exchange")
 routing_key = os.getenv("RABBITMQ_ROUTING_KEY", "recipient.registered")
-PERSONAL_DATA_URL = os.getenv("PERSONAL_DATA_URL", "http://personal_data_service:5011/person")
-PSEUDONYM_URL = os.getenv("PSEUDONYM_URL", "http://pseudonym_service:5012/pseudonymise")
-RECIPIENT_URL = os.getenv("RECIPIENT_URL", "http://recipient_service:5013/recipient")
-LAB_REPORT_URL = os.getenv("LAB_REPORT_URL", "http://lab_report_service:5007/lab-reports")
+PERSONAL_DATA_URL = os.getenv("PERSONAL_DATA_URL", "http://personalData:5011/person")
+PSEUDONYM_URL = os.getenv("PSEUDONYM_URL", "http://pseudonym:5012/pseudonymise")
+RECIPIENT_URL = os.getenv("RECIPIENT_URL", "http://recipient:5013/recipient")
+LAB_REPORT_URL = os.getenv("LAB_REPORT_URL", "http://labInfo:5007/lab-reports")
 
 
 
@@ -70,11 +70,11 @@ def request_for_organ():
            }
          }
       2. Transforms recipient data from snake_case to camelCase.
-      3. Generates a new recipient ID and attaches it.
+      3. Generates a single UUID to be used for the recipient, personal data, lab report, and pseudonym.
       4. Builds a pseudonym payload and sends it to the Pseudonym service.
       5. Prepares payloads for the Personal Data, Recipient, and Lab Report services.
-      6. Publishes a composite (flattened) payload to RabbitMQ for logging.
-      7. Returns a consolidated JSON response.
+      6. Publishes a composite payload to RabbitMQ for logging.
+      7. Returns a consolidated JSON response including the pseudonym service result.
     """
     payload = request.get_json() or {}
     data = payload.get("data", {})
@@ -83,13 +83,13 @@ def request_for_organ():
 
     # Transform recipient data from snake_case to camelCase
     transformed_recipient = transform_recipient(recipient_data)
-    new_recipient_id = str(uuid.uuid4())
-    transformed_recipient["recipientId"] = new_recipient_id
+    new_uuid = str(uuid.uuid4())
+    transformed_recipient["recipientId"] = new_uuid
 
     # Build pseudonym payload (only includes fields needed for pseudonymisation)
     pseudonym_payload = {
-        new_recipient_id: {
-            "recipientId": new_recipient_id,
+        new_uuid: {
+            "recipientId": new_uuid,
             "firstName": transformed_recipient.get("firstName"),
             "lastName": transformed_recipient.get("lastName"),
             "dateOfBirth": transformed_recipient.get("dateOfBirth"),
@@ -97,25 +97,27 @@ def request_for_organ():
         }
     }
 
-    # Call the Pseudonym service
+    # Call the Pseudonym service and capture its result
     try:
         pseudonym_resp = requests.post(PSEUDONYM_URL, json=pseudonym_payload)
         print("Pseudonym Service:", pseudonym_resp.status_code, pseudonym_resp.text)
+        pseudonym_result = safe_json_response(pseudonym_resp)
     except Exception as e:
         return jsonify({"error": "Error calling Pseudonym service", "details": str(e)}), 500
-    pseudonym_result = safe_json_response(pseudonym_resp)
-    # (Optionally, update transformed_recipient with masked fields from pseudonym_result)
 
-    # Prepare payloads for downstream services
+    # Prepare payloads for downstream services using the same UUID
     personal_payload = {
-        "personId": new_recipient_id,
+        "personId": new_uuid,
         "firstName": transformed_recipient.get("firstName"),
         "lastName": transformed_recipient.get("lastName"),
         "dateOfBirth": transformed_recipient.get("dateOfBirth"),
         "nokContact": transformed_recipient.get("nokContact")
     }
     recipient_payload = transformed_recipient
-    lab_payload = lab_info_data  # Assumed to already be in the proper format
+
+    # Ensure the lab report payload includes the UUID
+    lab_payload = lab_info_data.copy()
+    lab_payload["uuid"] = new_uuid
 
     responses = {}
 
@@ -143,11 +145,14 @@ def request_for_organ():
     except Exception as e:
         return jsonify({"error": "Error calling Lab Report service", "details": str(e)}), 500
 
-    # Prepare a flattened composite payload for logging
+    # Include pseudonym service result in the final response
+    responses["pseudonym"] = pseudonym_result
+
+    # Prepare a flattened composite payload for activity logging
     composite_for_logging = {}
     composite_for_logging.update(transformed_recipient)
     composite_for_logging.update(lab_info_data)
-    composite_for_logging["recipientId"] = new_recipient_id
+    composite_for_logging["recipientId"] = new_uuid
 
     # Publish event to RabbitMQ for activity logging
     try:
