@@ -35,11 +35,13 @@ services:
       - queue_name=activity_log_queue
       - routing_key=*.info
       - PYTHONUNBUFFERED=1
-      - PYTHONPATH=/usr/src/app:/usr/src/app/common # Equivalent to export PYTHONPATH
+      - PYTHONPATH=/usr/src/app
     depends_on:
       - rabbitmq
     networks:
       - grabOrgan-net
+    volumes:
+      - ./common:/usr/src/app/common # Shared volume for common code
     command: ["python", "activity_log.py"]
     restart: always
 
@@ -106,11 +108,13 @@ services:
       - exchange_type=topic
       - queue_name=error_queue
       - PYTHONUNBUFFERED=1
-      - PYTHONPATH=/usr/src/app:/usr/src/app/common # Equivalent to export PYTHONPATH
+      - PYTHONPATH=/usr/src/app
     depends_on:
       - rabbitmq
     networks:
       - grabOrgan-net
+    volumes:
+      - ./common:/usr/src/app/common # Shared volume for common code
     command: ["python", "error.py"]
     restart: always
 
@@ -234,37 +238,6 @@ services:
       - grabOrgan-net
     # restart: always
 
-  match_organ:
-    build:
-      context: .
-      dockerfile: composite/MatchOrgan/Dockerfile.match.organ
-    image: GrabOrgan/match_organ:1.0
-    environment:
-      - AMQP_URL=amqp://rabbitmq:5672/
-      - rabbit_host=rabbitmq # The name of the RabbitMQ container defined in the RabbitMQ compose file
-      - rabbit_port=5672
-      - RECIPIENT_URL=http://recipient:5013/recipient
-      - DONOR_URL=http://donor:5003/donor
-      - ORGAN_URL=http://organ:5010/organ
-      - MATCH_URL=http://match:5008/matches
-      - PYTHONPATH=/usr/src/app:/usr/src/app/common # Equivalent to export PYTHONPATH
-      - PYTHONUNBUFFERED=1
-    ports:
-      - "5020:5020"
-    depends_on:
-      - rabbitmq
-      - activity_log
-      - error
-      - recipient
-      - donor
-      - match
-      - organ
-    container_name: match_organ_service
-    networks:
-      - grabOrgan-net
-    # restart: always
-    command: ["python", "match_organ.py"]
-
   createDelivery:
     build:
       context: ./composite/createDelivery/.
@@ -278,6 +251,7 @@ services:
       - "5026:5026"
     networks:
       - grabOrgan-net
+    command: ["python", "createDelivery.py"]
 
   selectDriver:
     build:
@@ -301,7 +275,7 @@ services:
     # restart: always
     container_name: trackDelivery
     environment:
-    - PYTHONUNBUFFERED=1
+      - PYTHONUNBUFFERED=1
     ports:
       - "5025:5025"
     networks:
@@ -309,22 +283,23 @@ services:
 
   request_organ:
     build:
-      context: ./composite/requestOrgan
-      dockerfile: Dockerfile
-    image: GrabOrgan/requestorgan:1.0
+      context: .
+      dockerfile: composite/requestOrgan/Dockerfile
+    image: GrabOrgan/request_organ:1.0
     container_name: request_organ_service
     ports:
       - "5021:5021"
     environment:
-      PERSONAL_DATA_URL: "http://personalData:5011/person"
-      PSEUDONYM_URL: "http://pseudonym:5012/pseudonymise"
-      RECIPIENT_URL: "http://recipient:5013/recipient"
-      LAB_REPORT_URL: "http://labInfo:5007/lab-reports"
-      RABBITMQ_HOST: "rabbitmq"
-      RABBITMQ_PORT: "5672"
-      RABBITMQ_EXCHANGE: "request_organ_exchange"
-      RABBITMQ_ROUTING_KEY: "recipient.registered"
-      PYTHONUNBUFFERED: 1
+      - PERSONAL_DATA_URL="http://personalData:5011/person"
+      - PSEUDONYM_URL="http://pseudonym:5012/pseudonymise"
+      - RECIPIENT_URL="http://recipient:5013/recipient"
+      - LAB_REPORT_URL="http://labInfo:5007/lab-reports"
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_EXCHANGE=request_organ_exchange
+      - RABBITMQ_ROUTING_KEY=match.request
+      - PYTHONPATH=/usr/src/app
+      - PYTHONUNBUFFERED=1
     depends_on:
       - personalData
       - pseudonym
@@ -333,3 +308,67 @@ services:
       - rabbitmq
     networks:
       - grabOrgan-net
+    volumes:
+      - ./common:/usr/src/app/common # Shared volume for common code
+    command: ["python", "request_organ.py"]
+
+  match_organ:
+    build:
+      context: .
+      dockerfile: composite/MatchOrgan/Dockerfile.match.organ
+    image: GrabOrgan/match_organ:1.0
+    environment:
+      - rabbit_host=rabbitmq # The name of the RabbitMQ container defined in the RabbitMQ compose file
+      - rabbit_port=5672
+      - RECIPIENT_URL=http://recipient:5013/recipient
+      - DONOR_URL=http://donor:5003/donor
+      - ORGAN_URL=http://organ:5010/organ
+      - MATCH_URL=http://match:5008/matches
+      # - PYTHONPATH=/usr/src/app:/usr/src/app/common # Equivalent to export PYTHONPATH
+      - PYTHONPATH=/usr/src/app
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "5020:5020"
+    depends_on:
+      - rabbitmq
+      - activity_log
+      - error
+      - recipient
+      - donor
+      - match
+      - organ
+      - request_organ
+    container_name: match_organ_service
+    networks:
+      - grabOrgan-net
+    volumes:
+      - ./common:/usr/src/app/common # Shared volume for common code
+    # restart: always
+    command: ["python", "match_organ.py"]
+
+  test_compatibility:
+    build:
+      context: .
+      dockerfile: composite/TestCompatibility/Dockerfile.test.compatibility
+    container_name: "test_compatibility"
+    #volumes map to secret key
+    environment:
+      - rabbit_host=rabbitmq # The name of the RabbitMQ container defined in the RabbitMQ compose file
+      - rabbit_port=5672
+      - LAB_INFO_URL=http://labInfo:5007/lab-reports
+      - MATCH_SERVICE_URL=http://match:5008/matches
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/usr/src/app
+
+    depends_on:
+      - labInfo
+      - match
+      - match_organ
+
+    networks:
+      - grabOrgan-net
+    ports:
+      - "5022:5022"
+    volumes:
+      - ./common:/usr/src/app/common # Shared volume for common code
+    command: ["python", "test_compatibility.py"]
