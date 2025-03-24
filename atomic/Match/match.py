@@ -97,6 +97,37 @@ def create_matches():
             "code": 500,
             "message": f"Internal server error: {str(e)}"
         }), 500
+    
+@app.route("/matches/recipient/<string:recipient_id>", methods=['GET'])
+def get_matches_by_recipient_id(recipient_id):
+    try:
+        # Query matches collection where recipientId equals the provided recipient_id
+        matches_ref = db.collection("matches")
+        query = matches_ref.where("recipientId", "==", recipient_id)
+        docs = query.get()
+        
+        # Convert documents to dictionaries
+        matches = [doc.to_dict() for doc in docs]
+        
+        if matches:
+            return jsonify({
+                "code": 200,
+                "data": matches,
+                "message": f"Matches for recipient {recipient_id} fetched successfully"
+            }), 200
+        else:
+            return jsonify({
+                "code": 200,
+                "data": [],
+                "message": f"No matches found for recipient {recipient_id}"
+            }), 200
+
+    except Exception as e:
+        return jsonify({
+            "code": 500,
+            "data": {"error": str(e)},
+            "message": f"An error occurred while fetching matches for recipient {recipient_id}"
+        }), 500
 
 
 if __name__ == '__main__':

@@ -97,8 +97,13 @@ export default function RecipientsDashboard() {
     setMatches([]);
     setMatchError(null);
     setRequestSuccess(false);
+
     if (recipient.recipientId) {
+      // Fetch lab reports
       fetchLabReports(recipient.recipientId);
+
+      // Automatically find matches for this recipient
+      handleFindMatches(recipient.recipientId);
     }
   };
 
@@ -120,14 +125,25 @@ export default function RecipientsDashboard() {
     setSelectedMatch(null);
 
     try {
-      // Call the match request API
-      const response = await fetch("http://localhost:5020/match_request", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ recipientId }),
-      });
+      // Extract just the number portion from the recipient ID
+      // Then convert to a number to remove leading zeros
+      const idMatch = recipientId.match(/\d+/);
+      const idNumber = idMatch
+        ? parseInt(idMatch[0], 10).toString()
+        : recipientId;
+
+      console.log("Searching for matches with recipient number:", idNumber);
+
+      // Use the new endpoint to get matches by recipient ID number
+      const response = await fetch(
+        `http://localhost:5008/matches/recipient/${idNumber}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`API request failed with status ${response.status}`);
@@ -135,10 +151,15 @@ export default function RecipientsDashboard() {
 
       const data = await response.json();
 
-      if (data && data.matches) {
-        setMatches(data.matches);
+      if (data && data.code === 200) {
+        setMatches(data.data || []);
+
+        if (!data.data || data.data.length === 0) {
+          console.log("No matches found for this recipient");
+        }
       } else {
         setMatches([]);
+        console.log("Invalid response format or no data returned");
       }
     } catch (err) {
       console.error("Error finding matches:", err);
@@ -156,7 +177,68 @@ export default function RecipientsDashboard() {
     setRequestLoading(true);
 
     try {
-      // Call the request organ API
+      // Create order for the selected match
+      const orderResponse = await fetch("http://localhost:5009/order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          orderId: `order-${Date.now()}`,
+          organType: selectedMatch.OrganId.split("-")[1] || "Unknown",
+          transplantDateTime: new Date(Date.now() + 86400000).toISOString(), // Schedule 24 hours from now
+          startHospital: "Changi Hospital", // Default values since we don't have this information
+          endHospital: "Tan Tock Seng Hospital",
+          matchId: selectedMatch.matchId,
+          remarks: `Organ transplant request for ${selectedRecipient.firstName} ${selectedRecipient.lastName}`,
+        }),
+      });
+
+      if (!orderResponse.ok) {
+        throw new Error(
+          `Order request failed with status ${orderResponse.status}`
+        );
+      }
+
+      // Now request organ delivery
+      const deliveryResponse = await fetch(
+        "http://localhost:5026/createDelivery",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            startHospital: "Changi Hospital",
+            endHospital: "Tan Tock Seng Hospital",
+            DoctorId: "doctor-001", // Assuming a default doctor ID
+            transplantDateTime: new Date(Date.now() + 86400000).toISOString(),
+          }),
+        }
+      );
+
+      if (!deliveryResponse.ok) {
+        console.warn("Delivery request might have issues, but proceeding...");
+      }
+
+      // Show success message
+      setRequestSuccess(true);
+    } catch (err) {
+      console.error("Error requesting organ:", err);
+      alert(`Failed to request organ: ${err.message}`);
+    } finally {
+      setRequestLoading(false);
+    }
+  };
+
+  // Handle requesting new organs (when no matches found)
+  const handleRequestNewOrgans = async () => {
+    if (!selectedRecipient) return;
+
+    setRequestLoading(true);
+
+    try {
+      // Call the request_for_organ API to initiate a new organ search
       const response = await fetch("http://localhost:5021/request_for_organ", {
         method: "POST",
         headers: {
@@ -164,11 +246,21 @@ export default function RecipientsDashboard() {
         },
         body: JSON.stringify({
           recipientId: selectedRecipient.recipientId,
-          matchId: selectedMatch.matchId,
-          organId: selectedMatch.OrganId,
-          // Include any other required data for the request
-          requestDate: new Date().toISOString(),
-          status: "Requested",
+          firstName: selectedRecipient.firstName,
+          lastName: selectedRecipient.lastName,
+          dateOfBirth: selectedRecipient.dateOfBirth,
+          gender: selectedRecipient.gender,
+          bloodType: selectedRecipient.bloodType,
+          organsNeeded: selectedRecipient.organsNeeded,
+          nokContact: selectedRecipient.nokContact || {},
+          // Lab report data
+          reportName: "Transplant Eligibility",
+          testType: "Organ Request",
+          dateOfReport: new Date().toISOString(),
+          uuid: `report-${Date.now()}`,
+          results: {
+            status: "Requested",
+          },
         }),
       });
 
@@ -176,14 +268,21 @@ export default function RecipientsDashboard() {
         throw new Error(`Request failed with status ${response.status}`);
       }
 
-      // Handle successful request
-      setRequestSuccess(true);
+      const data = await response.json();
+      console.log("Request for new organs response:", data);
 
-      // You could also update the UI to show the request status
-      // or fetch updated recipient data
+      // Show success message
+      alert(
+        "Request for new organs submitted successfully. The system will search for potential matches."
+      );
+
+      // Check for matches again after a short delay
+      setTimeout(() => {
+        handleFindMatches(selectedRecipient.recipientId);
+      }, 3000);
     } catch (err) {
-      console.error("Error requesting organ:", err);
-      alert(`Failed to request organ: ${err.message}`);
+      console.error("Error requesting new organs:", err);
+      alert(`Failed to request new organs: ${err.message}`);
     } finally {
       setRequestLoading(false);
     }
@@ -488,14 +587,40 @@ export default function RecipientsDashboard() {
             <div className="bg-white rounded-lg shadow-lg overflow-hidden mt-6">
               <div className="bg-green-600 text-white p-6 flex justify-between items-center">
                 <h2 className="text-2xl font-bold">Organ Matches</h2>
-                <button
-                  onClick={() =>
-                    handleFindMatches(selectedRecipient.recipientId)
-                  }
-                  className="px-4 py-2 bg-white text-green-600 rounded-md hover:bg-gray-100 transition-colors"
-                >
-                  Find Matches
-                </button>
+                <div className="flex gap-2">
+                  {matches.length === 0 && !matchLoading && (
+                    <button
+                      onClick={handleRequestNewOrgans}
+                      className="px-4 py-2 bg-white text-orange-600 rounded-md hover:bg-gray-100 transition-colors flex items-center"
+                      disabled={requestLoading}
+                    >
+                      {requestLoading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Requesting...
+                        </>
+                      ) : (
+                        "Request New Organs"
+                      )}
+                    </button>
+                  )}
+                  <button
+                    onClick={() =>
+                      handleFindMatches(selectedRecipient.recipientId)
+                    }
+                    className="px-4 py-2 bg-white text-green-600 rounded-md hover:bg-gray-100 transition-colors flex items-center"
+                    disabled={matchLoading}
+                  >
+                    {matchLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Finding Matches...
+                      </>
+                    ) : (
+                      "Refresh Matches"
+                    )}
+                  </button>
+                </div>
               </div>
 
               <div className="p-6">
@@ -520,6 +645,16 @@ export default function RecipientsDashboard() {
                   </div>
                 ) : (
                   <div>
+                    {requestSuccess && (
+                      <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+                        <p className="font-bold">Success!</p>
+                        <p>
+                          Organ transplant has been requested successfully. The
+                          medical team will be notified.
+                        </p>
+                      </div>
+                    )}
+
                     <p className="text-gray-700 mb-4">
                       Select a match to request organ transplant:
                     </p>
@@ -572,9 +707,17 @@ export default function RecipientsDashboard() {
                       <div className="mt-6 flex justify-end">
                         <button
                           onClick={handleRequestOrgan}
-                          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center"
+                          disabled={requestLoading}
                         >
-                          Request Organ Transplant
+                          {requestLoading ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Processing Request...
+                            </>
+                          ) : (
+                            "Request Organ Transplant"
+                          )}
                         </button>
                       </div>
                     )}
