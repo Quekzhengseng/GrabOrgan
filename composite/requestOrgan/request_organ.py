@@ -1,12 +1,9 @@
 import os
 import json
 import uuid
-import requests
-import pika
-import uuid
 from flask import Flask, request, jsonify
-from common import amqp_lib  # Assumes your reusable AMQP functions are here
-from common.invokes import invoke_http
+from common import amqp_lib  # Reusable AMQP functions
+from common.invokes import invoke_http  # Import the invoke_http function
 
 app = Flask(__name__)
 
@@ -23,139 +20,95 @@ connection = None
 channel = None
 
 def connectAMQP():
-    # Use global variables to reduce number of reconnection to RabbitMQ
-    # There are better ways but this suffices for our lab
-    global connection
-    global channel
-
-    print("  Connecting to AMQP broker...")
+    global connection, channel
+    print("Connecting to AMQP broker...")
     try:
         connection, channel = amqp_lib.connect(
-                hostname=rabbitmq_host,
-                port=rabbitmq_port,
-                exchange_name=exchange_name,
-                exchange_type="direct",
+            hostname=rabbitmq_host,
+            port=rabbitmq_port,
+            exchange_name=exchange_name,
+            exchange_type="direct",
         )
-    except Exception as exception:
-        print(f"  Unable to connect to RabbitMQ.\n     {exception=}\n")
-        exit(1) # terminate
+    except Exception as e:
+        print(f"Unable to connect to RabbitMQ: {e}")
+        exit(1)
 
-
-def safe_json_response(resp):
-    try:
-        return resp.json()
-    except Exception:
-        print("Failed to parse JSON from response:", resp.text)
-        return {"error": "Invalid JSON", "raw": resp.text}
+def remove_code_field(response):
+    """Helper to remove the 'code' field from a response dictionary."""
+    if isinstance(response, dict) and "code" in response:
+         del response["code"]
+    return response
 
 @app.route('/request-for-organ', methods=['POST'])
 def request_for_organ():
-    """
-    Composite service workflow:
-      1. Receives a JSON payload with structure:
-         {
-           "data": {
-             "recipient": { ... already in camelCase ... },
-             "labInfo": { ... already in camelCase ... }
-           }
-         }
-      2. Generates a single UUID to be used for all atomic services.
-      3. Builds payloads for each service:
-            - Recipient service: expects "recipientId"
-            - Personal Data service: expects "personId"
-            - Lab Report service: expects "uuid"
-            - Pseudonym service: expects inner "recipientId"
-      4. Calls each service and publishes an activity log.
-      5. Returns a consolidated JSON response.
-    """
     payload = request.get_json() or {}
     data = payload.get("data", {})
     recipient_data = data.get("recipient", {})
     lab_info_data = data.get("labInfo", {})
 
-    # Use input data that is already in camelCase.
+    # Generate a unique ID for this request.
     new_uuid = str(uuid.uuid4())
 
-    # Prepare Recipient Service payload.
-    recipient_payload = recipient_data.copy()
-    recipient_payload["recipientId"] = new_uuid
-
-    # Prepare Personal Data Service payload.
-    personal_payload = {
-        "personId": new_uuid,
-        "firstName": recipient_data.get("firstName"),
-        "lastName": recipient_data.get("lastName"),
-        "dateOfBirth": recipient_data.get("dateOfBirth"),
-        "nokContact": recipient_data.get("nokContact")
-    }
-
-    # Prepare Lab Report Service payload.
-    lab_payload = lab_info_data.copy()
-    lab_payload["uuid"] = new_uuid
-
-    # Prepare Pseudonym Service payload.
+    # Send all recipient fields to the pseudonym service (plus generated recipientId)
     pseudonym_payload = {
-        new_uuid: {
-            "recipientId": new_uuid,
-            "firstName": recipient_data.get("firstName"),
-            "lastName": recipient_data.get("lastName"),
-            "dateOfBirth": recipient_data.get("dateOfBirth"),
-            "nokContact": recipient_data.get("nokContact")
-        }
+        new_uuid: { **recipient_data, "personId": new_uuid }
     }
 
     responses = {}
 
     # Call the Pseudonym Service.
-    try:
-        pseudonym_resp = requests.post(PSEUDONYM_URL, json=pseudonym_payload)
-        print("Pseudonym Service:", pseudonym_resp.status_code, pseudonym_resp.text)
-        responses["pseudonym"] = safe_json_response(pseudonym_resp)
-    except Exception as e:
-        return jsonify({"error": "Error calling Pseudonym service", "details": str(e)}), 500
+    pseudonym_resp = invoke_http(PSEUDONYM_URL, method="POST", json=pseudonym_payload)
+    pseudonym_resp = remove_code_field(pseudonym_resp)
+    responses["pseudonym"] = pseudonym_resp
 
-    # Call the Personal Data Service.
-    try:
-        personal_resp = requests.post(PERSONAL_DATA_URL, json=personal_payload)
-        print("Personal Data Service:", personal_resp.status_code, personal_resp.text)
-        responses["personal_data"] = safe_json_response(personal_resp)
-        # Inject the personId into the personal data response.
-        if "data" in responses["personal_data"]:
-            responses["personal_data"]["data"]["personId"] = new_uuid
-    except Exception as e:
-        return jsonify({"error": "Error calling Personal Data service", "details": str(e)}), 500
+    # Extract the full masked record for our recipient from the pseudonym response.
+    masked_data = pseudonym_resp.get("maskedData", {}).get(new_uuid, {})
+    if not masked_data:
+        return jsonify({"error": "Pseudonym service did not return masked data"}), 500
+
+    # Build the Personal Data payload using only the key personal fields.
+    personal_data_from_ps = pseudonym_resp.get("personalData", {})
+    if not personal_data_from_ps:
+        return jsonify({"error": "Pseudonym service did not return personalData"}), 500
+
+    personal_payload = {
+        "personId": new_uuid,
+        "firstName": personal_data_from_ps.get("firstName"),
+        "lastName": personal_data_from_ps.get("lastName"),
+        "dateOfBirth": personal_data_from_ps.get("dateOfBirth"),
+        "nokContact": personal_data_from_ps.get("nokContact")
+    }
+
+    # Use the complete masked data as the payload for the Recipient service.
+    recipient_payload = { **masked_data, "recipientId": new_uuid }
+
+    # Prepare Lab Report Service payload.
+    lab_payload = lab_info_data.copy()
+    lab_payload["uuid"] = new_uuid
+
+    # Call the Personal Data Service internally (its response is not exposed to the client).
+    _ = invoke_http(PERSONAL_DATA_URL, method="POST", json=personal_payload)
 
     # Call the Recipient Service.
-    try:
-        recipient_resp = requests.post(RECIPIENT_URL, json=recipient_payload)
-        print("Recipient Service:", recipient_resp.status_code, recipient_resp.text)
-        responses["recipient"] = safe_json_response(recipient_resp)
-        # Add the generated UUID as "recipient_id" into the recipient response.
-        if "data" in responses["recipient"]:
-            responses["recipient"]["data"]["recipient_id"] = new_uuid
-    except Exception as e:
-        return jsonify({"error": "Error calling Recipient service", "details": str(e)}), 500
+    recipient_resp = invoke_http(RECIPIENT_URL, method="POST", json=recipient_payload)
+    recipient_resp = remove_code_field(recipient_resp)
+    responses["recipient"] = recipient_resp
 
     # Call the Lab Report Service.
-    try:
-        lab_resp = requests.post(LAB_REPORT_URL, json=lab_payload)
-        print("Lab Report Service:", lab_resp.status_code, lab_resp.text)
-        responses["lab_report"] = safe_json_response(lab_resp)
-    except Exception as e:
-        return jsonify({"error": "Error calling Lab Report service", "details": str(e)}), 500
+    lab_resp = invoke_http(LAB_REPORT_URL, method="POST", json=lab_payload)
+    lab_resp = remove_code_field(lab_resp)
+    responses["lab_report"] = lab_resp
 
-    # Publish a composite payload for activity logging.
+    # Publish composite payload for activity logging.
     composite_for_logging = {}
     composite_for_logging.update(recipient_data)
     composite_for_logging.update(lab_info_data)
     composite_for_logging["recipientId"] = new_uuid
-
-    message = json.dumps({"recipientId":composite_for_logging["recipientId"]})
-
+    message = json.dumps({"recipientId": composite_for_logging["recipientId"]})
     try:
-        print("Publishing message with routing key=", routing_key)
+        print("Publishing message with routing key =", routing_key)
         channel.basic_publish(exchange=exchange_name, routing_key=routing_key, body=message)
-        responses["activity_log"] = {"code": 200, "message": "Activity logged successfully."}
+        responses["activity_log"] = {"message": "Activity logged successfully."}
     except Exception as e:
         return jsonify({"error": "Error publishing message to RabbitMQ", "details": str(e)}), 500
 
