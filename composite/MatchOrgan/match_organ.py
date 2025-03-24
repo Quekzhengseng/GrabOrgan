@@ -158,7 +158,7 @@ def process_match_request(match_request_dict):
             body=message,
             properties=pika.BasicProperties(delivery_mode=2),
         )
-        return {"code": 500, "data": {"recipient_result": recipient_result}, "message": "Error handling recipient."}
+        return jsonify({"code": 500, "data": {"recipient_result": recipient_result}, "message": "Error handling recipient."}), 500
 
     recipient_data = recipient_result["data"]
     recipient_bloodType = recipient_data["bloodType"]
@@ -179,7 +179,7 @@ def process_match_request(match_request_dict):
             body=message,
             properties=pika.BasicProperties(delivery_mode=2),
         )
-        return {"code": 500, "data": {"organ_result": organ_result}, "message": "Error handling organs."}
+        return jsonify({"code": 500, "data": {"organ_result": organ_result}, "message": "Error handling organs."}), 500
 
     organ_data = organ_result["data"]
     organList = [organ["organId"] for organ in organ_data
@@ -196,7 +196,7 @@ def process_match_request(match_request_dict):
             body="No matches available",
             properties=pika.BasicProperties(delivery_mode=2),
         )
-        return {"code": 204, "message": "No compatible matches found."}
+        return jsonify({"code": 204, "message": "No compatible matches found."}), 204
 
     print("Publish message with routing_key=match_request.info")
     channel.basic_publish(
@@ -227,7 +227,7 @@ def process_match_result(match_test_result_dict):
             body=message,
             properties=pika.BasicProperties(delivery_mode=2),
         )
-        return {"code": 500, "data": {"matches_result": match_result}, "message": "Error handling matches."}
+        return jsonify({"code": 500, "data": {"matches_result": match_result}, "message": "Error handling matches."}), 500
 
     match_data = match_result["data"]
     match_test_result_list = [match for match in match_data if match["matchId"] in match_test_result_dict["listOfMatchId"]]

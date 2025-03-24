@@ -134,7 +134,10 @@ def pseudonymise_service():
     try:
         data = request.get_json()
         if not data:
-            return jsonify({"message": "No data provided"}), 400
+            return jsonify(
+                {"code": 400,
+                "message": "No data provided"
+                }), 400
 
         # Assume the JSON contains a single record keyed by an ID.
         record_id, record_data = list(data.items())[0]
@@ -151,6 +154,9 @@ def pseudonymise_service():
             "firstName": record_data.get("firstName", ""),
             "lastName": record_data.get("lastName", ""),
             "dateOfBirth": record_data.get("dateOfBirth", ""),
+            "nric": record_data.get("nric", ""),
+            "email": record_data.get("email", ""),
+            "address": record_data.get("address", ""),
             "nokContact": record_data.get("nokContact", {})
         }
 
@@ -158,7 +164,11 @@ def pseudonymise_service():
             "maskedData": { record_id: masked_data },
             "personalData": personal_data
         }
-        return jsonify(response), 200
+        return jsonify({
+            "code": 200,
+            "data": response,
+            "message": "Successfully Pseudonymised Data!"
+        }), 200
     except Exception as e:
         record_id, record_data = list(data.items())[0]
         print("Error: {}".format(str(e)))
