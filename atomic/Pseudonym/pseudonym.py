@@ -139,14 +139,9 @@ def pseudonymise_service():
         # Assume the JSON contains a single record keyed by an ID.
         record_id, record_data = list(data.items())[0]
 
-        # Determine which identifier to use.
-        # If record_data contains a "recipientId", then use that; otherwise, use record_id as donorId.
-        if "recipientId" in record_data:
-            id_field = "recipientId"
-        else:
-            id_field = "donorId"
+        id_field = 'personId'
 
-        # Process the data to pseudonymise/mask PII fields.
+       # Process the data to pseudonymise/mask PII fields.
         masked_data = process_pii(record_data)
         masked_data[id_field] = record_id
 
