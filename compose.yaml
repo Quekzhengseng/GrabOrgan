@@ -1,6 +1,8 @@
 volumes:
   rabbitmq_data:
     name: grabOrgan_rabbitmq_data
+  pgdata:
+    name: grabOrgan_pgdata
 
 networks:
   grabOrgan-net:
@@ -8,6 +10,73 @@ networks:
     name: grabOrgan-net
 
 services:
+  #######################################
+  # Postgres: The database used by Kong
+  #######################################
+  kong-database:
+    image: postgres:17.4
+    platform: linux/amd64 # <- required for Mac M1 chip. Otherwise, can remove
+    restart: always
+    networks:
+      - grabOrgan-net
+    environment:
+      POSTGRES_DB: kong
+      POSTGRES_USER: kong
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "kong"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  #######################################
+  # Kong database migration
+  #######################################
+  kong-migration:
+    image: kong/kong-gateway:3.9
+    platform: linux/amd64 # <- required for Mac M1 chip. Otherwise, can remove
+    command: "kong migrations bootstrap"
+    restart: on-failure
+    networks:
+      - grabOrgan-net
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-database
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: password
+    depends_on:
+      - kong-database
+
+  #######################################
+  # Kong: The API Gateway
+  #######################################
+  kong:
+    image: kong/kong-gateway:3.9
+    platform: linux/amd64 # <- required for Mac M1 chip. Otherwise, can remove
+    restart: always
+    networks:
+      - grabOrgan-net
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-database
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: password
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+      KONG_ADMIN_GUI_URL: http://localhost:8002
+    depends_on:
+      - kong-migration
+    ports: # https://docs.konghq.com/gateway/latest/production/networking/default-ports/
+      - "8000:8000" # Takes incoming HTTP traffic from Consumers, and forwards it to upstream Services.
+      - "8001:8001" # Admin API. Listens for calls from the command line over HTTP.
+      - "8002:8002" # Kong Manager (GUI). Listens for HTTP traffic.
   rabbitmq:
     image: rabbitmq:3-management
     hostname: grabOrgan-rabbit
@@ -60,6 +129,8 @@ services:
       - "5002:5002"
     networks:
       - grabOrgan-net
+    depends_on:
+      - kong
     # restart: always
 
   donor:
@@ -76,6 +147,8 @@ services:
       - "5003:5003"
     networks:
       - grabOrgan-net
+    depends_on:
+      - kong
     # restart: always
 
   driverInfo:
@@ -92,6 +165,8 @@ services:
       - "5004:5004"
     networks:
       - grabOrgan-net
+    depends_on:
+      - kong
   error:
     build:
       context: .
@@ -128,6 +203,8 @@ services:
       - "5006:5006"
     networks:
       - grabOrgan-net
+    depends_on:
+      - kong
     # restart: always
 
   labInfo:
@@ -144,6 +221,8 @@ services:
       - "5007:5007"
     networks:
       - grabOrgan-net
+    depends_on:
+      - kong
     # restart: always
 
   match:
@@ -160,6 +239,8 @@ services:
       - "5008:5008"
     networks:
       - grabOrgan-net
+    depends_on:
+      - kong
     # restart: always
 
   order:
@@ -176,6 +257,8 @@ services:
       - "5009:5009"
     networks:
       - grabOrgan-net
+    depends_on:
+      - kong
     # restart: always
 
   organ:
@@ -192,6 +275,8 @@ services:
     container_name: organ_service
     networks:
       - grabOrgan-net
+    depends_on:
+      - kong
     # restart: always
 
   personalData:
@@ -208,6 +293,8 @@ services:
       - "5011:5011"
     networks:
       - grabOrgan-net
+    depends_on:
+      - kong
     # restart: always
 
   pseudonym:
@@ -220,9 +307,8 @@ services:
       - "5012:5012"
     networks:
       grabOrgan-net:
-        aliases:
-          - pseudonym
-          - pseudonym_service
+    depends_on:
+      - kong
 
   recipient:
     build:
@@ -238,6 +324,8 @@ services:
     container_name: recipient_service
     networks:
       - grabOrgan-net
+    depends_on:
+      - kong
     # restart: always
 
   createDelivery:
@@ -303,11 +391,12 @@ services:
       - PYTHONPATH=/usr/src/app
       - PYTHONUNBUFFERED=1
     depends_on:
+      - rabbitmq
+      - kong
       - personalData
       - pseudonym
       - recipient
       - labInfo
-      - rabbitmq
     networks:
       - grabOrgan-net
     volumes:
@@ -333,6 +422,7 @@ services:
       - "5020:5020"
     depends_on:
       - rabbitmq
+      - kong
       - activity_log
       - error
       - recipient
@@ -340,6 +430,7 @@ services:
       - match
       - organ
       - request_organ
+
     container_name: match_organ_service
     networks:
       - grabOrgan-net
@@ -364,6 +455,8 @@ services:
       - PYTHONPATH=/usr/src/app
 
     depends_on:
+      - rabbitmq
+      - kong
       - recipient
       - labInfo
       - match
