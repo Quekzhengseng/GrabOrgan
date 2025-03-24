@@ -16,6 +16,7 @@ const DeliveryMapbox = ({ deliveryData }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [basepolyline, setPolyline] = useState(null);
+  const [driverCoord, setDriverCoord] = usestate(null);
   const [driver, setDriver] = useState({
     name: deliveryData?.driverID || "John Doe",
     status: deliveryData?.status || "Delivering",
@@ -162,13 +163,7 @@ const DeliveryMapbox = ({ deliveryData }) => {
       // For demo/fallback, return some fake coordinates
       // This simulates what your API would return
       return [
-        { lat: 1.3551344, lng: 103.9848883 }, // Changi
-        { lat: 1.3502, lng: 103.952 },
-        { lat: 1.3402, lng: 103.9496 },
-        { lat: 1.3352, lng: 103.925 },
-        { lat: 1.3315, lng: 103.905 },
-        { lat: 1.328, lng: 103.885 },
-        { lat: 1.32316, lng: 103.846336 }, // TTSH
+        // this should return a error
       ];
     }
   };
@@ -224,6 +219,7 @@ const DeliveryMapbox = ({ deliveryData }) => {
 
   // Initialize Mapbox map
   useEffect(() => {
+    console.log({ deliveryData });
     const script = document.createElement("script");
     script.src =
       "https://cdnjs.cloudflare.com/ajax/libs/mapbox-gl/2.15.0/mapbox-gl.js";
@@ -307,7 +303,7 @@ const DeliveryMapbox = ({ deliveryData }) => {
 
       // Set ref for the decoded points to be used
       setRoutePoints(decodedPoints);
-      setfakeRoutePoints(fakedecodedPoints || decodedPoints);
+      // setfakeRoutePoints(fakedecodedPoints || decodedPoints);
 
       // Update driver's initial location to first point in route
       setDriver((prev) => ({
