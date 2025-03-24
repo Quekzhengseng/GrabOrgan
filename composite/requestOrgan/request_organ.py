@@ -12,12 +12,34 @@ app = Flask(__name__)
 
 rabbitmq_host = os.getenv("RABBITMQ_HOST", "rabbitmq")
 rabbitmq_port = int(os.getenv("RABBITMQ_PORT", "5672"))
-exchange = os.getenv("RABBITMQ_EXCHANGE", "request_organ_exchange")
-routing_key = os.getenv("RABBITMQ_ROUTING_KEY", "recipient.registered")
+exchange_name = os.getenv("RABBITMQ_EXCHANGE", "request_organ_exchange")
+routing_key = os.getenv("RABBITMQ_ROUTING_KEY", "match.request")
 PERSONAL_DATA_URL = os.getenv("PERSONAL_DATA_URL", "http://personalData:5011/person")
 PSEUDONYM_URL = os.getenv("PSEUDONYM_URL", "http://pseudonym:5012/pseudonymise")
 RECIPIENT_URL = os.getenv("RECIPIENT_URL", "http://recipient:5013/recipient")
 LAB_REPORT_URL = os.getenv("LAB_REPORT_URL", "http://labInfo:5007/lab-reports")
+
+connection = None 
+channel = None
+
+def connectAMQP():
+    # Use global variables to reduce number of reconnection to RabbitMQ
+    # There are better ways but this suffices for our lab
+    global connection
+    global channel
+
+    print("  Connecting to AMQP broker...")
+    try:
+        connection, channel = amqp_lib.connect(
+                hostname=rabbitmq_host,
+                port=rabbitmq_port,
+                exchange_name=exchange_name,
+                exchange_type="direct",
+        )
+    except Exception as exception:
+        print(f"  Unable to connect to RabbitMQ.\n     {exception=}\n")
+        exit(1) # terminate
+
 
 def safe_json_response(resp):
     try:
@@ -26,7 +48,7 @@ def safe_json_response(resp):
         print("Failed to parse JSON from response:", resp.text)
         return {"error": "Invalid JSON", "raw": resp.text}
 
-@app.route('/request_for_organ', methods=['POST'])
+@app.route('/request-for-organ', methods=['POST'])
 def request_for_organ():
     """
     Composite service workflow:
@@ -128,12 +150,11 @@ def request_for_organ():
     composite_for_logging.update(lab_info_data)
     composite_for_logging["recipientId"] = new_uuid
 
+    message = json.dumps({"recipientId":composite_for_logging["recipientId"]})
+
     try:
-        connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbitmq_host, port=rabbitmq_port))
-        channel = connection.channel()
-        channel.exchange_declare(exchange=exchange, exchange_type='direct', durable=True)
-        channel.basic_publish(exchange=exchange, routing_key=routing_key, body=json.dumps(composite_for_logging))
-        connection.close()
+        print("Publishing message with routing key=", routing_key)
+        channel.basic_publish(exchange=exchange_name, routing_key=routing_key, body=message)
         responses["activity_log"] = {"code": 200, "message": "Activity logged successfully."}
     except Exception as e:
         return jsonify({"error": "Error publishing message to RabbitMQ", "details": str(e)}), 500
