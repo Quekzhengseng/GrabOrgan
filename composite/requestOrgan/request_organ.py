@@ -8,6 +8,17 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
+rabbitmq_host = os.getenv("RABBITMQ_HOST", "rabbitmq")
+rabbitmq_port = int(os.getenv("RABBITMQ_PORT", "5672"))
+exchange = os.getenv("RABBITMQ_EXCHANGE", "request_organ_exchange")
+routing_key = os.getenv("RABBITMQ_ROUTING_KEY", "match.request")
+PERSONAL_DATA_URL = os.getenv("PERSONAL_DATA_URL", "http://personal_data_service:5011/person")
+PSEUDONYM_URL = os.getenv("PSEUDONYM_URL", "http://pseudonym_service:5012/pseudonymise")
+RECIPIENT_URL = os.getenv("RECIPIENT_URL", "http://recipient_service:5013/recipient")
+LAB_REPORT_URL = os.getenv("LAB_REPORT_URL", "http://lab_report_service:5007/lab-reports")
+
+
+
 def safe_json_response(resp):
     """
     Attempts to decode a JSON response.
@@ -52,7 +63,7 @@ def extract_personal_data(data):
             payload[key] = data.get(key)
     return payload
 
-@app.route('/request_for_organ', methods=['POST'])
+@app.route('/request-for-organ', methods=['POST'])
 def request_for_organ():
     """
     Composite service that:
@@ -79,26 +90,22 @@ def request_for_organ():
 
     try:
         # Forward to Personal Data Service
-        personal_url = os.getenv("PERSONAL_DATA_URL", "http://personal_data_service:5011/person")
-        personal_resp = requests.post(personal_url, json=personal_payload)
+        personal_resp = requests.post(PERSONAL_DATA_URL, json=personal_payload)
         print("Personal Service:", personal_resp.status_code, personal_resp.text)
         responses["personal_data"] = safe_json_response(personal_resp)
 
         # Forward to Pseudonym Service
-        pseudonym_url = os.getenv("PSEUDONYM_URL", "http://pseudonym_service:5012/pseudonymise")
-        pseudonym_resp = requests.post(pseudonym_url, json=pseudonym_payload)
+        pseudonym_resp = requests.post(PSEUDONYM_URL, json=pseudonym_payload)
         print("Pseudonym Service:", pseudonym_resp.status_code, pseudonym_resp.text)
         responses["pseudonym"] = safe_json_response(pseudonym_resp)
 
         # Forward to Recipient Service
-        recipient_url = os.getenv("RECIPIENT_URL", "http://recipient_service:5013/recipient")
-        recipient_resp = requests.post(recipient_url, json=recipient_payload)
+        recipient_resp = requests.post(RECIPIENT_URL, json=recipient_payload)
         print("Recipient Service:", recipient_resp.status_code, recipient_resp.text)
         responses["recipient"] = safe_json_response(recipient_resp)
 
         # Forward to Lab Report Service
-        lab_url = os.getenv("LAB_REPORT_URL", "http://lab_report_service:5007/lab-reports")
-        lab_resp = requests.post(lab_url, json=lab_payload)
+        lab_resp = requests.post(LAB_REPORT_URL, json=lab_payload)
         print("Lab Report Service:", lab_resp.status_code, lab_resp.text)
         responses["lab_report"] = safe_json_response(lab_resp)
 
@@ -110,16 +117,11 @@ def request_for_organ():
 
     # Publish event to RabbitMQ for activity logging
     try:
-        rabbitmq_host = os.getenv("RABBITMQ_HOST", "rabbitmq")
-        rabbitmq_port = int(os.getenv("RABBITMQ_PORT", "5672"))
-        exchange = os.getenv("RABBITMQ_EXCHANGE", "request_organ_exchange")
-        routing_key = os.getenv("RABBITMQ_ROUTING_KEY", "match.request")
-        
         connection = pika.BlockingConnection(
             pika.ConnectionParameters(host=rabbitmq_host, port=rabbitmq_port)
         )
         channel = connection.channel()
-        channel.exchange_declare(exchange=exchange, exchange_type='topic', durable=True)
+        channel.exchange_declare(exchange=exchange, exchange_type='direct', durable=True)
         channel.basic_publish(
             exchange=exchange,
             routing_key=routing_key,

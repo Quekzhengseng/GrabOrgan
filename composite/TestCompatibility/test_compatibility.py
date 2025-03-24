@@ -10,7 +10,7 @@ import sys
 app = Flask(__name__)
 
 # RabbitMQ Connection Details
-RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "localhost")
+rabbit_host= os.getenv("rabbit_host", "localhost")
 
 # RabbitMQ Exchange & Routing Keys
 TEST_COMPATIBILITY_EXCHANGE = "test_compatibility_exchange"
@@ -19,13 +19,13 @@ TEST_COMPATIBILITY_ROUTING_KEY = "test.compatibility"
 MATCH_TEST_RESULT_ROUTING_KEY = "test.result"
 
 # Lab Info & Match Atomic Service URLs
-LAB_INFO_URL = os.getenv("LAB_INFO_URL", "http://lab_info_service:5007/lab-reports")
-MATCH_SERVICE_URL = os.getenv("MATCH_SERVICE_URL", "http://match-service:5008/matches")
+LAB_INFO_URL = os.getenv("LAB_INFO_URL", "http://localhost:5007/lab-reports")
+MATCH_SERVICE_URL = os.getenv("MATCH_SERVICE_URL", "http://localhost:5008/matches")
 
 def connect_rabbitmq():
-    print(f"🔌 Trying to connect to RabbitMQ at host '{RABBITMQ_HOST}'...")
+    print(f"🔌 Trying to connect to RabbitMQ at host '{rabbit_host}'...")
     try:
-        connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))
+        connection = pika.BlockingConnection(pika.ConnectionParameters(rabbit_host))
         channel = connection.channel()
         channel.exchange_declare(exchange=TEST_COMPATIBILITY_EXCHANGE, exchange_type="direct", durable=True)
         channel.exchange_declare(exchange=MATCH_TEST_RESULT_EXCHANGE, exchange_type="direct", durable=True)
@@ -33,7 +33,7 @@ def connect_rabbitmq():
         sys.stdout.flush()
         return connection, channel
     except Exception as e:
-        print(f"❌ Failed to connect to RabbitMQ at host '{RABBITMQ_HOST}': {e}")
+        print(f"❌ Failed to connect to RabbitMQ at host '{rabbit_host}': {e}")
         return None, None
 
 @app.route("/")
