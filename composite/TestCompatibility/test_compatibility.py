@@ -49,6 +49,10 @@ LAB_INFO_URL = os.getenv("LAB_INFO_URL", "http://localhost:5007/lab-reports")
 MATCH_SERVICE_URL = os.getenv("MATCH_SERVICE_URL", "http://localhost:5008/matches")
 
 # Global connection and channel variables for reuse
+@app.route("/", methods=['GET'])
+def health_check():
+    return jsonify({"code": 200, "status": "ok"}), 200
+
 channel = None
 
 def handle_message(ch, method, properties, body):

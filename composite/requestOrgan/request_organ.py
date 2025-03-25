@@ -19,6 +19,10 @@ LAB_REPORT_URL = os.getenv("LAB_REPORT_URL", "http://labInfo:5007/lab-reports")
 connection = None 
 channel = None
 
+@app.route("/", methods=['GET'])
+def health_check():
+    return jsonify({"code": 200, "status": "ok"}), 200
+
 def connectAMQP():
     global connection, channel
     print("Connecting to AMQP broker...")

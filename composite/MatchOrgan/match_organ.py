@@ -50,6 +50,9 @@ SUBSCRIBE_QUEUES = [
     {"name": "match_request_queue", "exchange": "request_organ_exchange", "routing_key": "match.request", "type": "direct"},
     {"name": "match_test_result_queue", "exchange": "test_result_exchange", "routing_key": "test.result", "type": "direct"},
 ]
+@app.route("/", methods=['GET'])
+def health_check():
+    return jsonify({"code": 200, "status": "ok"}), 200
 
 # Global channel for publishing messages (set when the channel opens)
 channel = None
