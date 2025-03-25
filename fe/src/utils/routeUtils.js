@@ -182,7 +182,13 @@ export const requestNewRoute = async (currentPosition, destinationPoint) => {
   }
 };
 
-// Calculate progress based on straight-line distance
+/**
+ * Calculate progress based on straight-line distance
+ * @param {Object} currentPos - Current position as {lat, lng}
+ * @param {Object} startPos - Start position as {lat, lng}
+ * @param {Object} endPos - End position as {lat, lng}
+ * @returns {number} Progress percentage (0-100)
+ */
 export const calculateProgressByDistance = (currentPos, startPos, endPos) => {
   // Calculate total straight-line distance from start to end
   const totalDistance = Math.sqrt(
@@ -198,4 +204,86 @@ export const calculateProgressByDistance = (currentPos, startPos, endPos) => {
 
   // Calculate progress percentage
   return Math.min(Math.floor((distanceTraveled / totalDistance) * 100), 100);
+};
+
+/**
+ * Format a date string in the format "YYYYMMDD HH:MM:SS AM/PM"
+ * @param {string} dateString - The date string to format
+ * @returns {string} Formatted date string
+ */
+export const formatDeliveryDate = (dateString) => {
+  if (!dateString) return "N/A";
+
+  // Parse the date format "YYYYMMDD HH:MM:SS AM/PM"
+  const [datePart, timePart, ampm] = dateString.split(" ");
+
+  // Format YYYYMMDD to YYYY-MM-DD
+  const year = datePart.substring(0, 4);
+  const month = datePart.substring(4, 6);
+  const day = datePart.substring(6, 8);
+
+  return `${year}-${month}-${day} ${timePart} ${ampm}`;
+};
+
+/**
+ * Get the color class for a delivery status badge
+ * @param {string} status - The delivery status
+ * @returns {string} CSS class string for the status badge
+ */
+export const getDeliveryStatusColor = (status) => {
+  switch (status) {
+    case "Awaiting pickup":
+      return "bg-yellow-100 text-yellow-800";
+    case "In progress":
+      return "bg-blue-100 text-blue-800";
+    case "Completed":
+      return "bg-green-100 text-green-800";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
+};
+
+/**
+ * Fetch all delivery information
+ * @returns {Promise<Array>} Array of delivery objects
+ */
+export const fetchDeliveries = async () => {
+  const response = await fetch("http://localhost:5002/deliveryinfo");
+
+  if (!response.ok) {
+    throw new Error(`API request failed with status ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  if (data.code === 200 && data.data) {
+    // Convert the object of deliveries into an array
+    return Object.values(data.data);
+  } else {
+    throw new Error("Invalid response format");
+  }
+};
+
+/**
+ * Delete a delivery
+ * @param {string} deliveryId - The delivery ID to delete
+ * @returns {Promise<boolean>} Success status
+ */
+export const deleteDelivery = async (deliveryId) => {
+  const response = await fetch(
+    `http://localhost:5002/deliveryinfo/${deliveryId}`,
+    {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ status: "Deleted" }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to delete delivery");
+  }
+
+  return true;
 };

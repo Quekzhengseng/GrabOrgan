@@ -349,18 +349,45 @@ const DeliveryMapbox = ({ deliveryData }) => {
                   setRoutePoints(updatedRoute);
 
                   // Update the polyline displayed on the map
-                  if (map.current && map.current.getSource("route")) {
-                    map.current.getSource("route").setData({
-                      type: "Feature",
-                      properties: {},
-                      geometry: {
-                        type: "LineString",
-                        coordinates: [
-                          ...[[nextPoint.lng, nextPoint.lat]],
-                          ...newCoords.map((coord) => [coord.lng, coord.lat]),
-                        ],
-                      },
-                    });
+                  if (
+                    map.current &&
+                    map.current.isStyleLoaded &&
+                    map.current.isStyleLoaded()
+                  ) {
+                    // First check if the map style is loaded
+                    try {
+                      // Check if the source exists
+                      const hasSource =
+                        map.current.getStyle() &&
+                        map.current.getStyle().sources &&
+                        map.current.getStyle().sources.route;
+
+                      if (hasSource) {
+                        // Now we can safely update the source
+                        map.current.getSource("route").setData({
+                          type: "Feature",
+                          properties: {},
+                          geometry: {
+                            type: "LineString",
+                            coordinates: [
+                              ...[[nextPoint.lng, nextPoint.lat]],
+                              ...newCoords.map((coord) => [
+                                coord.lng,
+                                coord.lat,
+                              ]),
+                            ],
+                          },
+                        });
+                      } else {
+                        console.log(
+                          "Route source does not exist, cannot update"
+                        );
+                      }
+                    } catch (err) {
+                      console.log("Error updating map source:", err);
+                    }
+                  } else {
+                    console.log("Map is not fully loaded or initialized");
                   }
 
                   // Update base polyline for future deviation checks
@@ -501,8 +528,8 @@ const DeliveryMapbox = ({ deliveryData }) => {
 
   return (
     <div className="w-full h-full shadow-md rounded-lg overflow-hidden">
-      <Card className="h-full">
-        <CardHeader className="bg-green-600 text-white">
+      <Card className="h-full ">
+        <CardHeader className="bg-green-600 text-white py-3">
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Truck className="w-6 h-6" />
@@ -663,9 +690,6 @@ const DeliveryMapbox = ({ deliveryData }) => {
                         </p>
                       </div>
                     </div>
-                    <p className="text-sm">
-                      Points Traveled: {currentPointIndex}/{routePoints.length}
-                    </p>
                   </div>
                 </div>
 
