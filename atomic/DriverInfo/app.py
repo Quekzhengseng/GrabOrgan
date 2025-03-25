@@ -29,7 +29,7 @@ def home():
 
 
 #post (create) one driver
-@app.route("/driver", methods=["POST"])
+@app.route("/drivers", methods=["POST"])
 def add_driver():
     try:
         driver_info = request.json
