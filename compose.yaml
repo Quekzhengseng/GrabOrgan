@@ -127,7 +127,7 @@ services:
     networks:
       - grabOrgan-net
     command: ["python", "azure_email.py"]
-    # restart: always
+    restart: always
 
   delivery_info:
     build:
@@ -257,30 +257,29 @@ services:
     depends_on:
       - kong
     # restart: always
-  notification:
+  send_notification:
     build:
       context: .
-      dockerfile: atomic/Notification/Dockerfile.notification
-    image: GrabOrgan/notification:1.0
+      dockerfile: composite/SendNotification/Dockerfile.notification
+    image: GrabOrgan/send_notification:1.0
 
     ports:
       - "5027:5027"
     environment:
       - rabbit_host=rabbitmq # The name of the RabbitMQ container defined in the RabbitMQ compose file
       - rabbit_port=5672
-      - exchange_name=notification_exchange
-      - exchange_type=topic
-      - queue_name=notification_queue
-      - routing_key=*.status
+      - email_subdomain=DoNotReply@c4de2af4-af42-4134-8003-492f444c8562.azurecomm.net
+      - AZURE_EMAIL_URL=http://azure_email:5014/email
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/usr/src/app
     depends_on:
       - rabbitmq
+      - azure_email
     networks:
       - grabOrgan-net
     volumes:
       - ./common:/usr/src/app/common # Shared volume for common code
-    command: ["python", "notification.py"]
+    command: ["python", "send_notification.py"]
     restart: always
 
   order:

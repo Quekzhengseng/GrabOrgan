@@ -7,11 +7,9 @@ COPY requirements.txt ./
 RUN python -m pip install --no-cache-dir -r requirements.txt
 
 # Copy the service file
-COPY atomic/Notification/notification.py .
+COPY composite/SendNotification/send_notification.py .
 
-# Copy the shared common folder from the repository root
-COPY common /usr/src/app/common
 
-EXPOSE 5001
+EXPOSE 5027
 
-CMD ["python", "notification.py"]
+CMD ["python", "send_notification.py"]

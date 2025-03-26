@@ -2,25 +2,25 @@
 from os import environ
 import json
 import os
-from common import amqp_lib
+from common.invokes import invoke_http
 import pika  # or your preferred AMQP library
 import ast
 import threading
 import time
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+from flask import Flask, jsonify
+from flask_cors import CORS
 
+app = Flask(__name__)
+CORS(app)
 # Retrieve connection parameters from the environment if available.
 rabbit_host = environ.get("rabbit_host") or "localhost"
 rabbit_port = int(environ.get("rabbit_port")) or 5672
-exchange_name = environ.get("exchange_name") or "notification_exchange"
-exchange_type = environ.get("exchange_type") or "topic"
-queue_name = environ.get("queue_name") or "notification_queue"
+EMAIL_SUBDOMAIN = environ.get("email_subdomain") or 'DoNotReply@c4de2af4-af42-4134-8003-492f444c8562.azurecomm.net'
+AZURE_EMAIL_URL = environ.get("AZURE_EMAIL_URL") or "http://localhost:5014/email"
 
 SUBSCRIBE_QUEUES = [
-    {"name": "delivery_status_queue", "exchange": "notification_exchange", "routing_key": "*.status", "type": "topic"},
-    {"name": "acknowledgement_queue", "exchange": "notification_exchange", "routing_key": "acknowledge.*", "type": "topic"},
+    {"name": "noti_delivery_status_queue", "exchange": "notification_status_exchange", "routing_key": "*.status", "type": "topic"},
+    {"name": "noti_acknowledgement_queue","exchange":"notification_acknowledge_exchange", "routing_key": "*.acknowledge", "type": "topic"},
 ]
 MAX_RETRIES = 3
 # Global channel for publishing messages (set when the channel opens)
@@ -28,15 +28,14 @@ channel = None
 
 def handle_message(ch, method, properties, body):
     try:
-        print("Raw message body:", body)
         message_dict = ast.literal_eval(body.decode())
         print(f"Received message from {method.routing_key}: {message_dict}")
-        
+        parts = method.routing_key.split(".")
         # Simulate processing
-        if method.routing_key == "*.status":
-            print("Processing status request...")
+        if len(parts) == 2 and parts[1] == "status":            
+            print("Processing status request with routing_key: ", method.routing_key)
             process_delivery_status(message_dict, method.routing_key)
-        elif method.routing_key == "acknowledge.request":
+        elif method.routing_key == "request.acknowledge":
             print("Processing acknowledge request...")
             # process_match_result(message_dict)
         else:
@@ -132,6 +131,37 @@ def ensure_exchange_exists(channel, exchange, exchange_type):
     # Declare the exchange (it will only create it if it does not already exist)
     channel.exchange_declare(exchange=exchange, exchange_type=exchange_type, durable=True)
 
+def delivery_status_email(status):
+    """
+    Returns a tuple of (plain_text, html_text)
+    incorporating the delivery status into the email body.
+    """
+    plain_text = f"Hello there! Your GrabOrgan delivery status is: {status}."
+    html_text = f"""
+    <html>
+      <body>
+        <h1>Hello there!</h1>
+        <p>Your GrabOrgan delivery status is: <strong>{status}</strong></p>
+      </body>
+    </html>
+    """
+    return plain_text, html_text
+
+def create_status_email_message(driver_email, subject, plain_text, html_text):
+    # Build the final email message dictionary.
+    email_message = {
+        "senderAddress": EMAIL_SUBDOMAIN,
+        "recipients": {
+            "to": [{"address": driver_email}]
+        },
+        "content": {
+            "subject": subject,
+            "plainText": plain_text,
+            "html": html_text
+        }
+    }
+    return email_message
+
 def process_delivery_status(message_dict, routing_key):
     """
     Process delivery status and send an email notification.
@@ -154,62 +184,49 @@ def process_delivery_status(message_dict, routing_key):
      # Extract information from the message
     driver_id = message_dict.get("driverId", "Driver")
     driver_email = message_dict.get("email")
-    
-    # Define SMTP server configuration (replace with your own)
-    smtp_server = "smtp.gmail.com"
-    smtp_port = 587
-    smtp_username = "your_email@gmail.com"
-    smtp_password = "your_email_password"  # Consider using environment variables or a secure vault
 
     # Build email subject and body based on routing_key
-    if routing_key == "searching.status":
-        subject = "Delivery Status Update: Searching for Driver"
-        body = f"Dear {driver_id},\n\nWe are currently searching for a driver to handle your delivery."
-    elif routing_key == "assigned.status":
-        subject = "Delivery Status Update: Driver Assigned"
-        body = f"Dear {driver_id},\n\nA driver has been assigned to your delivery. Please wait for further updates."
-    elif routing_key == "on_the_way.status":
-        subject = "Delivery Status Update: Driver On The Way"
-        body = f"Dear {driver_id},\n\nYour driver has started the delivery and is on the way."
-    elif routing_key == "halfway.status":
-        subject = "Delivery Status Update: Driver Halfway"
-        body = f"Dear {driver_id},\n\nYour driver is halfway to your destination."
-    elif routing_key == "close_by.status":
-        subject = "Delivery Status Update: Driver Close By"
-        body = f"Dear {driver_id},\n\nYour driver is almost there (80% of the way)."
-    elif routing_key == "arrived.status":
-        subject = "Delivery Status Update: Driver Arrived"
-        body = f"Dear {driver_id},\n\nYour driver has arrived at the destination."
-    elif routing_key == "completed.status":
-        subject = "Delivery Status Update: Delivery Completed"
-        body = f"Dear {driver_id},\n\nYour delivery has been completed and acknowledged."
+    subject_prefix = "Delivery Status Update: "
+    subject_status_dict = {
+        "searching": "Searching for Driver",
+        "assigned": "Driver Assigned",
+        "on_the_way": "Driver On The Way",
+        "halfway": "Driver Halfway",
+        "close_by": "Driver Close By",
+        "arrived": "Driver Has Arrived",
+        "completed": "Delivery Completed",
+    }
+
+    # Get the status (before .status) from the routing key.
+    status_key = routing_key.split(".")[0]
+    subject = subject_prefix + subject_status_dict.get(status_key, "Status Updated")
+
+        # Generate email body using our helper function.
+    if status_key in subject_status_dict:
+        plain_text, html_text = delivery_status_email(subject_status_dict[status_key])
     else:
-        subject = "Delivery Status Update"
-        body = f"Dear {driver_id},\n\nYour delivery status has been updated."
+        plain_text, html_text = delivery_status_email("Status Updated")
+    
+    email_message = create_status_email_message(driver_email, subject, plain_text, html_text)
+    print("Sending Email with status: " + status_key)
+    email_resp = invoke_http(AZURE_EMAIL_URL, method="POST",json=email_message)
+    json_resp = json.dumps(email_resp)
+    code = email_resp["code"]
 
-    # Setup the MIME message
-    msg = MIMEMultipart()
-    msg['From'] = smtp_username
-    msg['To'] = driver_email
-    msg['Subject'] = subject
-    msg.attach(MIMEText(body, 'plain'))
-
-    try:
-        # Connect to the SMTP server and send the email
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()  # Upgrade the connection to secure
-        server.login(smtp_username, smtp_password)
-        server.send_message(msg)
-        server.quit()
-        print(f"Email sent to {driver_email} with subject: {subject}")
-    except Exception as e:
-        print(f"Failed to send email to {driver_email}: {e}")
-
-
+    if code not in range(200,300):
+        return jsonify({"code": code, "message": email_resp["message"]}), code
+    
+    print("Publishing message to with routing_key: ", "status.info")
+    channel.basic_publish(
+            exchange="activity_log_exchange",
+            routing_key="status.info",
+            body=json_resp,
+            properties=pika.BasicProperties(delivery_mode=2)  # make message persistent
+        )
 if __name__ == "__main__":
-    print(f"This is {os.path.basename(__file__)} - amqp consumer (Notification)...")
-    try:
-        consumer_thread = threading.Thread(target=run_async_consumer, daemon=True)
-        consumer_thread.start()
-    except Exception as exception:
-        print(f"  Unable to connect to RabbitMQ.\n     {exception=}\n")
+    print(f"This is {os.path.basename(__file__)} - Send Notification service...")
+    consumer_thread = threading.Thread(target=run_async_consumer, daemon=True)
+    consumer_thread.start()
+
+    # Now run the Flask server in the main thread.
+    app.run(host="0.0.0.0", port=5027, debug=True)

@@ -19,11 +19,8 @@ def health_check():
 
 @app.route("/email", methods=["POST"])
 def send_email():
-    try:
-        connection_string = CONNECTION_STRING 
-        client = EmailClient.from_connection_string(connection_string)
-
-        message = {
+    '''
+     message = {
             "senderAddress": "DoNotReply@c4de2af4-af42-4134-8003-492f444c8562.azurecomm.net",
             "recipients": {
                 "to": [{"address": "isaidchia@gmail.com"}]
@@ -40,6 +37,28 @@ def send_email():
             },
             
         }
+    '''
+    try:
+        connection_string = CONNECTION_STRING 
+        client = EmailClient.from_connection_string(connection_string)
+        message = request.get_json()
+        # receiver_email = email_data.get("receiverEmail")
+        # subject = email_data.get("subject")
+        # plainText = email_data.get("plainText")
+        # html_text = email_data.get("htmlText")
+        # message = {
+        #     "senderAddress": "DoNotReply@c4de2af4-af42-4134-8003-492f444c8562.azurecomm.net",
+        #     "recipients": {
+        #         "to": [{"address": str(receiver_email)}]
+        #     },
+        #     "content": {
+        #         "subject": str(subject),
+        #         "plainText": str(plainText),
+        #         "html": str(html_text)
+        #     },
+            
+        # }
+        print(message)
 
         poller = client.begin_send(message)
         result = poller.result()
