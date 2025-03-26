@@ -133,10 +133,6 @@ def ensure_exchange_exists(channel, exchange, exchange_type):
     # Declare the exchange (it will only create it if it does not already exist)
     channel.exchange_declare(exchange=exchange, exchange_type=exchange_type, durable=True)
 
-@app.route("/")
-def health_check():
-    """Health check endpoint."""
-    return jsonify({"code": 200, "message": "Test Compatibility Service Running"}), 200
 
 def fetch_lab_info(uuid):
     """Fetch a lab report from Lab Info Atomic using UUID."""
