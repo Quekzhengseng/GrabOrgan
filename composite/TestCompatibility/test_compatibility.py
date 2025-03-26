@@ -2,35 +2,14 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 import pika
 import json
-import requests
-import os
-import ast
-import threading
-import time
+import random
 from datetime import datetime
-import sys
-from common import amqp_lib  # Assumes your reusable AMQP functions are here
+import os
 from common.invokes import invoke_http
-
+from common import amqp_lib  # Assuming your reusable AMQP functions are here
 
 app = Flask(__name__)
 CORS(app)
-
-"""
-for testing:
-routing_key = test.compatibility
-amqp message:
-{"recipientId": "5RWWwCxq2M2eoXX91Z5BBsONTLs=", 
-"listOfOrganId": ["27e4f60b-cornea", "27e4f60b-lungs", "6b94627a-lungs", "8e32a037-cornea", "8e32a037-liver"]
-}
-
-{
-  "recipientId": "015051e7-0c87-4c13-9bb0-dd5e7584aabc",
-  "listOfOrganId": [
-    "1fdd282d-5eb7-42a8-b672-3dbb44557a29"
-  ]
-}
-"""
 
 # RabbitMQ Connection Details
 rabbit_host = os.getenv("rabbit_host", "localhost")
@@ -47,22 +26,20 @@ MATCH_TEST_RESULT_ROUTING_KEY = "test.result"
 RECIPIENT_URL = os.environ.get("RECIPIENT_URL") or "http://localhost:5013/recipient"
 LAB_INFO_URL = os.getenv("LAB_INFO_URL", "http://localhost:5007/lab-reports")
 MATCH_SERVICE_URL = os.getenv("MATCH_SERVICE_URL", "http://localhost:5008/matches")
+ORGAN_ATOMIC_URL = os.getenv("ORGAN_ATOMIC_URL", "http://localhost:5009/organ")
 
-# Global connection and channel variables for reuse
 @app.route("/", methods=['GET'])
 def health_check():
     return jsonify({"code": 200, "status": "ok"}), 200
 
-channel = None
-
+# Step 1 - Receive RecipientId & List of OrganId via AMQP
 def handle_message(ch, method, properties, body):
     """Callback function to process incoming messages."""
     try:
         print("Raw message body:", body)
-        message_dict = ast.literal_eval(body.decode())
-        print(f"Received message from {method.routing_key}: {message_dict}")
-        
-        # Simulate processing
+        message_dict = json.loads(body.decode())
+        print(f"Received message: {message_dict}")
+
         if method.routing_key == "test.compatibility":
             print("Processing compatibility request...")
             response = process_message(message_dict)
@@ -81,169 +58,110 @@ def handle_message(ch, method, properties, body):
         print(f"Error while handling message: {e}")
         ch.basic_nack(delivery_tag=method.delivery_tag)
 
+def process_message(message_dict):
+    """Process the matching request message as described earlier."""
+    recipient_uuid = message_dict["recipientId"]
+    organ_uuids = message_dict["listOfOrganId"]
+    print(f"Received message for recipientId: {recipient_uuid}, organIds: {organ_uuids}")
 
-def on_channel_open(ch):
-    """Callback when the channel has been opened; set up consumers for all queues."""
-    global channel
-    channel = ch  # Save channel for later publishing
-    print("Channel opened, setting up consumers...")
-    print(f"Subscribing to queue: {TEST_COMPATIBILITY_QUEUE}")
-    ch.basic_consume(
-        queue=TEST_COMPATIBILITY_QUEUE,
-        on_message_callback=handle_message,
-        auto_ack=False
-        )
-    print("Consumers are set up. Waiting for messages...")
-
-def on_connection_open(conn):
-    """Callback when the connection is opened; create a channel."""
-    print("Connection opened")
-    conn.channel(on_open_callback=on_channel_open)
-
-def on_connection_closed(conn, reply_code, reply_text=None):
-    """Callback when the connection is closed."""
-    print(f"Connection closed: reply_code={reply_code}, reply_text={reply_text}")
-    conn.ioloop.stop()
-
-def run_async_consumer():
-    """Set up the asynchronous connection and start the IOLoop with a retry loop."""
-    parameters = pika.ConnectionParameters(
-        host=rabbit_host,
-        port=rabbit_port,
-        heartbeat=300,
-        blocked_connection_timeout=300
-    )
-    while True:
-        try:
-            print(f"Attempting to connect to RabbitMQ at {rabbit_host}:{rabbit_port} ...")
-            conn = pika.SelectConnection(
-                parameters=parameters,
-                on_open_callback=on_connection_open,
-                on_close_callback=on_connection_closed
-            )
-            print("Starting IOLoop")
-            conn.ioloop.start()
-            break  # Exit the loop if the connection and loop run normally
-        except pika.exceptions.AMQPConnectionError as e:
-            print(f"AMQPConnectionError: {e}. Retrying in 5 seconds...")
-            time.sleep(5)
-        except Exception as e:
-            print(f"Unexpected error: {e}. Retrying in 5 seconds...")
-            time.sleep(5)
-
-def ensure_exchange_exists(channel, exchange, exchange_type):
-    # Declare the exchange (it will only create it if it does not already exist)
-    channel.exchange_declare(exchange=exchange, exchange_type=exchange_type, durable=True)
-
-def fetch_lab_info(uuid):
-    """Fetch a lab report from Lab Info Atomic using UUID."""
-    try:
-        response = requests.get(f"{LAB_INFO_URL}/{uuid}")
-        if response.status_code == 200:
-            lab_data = response.json().get("data", {})
-            results = lab_data.get("results", {})
-            lab_data.update(results)
-            return lab_data
-        elif response.status_code == 404:
-            print(f"Lab report for UUID {uuid} not found.")
-            return None
+    organ_data = {}
+    for organ_uuid in organ_uuids:
+        print(f"Fetching organ data for organId: {organ_uuid}...")
+        organ_url = f"{ORGAN_ATOMIC_URL}/{organ_uuid}"
+        organ_result = invoke_http(organ_url, method="GET", json=message_dict)
+        
+        if 'code' in organ_result and organ_result["code"] in range(200, 300):
+            organ_data[organ_uuid] = organ_result
+            print(f"Successfully fetched organ data: {organ_result}")
         else:
-            print(f"Unexpected response from Lab Info Service: {response.status_code}")
-            return None
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching lab report: {str(e)}")
-        return None
+            print(f"Failed to fetch organ data for organId: {organ_uuid}. Error: {organ_result.get('message', 'Unknown error')}")
+    
+    # Fetch recipient's lab report
+    print(f"Fetching lab report for recipientId: {recipient_uuid}...")
+    lab_report = get_lab_report(recipient_uuid)
+    if lab_report:
+        print(f"Successfully fetched lab report: {lab_report}")
+    else:
+        print(f"Failed to fetch lab report for recipientId: {recipient_uuid}")
+        return jsonify({"code": 500, "message": "Failed to fetch lab report"}), 500
 
-def fetch_recipient_lab_report(recipient_uuid):
+    # Generate randomized HLA matches
+    matches = []
+    HLA_THRESHOLD = 4
+    for organ_uuid, organ_info in organ_data.items():
+        donor_id = organ_info["donorId"]
+        print(f"Creating match for organId: {organ_uuid} with donorId: {donor_id}")
+
+        hla_matches = {f"HLA {i+1}": random.choice([True, False]) for i in range(6)}
+        num_of_hla = sum(1 for match in hla_matches.values() if match)
+
+        if num_of_hla >= HLA_THRESHOLD:
+            match_id = f"{recipient_uuid}-{organ_uuid}"
+            match_record = {
+                "matchId": match_id,
+                "recipientId": recipient_uuid,
+                "donorId": donor_id,
+                "OrganId": organ_uuid,
+                **hla_matches,
+                "numOfHLA": num_of_hla,
+                "Test_DateTime": datetime.now().isoformat()
+            }
+            matches.append(match_record)
+            print(f"Generated valid match: {match_record}")
+        else:
+            print(f"OrganId {organ_uuid} did not meet HLA threshold: {num_of_hla}/6")
+
+    # Post valid matches to Match Atomic Service
+    if matches:
+        post_matches_to_match_service(matches)
+    else:
+        print("No valid HLA matches to post.")
+
+    # Send match results to matchOrgan composite via AMQP
+    match_ids = [match["matchId"] for match in matches]
+    if match_ids:
+        print(f"Sending match results via AMQP: {match_ids}")
+        send_results_to_match_organ(match_ids)
+    else:
+        print("No matches found. Sending empty list to matchOrgan.")
+        send_results_to_match_organ([])
+
+    return {"listOfMatchId": match_ids}
+
+def get_lab_report(recipient_uuid):
     """Fetch recipient's lab report from Lab Info Atomic using UUID."""
-    return fetch_lab_info(recipient_uuid)
+    lab_info_url = f"{LAB_INFO_URL}/{recipient_uuid}"
+    lab_result = invoke_http(lab_info_url, method="GET")
+    if 'code' in lab_result and lab_result["code"] in range(200, 300):
+        return lab_result
+    else:
+        print(f"Error fetching lab report: {lab_result.get('message', 'Unknown error')}")
+        return None
 
 def post_matches_to_match_service(matches):
     """POST valid matches to Match Atomic Service."""
     payload = {"matches": matches}
+    response = invoke_http(MATCH_SERVICE_URL, method="POST", json=payload)
+    if 'code' in response and response["code"] in range(200, 300):
+        print("Matches posted successfully.")
+    else:
+        print(f"Failed to post matches. Error: {response.get('message', 'Unknown error')}")
+
+def send_results_to_match_organ(match_ids):
+    """Send results back to matchOrgan composite via AMQP (test.result)."""
     try:
-        response = requests.post(MATCH_SERVICE_URL, json=payload)
-        if response.status_code == 201:
-            print(f"Matches posted successfully: {json.dumps(payload)}")
-        else:
-            print(f"Failed to post matches. Response: {response.text}")
-    except requests.exceptions.RequestException as e:
-        print(f"Error posting matches: {str(e)}")
-    sys.stdout.flush()
+        amqp_message = {"listOfMatchId": match_ids}
+        channel.basic_publish(
+            exchange=TEST_RESULT_EXCHANGE,
+            routing_key=MATCH_TEST_RESULT_ROUTING_KEY,
+            body=json.dumps(amqp_message),
+            properties=pika.BasicProperties(delivery_mode=2)  # Make message persistent
+        )
+        print(f"AMQP message sent: {json.dumps(amqp_message)}")
+    except Exception as e:
+        print(f"Failed to send AMQP message: {str(e)}")
 
-def process_message(message_dict):
-    """
-    Process an HLA matching request message.
-    If the connection is closed, we reconnect (this check is optional).
-    """
-    global connection
-
-    recipient_uuid = message_dict["recipientId"] # "recipientId" : string
-    organ_uuids = message_dict["listOfOrganId"]  # "listOfOrganId": [String organId#1, organId#2 ...] 
-    # check if the recipient exists first
-    recipient_URL = RECIPIENT_URL + "/" + recipient_uuid
-    print("Invoking recipient atomic service...")
-    recipient_result = invoke_http(recipient_URL, method="GET", json=message_dict)
-    message = json.dumps(recipient_result)
-    code = recipient_result["code"]
-
-    if code not in range(200, 300):
-            return jsonify({
-                "code": code,
-                "data": {"recipientId": recipient_uuid},
-                "message": recipient_result["message"]
-            }), code 
-    if len(organ_uuids) == 0:
-        print("No organs specified in request.")
-        return {"listOfMatchId": []}
-
-    recipient_data = fetch_recipient_lab_report(recipient_uuid)
-    if not recipient_data:
-        return {"listOfMatchId": []}
-
-    recipient_hla = recipient_data.get("hlaScore", 0)
-    matches = []
-    HLA_THRESHOLD = 4
-
-    for organ_uuid in organ_uuids:
-        donor_data = fetch_lab_info(organ_uuid)
-        if not donor_data:
-            continue
-
-        donor_hla = donor_data.get("hlaScore", 0)
-        if donor_hla < HLA_THRESHOLD:
-            print(f"HLA mismatch: donor HLA {donor_hla} is below threshold {HLA_THRESHOLD}")
-            continue
-
-        match_id = f"{organ_uuid}-{recipient_uuid}"
-        match_record = {
-            "OrganId": donor_data.get("uuid"),
-            "Test_DateTime": datetime.now().isoformat(),
-            "donorId": donor_data.get("uuid"),
-            "donor_details": {
-                "blood_type": donor_data.get("blood_type", "B+"),
-                "first_name": donor_data.get("first_name", "Chartreuse"),
-                "gender": donor_data.get("gender", "Male"),
-                "last_name": donor_data.get("last_name", "Lavender")
-            },
-            "matchId": match_id,
-            "numOfHLA": donor_hla,
-            "recipientId": recipient_uuid,
-            "recipient_details": {
-                "blood_type": recipient_data.get("blood_type", "AB+"),
-                "first_name": recipient_data.get("first_name", "Nicholas"),
-                "gender": recipient_data.get("gender", "Female"),
-                "last_name": recipient_data.get("last_name", "Lam")
-            }
-        }
-        matches.append(match_record)
-
-    if matches:
-        post_matches_to_match_service(matches)
-
-    matched_ids = [m["matchId"] for m in matches]
-    return {"listOfMatchId": matched_ids}
-
+# Run the Flask app
 if __name__ == "__main__":
     print(f"This is {os.path.basename(__file__)} - Test Compatibility Service")
     # Start the RabbitMQ listener in a daemon thread so it doesn't block the main thread.
