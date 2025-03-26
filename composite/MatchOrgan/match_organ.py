@@ -57,13 +57,14 @@ def health_check():
 # Global channel for publishing messages (set when the channel opens)
 channel = None
 
+MAX_RETRIES = 3  # Maximum number of retry attempts
+
 def handle_message(ch, method, properties, body):
     try:
-        print("Raw message body:", body)
         message_dict = ast.literal_eval(body.decode())
         print(f"Received message from {method.routing_key}: {message_dict}")
         
-        # Simulate processing
+        # Process the message based on the routing key.
         if method.routing_key == "match.request":
             print("Processing match request...")
             process_match_request(message_dict)
@@ -72,10 +73,43 @@ def handle_message(ch, method, properties, body):
             process_match_result(message_dict)
         else:
             print("Unknown routing key.")
+        
+        # Acknowledge the message after successful processing.
         ch.basic_ack(delivery_tag=method.delivery_tag)
+    
     except Exception as e:
         print(f"Error while handling message: {e}")
-        ch.basic_nack(delivery_tag=method.delivery_tag)
+        
+        # Retrieve current retry count from headers, defaulting to 0 if not present.
+        retry_count = 0
+        if properties.headers and 'x-retry-count' in properties.headers:
+            retry_count = properties.headers['x-retry-count']
+        print(f"Current retry count: {retry_count}")
+
+        if retry_count < MAX_RETRIES:
+            # Increase the retry count.
+            new_retry_count = retry_count + 1
+
+            # Create new properties with the updated retry count.
+            new_properties = pika.BasicProperties(
+                headers={"x-retry-count": new_retry_count},
+                delivery_mode=properties.delivery_mode  # Preserve persistence if set.
+            )
+
+            # Republish the message with the updated headers.
+            print(f"Republishing message, retry attempt {new_retry_count}")
+            ch.basic_publish(
+                exchange=method.exchange,
+                routing_key=method.routing_key,
+                body=body,
+                properties=new_properties
+            )
+            # Acknowledge the current message so it is removed from the queue.
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+        else:
+            print("Max retries reached. Discarding message or sending to dead-letter queue.")
+            # Here you could also publish the message to a dead-letter queue instead.
+            ch.basic_ack(delivery_tag=method.delivery_tag)
 
 def on_channel_open(ch):
     """Callback when the channel has been opened; set up consumers for all queues."""
