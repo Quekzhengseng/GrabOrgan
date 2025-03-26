@@ -4,8 +4,10 @@ import uuid
 from flask import Flask, request, jsonify
 from common import amqp_lib  # Reusable AMQP functions
 from common.invokes import invoke_http  # Import the invoke_http function
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 rabbitmq_host = os.getenv("RABBITMQ_HOST", "rabbitmq")
 rabbitmq_port = int(os.getenv("RABBITMQ_PORT", "5672"))
