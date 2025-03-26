@@ -58,27 +58,29 @@ channel = None
 def handle_message(ch, method, properties, body):
     """Callback function to process incoming messages."""
     try:
+        print("Raw message body:", body)
         message_dict = ast.literal_eval(body.decode())
         print(f"Received message from {method.routing_key}: {message_dict}")
+        
+        # Simulate processing
+        if method.routing_key == "test.compatibility":
+            print("Processing compatibility request...")
+            response = process_message(message_dict)
+            print("Publishing match results...")
+            channel.basic_publish(
+                exchange=TEST_RESULT_EXCHANGE,
+                routing_key=MATCH_TEST_RESULT_ROUTING_KEY,
+                body=json.dumps(response),
+                properties=pika.BasicProperties(delivery_mode=2)  # Make message persistent
+            )
+            print(f"Match results sent: {response}")
+        else:
+            print("Unknown routing key.")
+        ch.basic_ack(delivery_tag=method.delivery_tag)
     except Exception as e:
-        print(f"Failed to parse message: {e}")
+        print(f"Error while handling message: {e}")
         ch.basic_nack(delivery_tag=method.delivery_tag)
-        return
 
-    if method.routing_key == "test.compatibility":
-        print("Processing compatibility request...")
-        response = process_message(message_dict)
-        print("Publishing match results...")
-        channel.basic_publish(
-            exchange=TEST_RESULT_EXCHANGE,
-            routing_key=MATCH_TEST_RESULT_ROUTING_KEY,
-            body=json.dumps(response),
-            properties=pika.BasicProperties(delivery_mode=2)  # Make message persistent
-        )
-        print(f"Match results sent: {response}")
-    else:
-        print("Unknown routing key.")
-    ch.basic_ack(delivery_tag=method.delivery_tag)
 
 def on_channel_open(ch):
     """Callback when the channel has been opened; set up consumers for all queues."""
@@ -89,7 +91,7 @@ def on_channel_open(ch):
     ch.basic_consume(
         queue=TEST_COMPATIBILITY_QUEUE,
         on_message_callback=handle_message,
-        auto_ack=True
+        auto_ack=False
         )
     print("Consumers are set up. Waiting for messages...")
 
