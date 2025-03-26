@@ -11,37 +11,37 @@ import time
 # Retrieve connection parameters from the environment if available.
 rabbit_host = environ.get("rabbit_host") or "localhost"
 rabbit_port = int(environ.get("rabbit_port")) or 5672
-exchange_name = environ.get("exchange_name") or "activity_log_exchange"
+exchange_name = environ.get("exchange_name") or "notification_exchange"
 exchange_type = environ.get("exchange_type") or "topic"
-queue_name = environ.get("queue_name") or "activity_log_queue"
+queue_name = environ.get("queue_name") or "notification_queue"
 
 SUBSCRIBE_QUEUES = [
-    {"name": "match_request_queue", "exchange": "request_organ_exchange", "routing_key": "match.request", "type": "direct"},
-    {"name": "match_test_result_queue", "exchange": "test_result_exchange", "routing_key": "test.result", "type": "direct"},
+    {"name": "delivery_status_queue", "exchange": "notification_exchange", "routing_key": "*.status", "type": "topic"},
+    {"name": "acknowledgement_queue", "exchange": "notification_exchange", "routing_key": "acknowledge.*", "type": "topic"},
 ]
 
 # Global channel for publishing messages (set when the channel opens)
 channel = None
 
 def handle_message(ch, method, properties, body):
-    """Callback function to process incoming messages."""
     try:
+        print("Raw message body:", body)
         message_dict = ast.literal_eval(body.decode())
         print(f"Received message from {method.routing_key}: {message_dict}")
+        
+        # Simulate processing
+        if method.routing_key == "*.status":
+            print("Processing status request...")
+            # process_match_request(message_dict)
+        elif method.routing_key == "acknowledge.request":
+            print("Processing acknowledge request...")
+            # process_match_result(message_dict)
+        else:
+            print("Unknown routing key.")
+        ch.basic_ack(delivery_tag=method.delivery_tag)
     except Exception as e:
-        print(f"Failed to parse message: {e}")
+        print(f"Error while handling message: {e}")
         ch.basic_nack(delivery_tag=method.delivery_tag)
-        return
-
-    if method.routing_key == "match.request":
-        print("Processing match request...")
-        process_match_request(message_dict)
-    elif method.routing_key == "test.result":
-        print("Processing test result...")
-        process_match_result(message_dict)
-    else:
-        print("Unknown routing key.")
-    ch.basic_ack(delivery_tag=method.delivery_tag)
 
 def on_channel_open(ch):
     """Callback when the channel has been opened; set up consumers for all queues."""
@@ -53,7 +53,7 @@ def on_channel_open(ch):
         ch.basic_consume(
             queue=queue["name"],
             on_message_callback=handle_message,
-            auto_ack=True
+            auto_ack=False
         )
     print("Consumers are set up. Waiting for messages...")
 

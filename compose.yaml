@@ -265,9 +265,8 @@ services:
       - grabOrgan-net
     volumes:
       - ./common:/usr/src/app/common # Shared volume for common code
-    command: ["python", "activity_log.py"]
+    command: ["python", "notification.py"]
     restart: always
-
 
   order:
     build:
