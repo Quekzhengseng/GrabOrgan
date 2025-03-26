@@ -148,14 +148,13 @@ def request_for_organ():
     composite_for_logging.update(lab_info_data)
     composite_for_logging["recipientId"] = new_uuid
     message = json.dumps({"recipientId": composite_for_logging["recipientId"]})
-    try:
-        print("Publishing message with routing key =", routing_key)
-        channel.basic_publish(exchange=exchange_name, routing_key=routing_key, body=message)
-        print("Publishing message with routing key =", "request_organ.info")
-        channel.basic_publish(exchange="activity_log_exchange", routing_key="request_organ.info", body=message)
+    
+    print("Publishing message with routing key =", routing_key)
+    channel.basic_publish(exchange=exchange_name, routing_key=routing_key, body=message)
+    print("Publishing message with routing key =", "request_organ.info")
+    channel.basic_publish(exchange="activity_log_exchange", routing_key="request_organ.info", body=message)
        
-    except Exception as e:
-        return jsonify({"error": "Error publishing message to RabbitMQ", "details": str(e)}), 500
+
 
     responses["message"] = "Composite request processed successfully."
     return jsonify(responses), 201
