@@ -1,0 +1,15 @@
+FROM python:3-slim
+
+WORKDIR /usr/src/app
+
+# Copy requirements and install dependencies
+COPY requirements.txt ./
+RUN python -m pip install --no-cache-dir -r requirements.txt
+
+# Copy the service file
+COPY composite/SendNotification/send_notification.py .
+
+
+EXPOSE 5027
+
+CMD ["python", "send_notification.py"]

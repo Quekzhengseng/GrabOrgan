@@ -20,6 +20,8 @@ EXCHANGES = {
     "activity_log_exchange": "topic",
     "error_handling_exchange": "topic",
     "confirm_match_exchange": "direct",
+    "notification_status_exchange": "topic",
+    "notification_acknowledge_exchange": "topic",
 }
 
 # Define queues and their respective exchange bindings
@@ -30,6 +32,8 @@ QUEUES = [
     {"name": "confirm_match_queue", "exchange": "confirm_match_exchange", "routing_key": "match.confirm"},
     {"name": "activity_log_queue", "exchange": "activity_log_exchange", "routing_key": "*.info"},  # Topic exchange wildcard
     {"name": "error_queue", "exchange": "error_handling_exchange", "routing_key": "*.error"},  # Topic exchange pattern
+     {"name": "noti_delivery_status_queue", "exchange": "notification_status_exchange", "routing_key": "*.status", "type": "topic"},
+    {"name": "noti_acknowledgement_queue","exchange":"notification_acknowledge_exchange", "routing_key": "*.acknowledge", "type": "topic"},
 ]
 
 
