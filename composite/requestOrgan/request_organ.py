@@ -1,8 +1,9 @@
 import os
 import json
-import requests
-import pika
+import uuid
 from flask import Flask, request, jsonify
+from common import amqp_lib  # Reusable AMQP functions
+from common.invokes import invoke_http  # Import the invoke_http function
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -10,132 +11,155 @@ CORS(app)
 
 rabbitmq_host = os.getenv("RABBITMQ_HOST", "rabbitmq")
 rabbitmq_port = int(os.getenv("RABBITMQ_PORT", "5672"))
-exchange = os.getenv("RABBITMQ_EXCHANGE", "request_organ_exchange")
+exchange_name = os.getenv("RABBITMQ_EXCHANGE", "request_organ_exchange")
 routing_key = os.getenv("RABBITMQ_ROUTING_KEY", "match.request")
-PERSONAL_DATA_URL = os.getenv("PERSONAL_DATA_URL", "http://personal_data_service:5011/person")
-PSEUDONYM_URL = os.getenv("PSEUDONYM_URL", "http://pseudonym_service:5012/pseudonymise")
-RECIPIENT_URL = os.getenv("RECIPIENT_URL", "http://recipient_service:5013/recipient")
-LAB_REPORT_URL = os.getenv("LAB_REPORT_URL", "http://lab_report_service:5007/lab-reports")
+PERSONAL_DATA_URL = os.getenv("PERSONAL_DATA_URL", "http://personalData:5011/person")
+PSEUDONYM_URL = os.getenv("PSEUDONYM_URL", "http://pseudonym:5012/pseudonymise")
+RECIPIENT_URL = os.getenv("RECIPIENT_URL", "http://recipient:5013/recipient")
+LAB_REPORT_URL = os.getenv("LAB_REPORT_URL", "http://labInfo:5007/lab-reports")
 
+connection = None 
+channel = None
 
+@app.route("/", methods=['GET'])
+def health_check():
+    return jsonify({"code": 200, "status": "ok"}), 200
 
-def safe_json_response(resp):
-    """
-    Attempts to decode a JSON response.
-    If decoding fails, logs the raw response text and returns an error dict.
-    """
+def connectAMQP():
+    global connection, channel
+    print("Connecting to AMQP broker...")
     try:
-        return resp.json()
-    except Exception:
-        print("Failed to parse JSON from response:", resp.text)
-        return {"error": "Invalid JSON", "raw": resp.text}
+        connection, channel = amqp_lib.connect(
+            hostname=rabbitmq_host,
+            port=rabbitmq_port,
+            exchange_name=exchange_name,
+            exchange_type="direct",
+        )
+    except Exception as e:
+        print(f"Unable to connect to RabbitMQ: {e}")
+        exit(1)
 
-def extract_recipient_data(data):
-    """
-    Extracts only the fields needed by the Recipient service.
-    We use "recipientId" as the unique identifier.
-    """
-    payload = {"recipientId": data.get("recipientId")}
-    keys = [
-        "firstName", "lastName", "dateOfBirth", "gender",
-        "bloodType", "organsNeeded", "medicalHistory", "allergies", "nokContact"
-    ]
-    for key in keys:
-        if key in data:
-            payload[key] = data.get(key)
-    return payload
-
-def extract_lab_report_data(data):
-    """Extracts only the fields needed by the Lab Report service."""
-    keys = ["reportName", "testType", "dateOfReport", "reportUrl", "results", "uuid"]
-    return {key: data.get(key) for key in keys if key in data}
-
-def extract_personal_data(data):
-    """
-    Extracts only the fields needed by the Personal Data service.
-    Since personId and recipientId are the same, we use "recipientId" as the unique identifier.
-    """
-    recipient_id = data.get("recipientId")
-    payload = {"personId": recipient_id}
-    keys = ["firstName", "lastName", "dateOfBirth", "nokContact"]
-    for key in keys:
-        if key in data:
-            payload[key] = data.get(key)
-    return payload
+def remove_code_field(response):
+    """Helper to remove the 'code' field from a response dictionary."""
+    if isinstance(response, dict) and "code" in response:
+         del response["code"]
+    return response
 
 @app.route('/request-for-organ', methods=['POST'])
 def request_for_organ():
-    """
-    Composite service that:
-      1. Receives a JSON payload.
-      2. Splits the composite payload into only the required fields for:
-         - Personal Data Service
-         - Pseudonym Service
-         - Recipient Service
-         - Lab Report Service
-      3. Publishes the original data to RabbitMQ for logging.
-      4. Returns a consolidated JSON response.
-    """
-    composite_data = request.get_json() or {}
+    payload = request.get_json() or {}
+    data = payload.get("data", {})
+    recipient_data = data.get("recipient", {})
+    lab_info_data = data.get("labInfo", {})
+
+    # Generate a unique ID for this request.
+    new_uuid = str(uuid.uuid4())
+
+    # Send all recipient fields to the pseudonym service (plus generated recipientId)
+    pseudonym_payload = {
+        new_uuid: { **recipient_data, "personId": new_uuid }
+    }
+
     responses = {}
 
-    # Extract minimal payloads for each atomic service
-    recipient_payload = extract_recipient_data(composite_data)
-    lab_payload = extract_lab_report_data(composite_data)
-    personal_payload = extract_personal_data(composite_data)
+    # Call the Pseudonym Service.
+    pseudonym_resp = invoke_http(PSEUDONYM_URL, method="POST", json=pseudonym_payload)
+    code = pseudonym_resp["code"]
+    pseudonym_data = pseudonym_resp["data"]
+    message = json.dumps(pseudonym_resp)
+
+    if code not in range(200, 300):
+        print("Publishing message with routing key =", "request_pseudo.error")
+        channel.basic_publish(exchange="error_handling_exchange", routing_key="request_pseudo.error", body=message)
+        return jsonify({"code": 500, "message": pseudonym_resp["message"]}), 500
+
+    pseudonym_resp = remove_code_field(pseudonym_resp)
+    responses["pseudonym"] = pseudonym_data
+
+    # Extract the full masked record for our recipient from the pseudonym response.
+    masked_data = pseudonym_data.get("maskedData", {}).get(new_uuid, {})
+    if not masked_data:
+        return jsonify({"error": "Pseudonym service did not return masked data"}), 500
+
+    # Build the Personal Data payload using only the key personal fields.
+    personal_data_from_ps = pseudonym_data.get("personalData", {})
+    if not personal_data_from_ps:
+        return jsonify({"error": "Pseudonym service did not return personalData"}), 500
+
+    personal_payload = {
+        "personId": new_uuid,
+        "firstName": personal_data_from_ps.get("firstName"),
+        "lastName": personal_data_from_ps.get("lastName"),
+        "dateOfBirth": personal_data_from_ps.get("dateOfBirth"),
+        "nric": personal_data_from_ps.get("nric"),
+        "email": personal_data_from_ps.get("email"),
+        "address": personal_data_from_ps.get("address"),
+        "nokContact": personal_data_from_ps.get("nokContact")
+    }
+
+    # Use the complete masked data as the payload for the Recipient service.
+    recipient_payload = { **masked_data, "recipientId": new_uuid }
+
+    # Prepare Lab Report Service payload.
+    lab_payload = lab_info_data.copy()
+    lab_payload["uuid"] = new_uuid
+
+    # Call the Personal Data Service internally (its response is not exposed to the client).
+    _ = invoke_http(PERSONAL_DATA_URL, method="POST", json=personal_payload)
+    code = _["code"]
+    message = json.dumps(_["message"])
+
+    if code not in range(200, 300):
+        print("Publishing message with routing key =", "request_personalData.error")
+        channel.basic_publish(exchange="error_handling_exchange", routing_key="request_pseudo.error", body=message)
+        return jsonify({"code": 500, "data": {"personal_data_result": pseudonym_resp}, "message": "Error handling Personal Data."}), 500
     
-    # For the pseudonym service, wrap the personal data keyed by recipientId.
-    record_id = composite_data.get("recipientId", "unknown")
-    pseudonym_payload = { record_id: personal_payload }
+    print("Publishing message with routing key =", "stored_personal_data.info")
+    channel.basic_publish(exchange="activity_log_exchange", routing_key="stored_personal_data.info", body=message)
+    # Call the Recipient Service.
+    recipient_resp = invoke_http(RECIPIENT_URL, method="POST", json=recipient_payload)
+    code = recipient_resp["code"]
+    message = json.dumps(recipient_resp)
 
+    if code not in range(200, 300):
+        print("Publishing message with routing key =", "request_recipient.error")
+        channel.basic_publish(exchange="error_handling_exchange", routing_key="request_recipient.error", body=message)
+        return jsonify({"code": 500, "data": {"recipient_result": recipient_resp}, "message": "Error handling recipient."}), 500
+
+    recipient_resp = remove_code_field(recipient_resp)
+    responses["recipient"] = recipient_resp
+
+    # Call the Lab Report Service.
+    lab_resp = invoke_http(LAB_REPORT_URL, method="POST", json=lab_payload)
+    code = lab_resp["code"]
+    message = json.dumps(lab_resp)
+
+    if code not in range(200, 300):
+        print("Publishing message with routing key =", "request_lab.error")
+        channel.basic_publish(exchange="error_handling_exchange", routing_key="request_lab.error", body=message)
+        return jsonify({"code": 500, "data": {"lab_result": lab_resp}, "message": "Error handling Lab Info."}), 500
+    
+    lab_resp = remove_code_field(lab_resp)
+    responses["lab_report"] = lab_resp
+
+    # Publish composite payload for activity logging.
+    composite_for_logging = {}
+    composite_for_logging.update(recipient_data)
+    composite_for_logging.update(lab_info_data)
+    composite_for_logging["recipientId"] = new_uuid
+    message = json.dumps({"recipientId": composite_for_logging["recipientId"]})
     try:
-        # Forward to Personal Data Service
-        personal_resp = requests.post(PERSONAL_DATA_URL, json=personal_payload)
-        print("Personal Service:", personal_resp.status_code, personal_resp.text)
-        responses["personal_data"] = safe_json_response(personal_resp)
-
-        # Forward to Pseudonym Service
-        pseudonym_resp = requests.post(PSEUDONYM_URL, json=pseudonym_payload)
-        print("Pseudonym Service:", pseudonym_resp.status_code, pseudonym_resp.text)
-        responses["pseudonym"] = safe_json_response(pseudonym_resp)
-
-        # Forward to Recipient Service
-        recipient_resp = requests.post(RECIPIENT_URL, json=recipient_payload)
-        print("Recipient Service:", recipient_resp.status_code, recipient_resp.text)
-        responses["recipient"] = safe_json_response(recipient_resp)
-
-        # Forward to Lab Report Service
-        lab_resp = requests.post(LAB_REPORT_URL, json=lab_payload)
-        print("Lab Report Service:", lab_resp.status_code, lab_resp.text)
-        responses["lab_report"] = safe_json_response(lab_resp)
-
+        print("Publishing message with routing key =", routing_key)
+        channel.basic_publish(exchange=exchange_name, routing_key=routing_key, body=message)
+        print("Publishing message with routing key =", "request_organ.info")
+        channel.basic_publish(exchange="activity_log_exchange", routing_key="request_organ.info", body=message)
+       
     except Exception as e:
-        return jsonify({
-            "error": "Error calling atomic microservices",
-            "details": str(e)
-        }), 500
+        return jsonify({"error": "Error publishing message to RabbitMQ", "details": str(e)}), 500
 
-    # Publish event to RabbitMQ for activity logging
-    try:
-        connection = pika.BlockingConnection(
-            pika.ConnectionParameters(host=rabbitmq_host, port=rabbitmq_port)
-        )
-        channel = connection.channel()
-        channel.exchange_declare(exchange=exchange, exchange_type='direct', durable=True)
-        channel.basic_publish(
-            exchange=exchange,
-            routing_key=routing_key,
-            body=json.dumps(composite_data)
-        )
-        connection.close()
-    except Exception as e:
-        return jsonify({
-            "error": "Error publishing message to RabbitMQ",
-            "details": str(e)
-        }), 500
-
-    responses["message"] = "Request processed and activity logged."
+    responses["message"] = "Composite request processed successfully."
     return jsonify(responses), 201
 
 if __name__ == '__main__':
+    connectAMQP()
     app.run(host='0.0.0.0', port=5021, debug=True)

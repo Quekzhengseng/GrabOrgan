@@ -28,12 +28,15 @@ print("Firestore initialized successfully for Recipient!")
 db = firestore.client()
 
 class Recipient:
-    def __init__(self, recipient_id, first_name, last_name, date_of_birth,
+    def __init__(self, recipient_id, first_name, last_name, date_of_birth, nric, email, address,
                  gender, blood_type, organs_needed, medical_history, allergies, nok_contact):
         self.recipient_id = recipient_id
         self.first_name = first_name
         self.last_name = last_name
         self.date_of_birth = date_of_birth
+        self.nric = nric
+        self.email = email
+        self.address = address
         self.gender = gender
         self.blood_type = blood_type
         self.organs_needed = organs_needed
@@ -47,6 +50,9 @@ class Recipient:
             "firstName": self.first_name,
             "lastName": self.last_name,
             "dateOfBirth": self.date_of_birth,
+            "nric": self.nric,
+            "email": self.email,
+            "address": self.address,
             "gender": self.gender,
             "bloodType": self.blood_type,
             "organsNeeded": self.organs_needed,
@@ -63,6 +69,9 @@ class Recipient:
             first_name=data["firstName"],
             last_name=data["lastName"],
             date_of_birth=data["dateOfBirth"],
+            nric=data["nric"],
+            email=data["email"],
+            address=data["address"],
             gender=data["gender"],
             blood_type=data["bloodType"],
             organs_needed=data["organsNeeded"],
@@ -214,6 +223,9 @@ def create_recipient():
             first_name=data["firstName"],
             last_name=data["lastName"],
             date_of_birth=data["dateOfBirth"],
+            nric=data["nric"],
+            email=data["email"],
+            address=data["address"],
             gender=data["gender"],
             blood_type=data["bloodType"],
             medical_history=data["medicalHistory"],

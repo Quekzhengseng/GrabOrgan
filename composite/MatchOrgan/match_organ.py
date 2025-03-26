@@ -4,7 +4,7 @@ import json
 import ast
 import threading
 
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify
 from flask_cors import CORS
 import pika
 
@@ -50,6 +50,9 @@ SUBSCRIBE_QUEUES = [
     {"name": "match_request_queue", "exchange": "request_organ_exchange", "routing_key": "match.request", "type": "direct"},
     {"name": "match_test_result_queue", "exchange": "test_result_exchange", "routing_key": "test.result", "type": "direct"},
 ]
+@app.route("/", methods=['GET'])
+def health_check():
+    return jsonify({"code": 200, "status": "ok"}), 200
 
 # Global channel for publishing messages (set when the channel opens)
 channel = None
@@ -158,7 +161,7 @@ def process_match_request(match_request_dict):
             body=message,
             properties=pika.BasicProperties(delivery_mode=2),
         )
-        return {"code": 500, "data": {"recipient_result": recipient_result}, "message": "Error handling recipient."}
+        return jsonify({"code": 500, "data": {"recipient_result": recipient_result}, "message": "Error handling recipient."}), 500
 
     recipient_data = recipient_result["data"]
     recipient_bloodType = recipient_data["bloodType"]
@@ -179,7 +182,7 @@ def process_match_request(match_request_dict):
             body=message,
             properties=pika.BasicProperties(delivery_mode=2),
         )
-        return {"code": 500, "data": {"organ_result": organ_result}, "message": "Error handling organs."}
+        return jsonify({"code": 500, "data": {"organ_result": organ_result}, "message": "Error handling organs."}), 500
 
     organ_data = organ_result["data"]
     organList = [organ["organId"] for organ in organ_data
@@ -196,7 +199,7 @@ def process_match_request(match_request_dict):
             body="No matches available",
             properties=pika.BasicProperties(delivery_mode=2),
         )
-        return {"code": 204, "message": "No compatible matches found."}
+        return jsonify({"code": 204, "message": "No compatible matches found."}), 204
 
     print("Publish message with routing_key=match_request.info")
     channel.basic_publish(
@@ -227,7 +230,7 @@ def process_match_result(match_test_result_dict):
             body=message,
             properties=pika.BasicProperties(delivery_mode=2),
         )
-        return {"code": 500, "data": {"matches_result": match_result}, "message": "Error handling matches."}
+        return jsonify({"code": 500, "data": {"matches_result": match_result}, "message": "Error handling matches."}), 500
 
     match_data = match_result["data"]
     match_test_result_list = [match for match in match_data if match["matchId"] in match_test_result_dict["listOfMatchId"]]

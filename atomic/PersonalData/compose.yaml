@@ -1,14 +1,19 @@
 services:
   personalData:
     build:
-      context: ./
+      context: ../../../atomic/PersonalData
       dockerfile: Dockerfile.personal.data
     image: GrabOrgan/personaldata:1.0
     volumes:
-      - ./secrets/PersonalData/PersonalData_Key.json:/usr/src/app/PersonalData_Key.json:ro
+      - ../../../secrets/PersonalData/PersonalData_Key.json:/usr/src/app/PersonalData_Key.json:ro
     environment:
       - PERSONAL_DATA_DB_KEY=/usr/src/app/PersonalData_Key.json
-    # restart: always
     container_name: personal_data_service
     ports:
       - "5011:5011"
+    networks:
+      - grabOrgan-net  
+
+networks:
+  grabOrgan-net:
+    external: true     
