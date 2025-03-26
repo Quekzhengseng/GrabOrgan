@@ -1,0 +1,20 @@
+FROM python:3-slim
+
+WORKDIR /usr/src/app
+
+# Copy requirements and install dependencies
+COPY requirements.txt ./
+RUN python -m pip install --no-cache-dir -r requirements.txt
+
+# Copy the service file
+RUN pip install azure-common==1.1.28
+RUN pip install azure-core==1.32.0
+RUN pip install azure-mgmt-core==1.5.0
+RUN pip install azure-mgmt-communication
+RUN pip install azure-communication-email==1.0.0
+RUN pip install azure-identity
+COPY atomic/AzureEmail/azure_email.py .
+
+EXPOSE 5014
+
+CMD ["python", "azure_email.py"]
