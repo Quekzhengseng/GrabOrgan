@@ -2,3 +2,5 @@
 *_Key.json
 .next/
 node_modules/
+__pycache__/
+*.pyc
