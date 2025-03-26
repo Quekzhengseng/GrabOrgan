@@ -32,7 +32,7 @@ def handle_message(ch, method, properties, body):
         # Simulate processing
         if method.routing_key == "*.status":
             print("Processing status request...")
-            # process_match_request(message_dict)
+            process_delivery_status(message_dict, method.routing_key)
         elif method.routing_key == "acknowledge.request":
             print("Processing acknowledge request...")
             # process_match_result(message_dict)
@@ -96,6 +96,29 @@ def run_async_consumer():
 def ensure_exchange_exists(channel, exchange, exchange_type):
     # Declare the exchange (it will only create it if it does not already exist)
     channel.exchange_declare(exchange=exchange, exchange_type=exchange_type, durable=True)
+
+def process_delivery_status(message_dict, routing_key):
+    """
+    routing_key: "*.status"
+    amqp message:
+    {
+    "driverId": "string value",
+    "email": "isaidchia@gmail.com",
+    }
+    Possible Statuses:
+    searching.status
+    assigned.status 
+    on_the_way.status # started delivery
+    halfway.status 
+    close_by.status #80% there
+    arrived.status
+    completed.status # acknowledged via email
+
+
+
+    """
+
+    return
 
 
 if __name__ == "__main__":
