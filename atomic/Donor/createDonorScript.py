@@ -2,7 +2,15 @@ import random
 import datetime
 import uuid
 import requests
+import string
 from donor import Donor  # Assuming you have a Donor class defined in donor.py
+
+# --- Endpoints (Container URLs) ---
+# PERSONAL_DATA_URL = "http://localhost:5007/person"   # POST endpoint for personal data
+PERSONAL_DATA_URL = "https://personal-gbst4bsa.outsystemscloud.com/PatientAPI/rest/patientAPI/patients/"
+DONOR_URL = "http://donor:5003/donor"              # POST endpoint for donor data
+PSEUDONYM_URL = "http://pseudonym:5012/pseudonymise"     # POST endpoint for pseudonym service
+ORGAN_URL = "http://organ:5010/organ" 
 
 # --- Dummy Data Generation Functions ---
 
@@ -24,20 +32,48 @@ def random_blood_type():
 def random_gender():
     return random.choice(["Male", "Female"])
 
-def random_organs():
-    organ_types = ["heart", "liver", "lungs", "kidneys", "pancreas", "intestines", "cornea"]
-    conditions = ["Excellent", "Good", "Normal", "Fair"]
-    statuses = ["Donated", "Available", "Unavailable"]
-    # Randomly pick 3 unique organs
-    return [{"organType": organ, "status": random.choice(statuses), "condition": random.choice(conditions)}
-            for organ in random.sample(organ_types, 3)]
-def random_organs(new_uuid):
-    organ_types = ["heart", "liver", "lungs", "kidneys", "pancreas", "intestines", "cornea"]
-    organIdArr = []
+# def random_organs():
+#     organ_types = ["heart", "liver", "lungs", "kidneys", "pancreas"]
+#     conditions = ["Excellent", "Good", "Normal", "Fair"]
+#     statuses = ["Donated", "Available", "Unavailable"]
+#     # Randomly pick 3 unique organs
+#     return [{"organType": organ, "status": random.choice(statuses), "condition": random.choice(conditions)}
+#             for organ in random.sample(organ_types, 4)]
+# def random_organs(new_uuid, bloodType):
+#     organ_types = ["heart", "liver", "lungs", "kidneys", "pancreas"]
+#     organIdArr = []
 
-    for organ in random.sample(organ_types, 3):
-        organId = new_uuid[:8]+ "-"+ organ
+#     for organ in random.sample(organ_types, 3):
+#         organId = organ + "=" + new_uuid
+    
+#         organIdArr.append(organId)
+#     return organIdArr
+
+def random_organs(new_uuid, bloodType):
+    organ_types = ["heart", "liver", "lungs", "kidneys", "pancreas"]
+    organIdArr = []
+    conditions = ["Excellent", "Good", "Normal", "Fair"]
+
+
+    for organ in random.sample(organ_types, 4):
+        organId = f"{organ}={new_uuid}"
+        organ_data = {
+            "organId": organId,
+            "organType": organ,
+            "donorId": new_uuid,
+            "bloodType": bloodType,
+            "condition": random.choice(conditions)  # or any random string if you want variety
+        }
+
+        # Post the organ data to the Organ DB
+        organ_resp = requests.post(ORGAN_URL, json=organ_data)
+        if organ_resp.status_code != 201:
+            print(f"Error posting organ data for donor {new_uuid}: {organ_resp.text}")
+        else:
+            print(f"Organ data posted successfully for donor {new_uuid}")
+
         organIdArr.append(organId)
+
     return organIdArr
 
 # print(random_organs("fcb3258f"))
@@ -61,6 +97,34 @@ def random_allergies():
 def random_phone():
     return str(random.randint(80000000, 99999999))
 
+def random_email(first, last):
+    return first+last+"@gmail.com"
+
+def random_nric(dob):
+    start = ["S"]
+    random_letter = random.choice(string.ascii_uppercase)
+    random_number = str(random.randint(10000, 99999))
+    return "S" + dob[2:4] + random_number + random_letter
+
+def random_address():
+    place_names = [ "Victoria", "Orchard", "Tanjong Pagar", "Bukit Timah",
+        "Serangoon", "Bras Basah", "Jalan Besar", "Clementi", "Tampines Central", "Holland",
+        "Paya Lebar", "Toa Payoh", "Yishun", "Ang Mo Kio", "Sengkang", "Bukit Batok",
+        "Jurong East", "Telok Blangah", "Pasir Ris", "Woodlands"
+        ]
+    street_names = [
+    "Street",
+    "Road",
+    "Avenue",
+    "Central",
+    ]
+    random_place = random.choice(place_names)
+    random_number = str(random.randint(1, 99))
+    random_street = random.choice(street_names)
+    return random_number + random_place + random_street
+
+
+
 # --- Generate Dummy Donor Data ---
 donor_names = []
 
@@ -71,16 +135,21 @@ for i, (first, last) in enumerate(donor_names, start=1):
     new_uuid = str(uuid.uuid4())
     random_dob = str(random_date(1940, 1990))
     random_age = 2025 - int(random_dob[:4])
+    random_address = random_address()
+    random_bloodType = random_blood_type()
     new_donor = Donor(
         donor_id=new_uuid,
         first_name=first,
         last_name=last,
         date_of_birth=random_dob,
+        nric=random_nric(random_dob),
+        email=random_email(first, last),
+        address=random_address,
         age=random_age,
         datetime_of_death=random_datetime_of_death(),
         gender=random_gender(),
-        blood_type=random_blood_type(),
-        organs=random_organs(new_uuid),
+        blood_type=random_blood_type,
+        organs=random_organs(new_uuid, random_bloodType),
         medical_history=random_medical_history(),
         allergies=random_allergies(),
         nok_contact={
@@ -92,10 +161,6 @@ for i, (first, last) in enumerate(donor_names, start=1):
     )
     donors.append(new_donor)
 
-# --- Endpoints (Container URLs) ---
-PERSONAL_DATA_URL = "http://localhost:5007/person"    # POST endpoint for personal data
-DONOR_URL = "http://localhost:5002/donor"              # POST endpoint for donor data
-PSEUDONYM_URL = "http://localhost:5006/pseudonymise"     # POST endpoint for pseudonym service
 
 # --- Process and Split Data for Each Donor ---
 for donor in donors:
@@ -107,6 +172,9 @@ for donor in donors:
         "lastName": donor.last_name,
         "dateOfBirth": donor.date_of_birth,
         "age": donor.age,
+        "nric": donor.nric,
+        "email": donor.email,
+        "address": donor.address,
         "datetimeOfDeath": donor.datetime_of_death,
         "gender": donor.gender,
         "bloodType": donor.blood_type,
@@ -149,3 +217,11 @@ for donor in donors:
         print(f"Error posting personal data for donor {donor.donor_id}: {personal_resp.text}")
     else:
         print(f"Personal data posted successfully for donor {donor.donor_id}")
+
+        # Post the masked donor data to the donor endpoint.
+    organ_resp = requests.post(ORGAN_URL, json=organ)
+    if organ_resp.status_code != 201:
+        # print(masked_donor_data)
+        print(f"Error posting masked donor data for donor {organ["donorId"]}: {organ_resp.text}")
+    else:
+        print(f"Organ data posted successfully for donor {organ["donorId"]}")

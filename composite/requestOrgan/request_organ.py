@@ -57,7 +57,7 @@ def request_for_organ():
 
     # Send all recipient fields to the pseudonym service (plus generated recipientId)
     pseudonym_payload = {
-        new_uuid: { **recipient_data, "personId": new_uuid }
+        new_uuid: { **recipient_data, "uuid": new_uuid }
     }
 
     responses = {}
@@ -87,7 +87,7 @@ def request_for_organ():
         return jsonify({"error": "Pseudonym service did not return personalData"}), 500
 
     personal_payload = {
-        "personId": new_uuid,
+        "uuid": new_uuid,
         "firstName": personal_data_from_ps.get("firstName"),
         "lastName": personal_data_from_ps.get("lastName"),
         "dateOfBirth": personal_data_from_ps.get("dateOfBirth"),
