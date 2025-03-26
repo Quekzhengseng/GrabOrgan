@@ -58,7 +58,7 @@ def send_email():
         #     },
             
         # }
-        print(message)
+        # print(message)
 
         poller = client.begin_send(message)
         result = poller.result()
