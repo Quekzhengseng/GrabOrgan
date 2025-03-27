@@ -22,8 +22,8 @@ TEST_COMPATIBILITY_EXCHANGE = "test_compatibility_exchange"
 TEST_COMPATIBILITY_QUEUE = "test_compatibility_queue"
 TEST_RESULT_EXCHANGE = "test_result_exchange"
 MATCH_TEST_RESULT_ROUTING_KEY = "test.result"
-ORGAN_ATOMIC_URL = os.environ.get("ORGAN_ATOMIC_URL") or "http://localhost:5009/organ"
-MATCH_SERVICE_URL = os.environ.get("MATCH_SERVICE_URL") or "http://localhost:5008/matches"
+ORGAN_URL = os.environ.get("ORGAN_URL") or "http://localhost:5009/organ"
+MATCH_URL = os.environ.get("MATCH_URL") or "http://localhost:5008/matches"
 
 @app.route("/", methods=['GET'])
 def health_check():
@@ -151,22 +151,24 @@ def process_message(message_dict):
         for organ_uuid in organ_uuids:
             try:
                 print(f"Fetching organ data for organId: {organ_uuid}...")
-                organ_url = f"{ORGAN_ATOMIC_URL}/{organ_uuid}"
+                organ_url = f"{ORGAN_URL}/{organ_uuid}"
                 organ_result = invoke_http(organ_url, method="GET", json=message_dict)
-                
-                if 'code' in organ_result and organ_result["code"] in range(200, 300):
+                message = json.dumps(organ_result)
+                code = organ_result["code"] 
+
+                if code in range(200, 300):
                     # Assume the useful data is in the "data" key if available.
-                    organ_data[organ_uuid] = organ_result.get("data", organ_result)
+                    organ_data[organ_uuid] = organ_result["data"]
                     print(f"Successfully fetched organ data for {organ_uuid}: {organ_result}")
                 else:
                     error_msg = organ_result.get('message', 'Unknown error')
                     print(f"Failed to fetch organ data for organId: {organ_uuid}. Error: {error_msg}")
                     channel.basic_publish(
                         exchange="error_handling_exchange",
-                        routing_key="process_message.organ.error",
+                        routing_key="test_compatibility.error",
                         body=json.dumps({
                             "organId": organ_uuid,
-                            "error": error_msg
+                            "message": error_msg
                         }),
                         properties=pika.BasicProperties(delivery_mode=2)
                     )
@@ -174,10 +176,10 @@ def process_message(message_dict):
                 print(f"Exception fetching organ {organ_uuid}: {str(ex)}")
                 channel.basic_publish(
                     exchange="error_handling_exchange",
-                    routing_key="process_message.organ.exception",
+                    routing_key="test_compatibility.error",
                     body=json.dumps({
                         "organId": organ_uuid,
-                        "error": str(ex)
+                        "message": str(ex)
                     }),
                     properties=pika.BasicProperties(delivery_mode=2)
                 )
@@ -213,10 +215,10 @@ def process_message(message_dict):
                 print(f"Error processing match for organId {organ_uuid}: {str(ex)}")
                 channel.basic_publish(
                     exchange="error_handling_exchange",
-                    routing_key="process_message.match_generation.error",
+                    routing_key="test_compatibility.error",
                     body=json.dumps({
                         "organId": organ_uuid,
-                        "error": str(ex)
+                        "message": str(ex)
                     }),
                     properties=pika.BasicProperties(delivery_mode=2)
                 )
@@ -229,9 +231,9 @@ def process_message(message_dict):
                 print(f"Error posting matches: {str(post_ex)}")
                 channel.basic_publish(
                     exchange="error_handling_exchange",
-                    routing_key="process_message.post_matches.error",
+                    routing_key="test_compatibility.error",
                     body=json.dumps({
-                        "error": str(post_ex),
+                        "message": str(post_ex),
                         "matches": matches
                     }),
                     properties=pika.BasicProperties(delivery_mode=2)
@@ -252,10 +254,10 @@ def process_message(message_dict):
             print(f"Error sending match results via AMQP: {str(amqp_ex)}")
             channel.basic_publish(
                 exchange="error_handling_exchange",
-                routing_key="process_message.amqp.error",
+                routing_key="test_compatibility.error",
                 body=json.dumps({
-                    "error": str(amqp_ex),
-                    "match_ids": match_ids
+                    "message": str(amqp_ex),
+                    "data": match_ids
                 }),
                 properties=pika.BasicProperties(delivery_mode=2)
             )
@@ -265,28 +267,34 @@ def process_message(message_dict):
     except Exception as e:
         print("Error in process_message:", str(e))
         error_payload = json.dumps({
-            "error": str(e),
-            "message_dict": message_dict
+            "message": str(e),
+            "data": message_dict
         })
         try:
             channel.basic_publish(
                 exchange="error_handling_exchange",
-                routing_key="process_message.exception",
+                routing_key="test_compatibility.error",
                 body=error_payload,
                 properties=pika.BasicProperties(delivery_mode=2)
             )
         except Exception as publish_exception:
             print("Failed to publish error message:", str(publish_exception))
-        return {"error": "Error processing message."}
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 def post_matches_to_match_service(matches):
     """POST valid matches to Match Atomic Service."""
-    payload = {"matches": matches}
-    response = invoke_http(MATCH_SERVICE_URL, method="POST", json=payload)
-    if 'code' in response and response["code"] in range(200, 300):
-        print("Matches posted successfully.")
-    else:
-        print(f"Failed to post matches. Error: {response.get('message', 'Unknown error')}")
+    try:
+        payload = {"matches": matches}
+        response = invoke_http(MATCH_URL, method="POST", json=payload)
+        message = json.dumps(response)
+        code = response["code"]
+        if 'code' in response and response["code"] in range(200, 300):
+            print("Matches posted successfully.")
+        else:
+            print(f"Failed to post matches. Error: {response["message"]}")
+    except Exception as e:
+
+
 
 def send_results_to_match_organ(match_ids):
     """Send results back to matchOrgan composite via AMQP (test.result)."""
