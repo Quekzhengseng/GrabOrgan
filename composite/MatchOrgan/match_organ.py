@@ -370,6 +370,54 @@ def initiate_match(recipientId):
 
 @app.route("/confirm-match/<string:matchId>", methods=['POST'])
 def confirm_match(matchId):
+    """
+    orderId = recipientId + organId
+    orderId = {
+	    "organType": 
+	    "transplantDateTime":
+	    "startHospital": {
+                "name": CGH
+                "latitude": 1.358604,
+                "longitude": 103.989944
+                }
+	    "endHospital": {
+                "name": TTSH
+                "latitude": 1.358604,
+                "longitude": 103.989944
+                }
+	    "matchId":
+	    "remarks":
+    """
+    hospital_coords_dict = {
+        "CGH": {
+            "latitude": 1.3402380226275528,
+            "longitude": 103.9496741599837
+        },
+        "SGH": {
+            "latitude": 1.2805689453652151,
+            "longitude": 103.83504895409699
+        },
+        "TTSH": {
+            "latitude": 1.3214817166088648,
+            "longitude": 103.84583143700398
+        },
+        "SKGH": {
+            "latitude": 1.3956165090489552, 
+            "longitude": 103.89350071151229
+        },
+        "NUH": {
+            "latitude": 1.295203845567723, 
+            "longitude": 103.7828300893688
+        },
+        "KTPH": {
+            "latitude": 1.4245009834534053, 
+            "longitude": 103.83861215383979
+        },
+        "NTFGH": {
+            "latitude": 1.333905687585315, 
+            "longitude": 103.74565971707347
+        }
+    }
 
     try:
         # Extract recipientId from the JSON payload
@@ -398,14 +446,14 @@ def confirm_match(matchId):
             # Return a response immediately
             return jsonify({
                 "code": 202,
-                "message": "Match initiation request accepted. You will be notified once the match is completed."
+                "message": "Match Confirmed. Scheduling Delivery Now."
             }), 202
 
     except Exception as e:
-        print("Error initiating match:", str(e))
+        print("Error confirming match:", str(e))
         return jsonify({
             "code": 500,
-            "message": "An error occurred while initiating the match: " + str(e)
+            "message": "An error occurred while confirmingg the match: " + str(e)
         }), 500
 
 
