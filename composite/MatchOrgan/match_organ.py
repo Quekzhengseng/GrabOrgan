@@ -33,6 +33,7 @@ RECIPIENT_URL = os.environ.get("RECIPIENT_URL") or "http://localhost:5013/recipi
 DONOR_URL = os.environ.get("DONOR_URL") or "http://localhost:5003/donor"
 ORGAN_URL = os.environ.get("ORGAN_URL") or "http://localhost:5010/organ"
 MATCH_URL = os.environ.get("MATCH_URL") or "http://localhost:5008/matches"
+ORDER_URL = os.environ.get("ORDER_URL") or "http://localhost:5009/order"
 
 # RabbitMQ connection parameters
 rabbit_host = os.environ.get("rabbit_host", "localhost")
@@ -371,49 +372,60 @@ def initiate_match(recipientId):
 @app.route("/confirm-match/<string:matchId>", methods=['POST'])
 def confirm_match(matchId):
     """
+    Store this in Order DB
     orderId = recipientId + organId
+    OR
+    orderId = str(uuid.uuid4())
     orderId = {
-	    "organType": 
-	    "transplantDateTime":
-	    "startHospital": {
-                "name": CGH
-                "latitude": 1.358604,
-                "longitude": 103.989944
-                }
-	    "endHospital": {
-                "name": TTSH
-                "latitude": 1.358604,
-                "longitude": 103.989944
-                }
-	    "matchId":
-	    "remarks":
+	    "organType": "heart"
+        "doctorId" : "isaidchia@gmail.com"
+	    "transplantDateTime": "2025-03-25T24:08:00+08:00" # GMT+8 or UTC?
+	    "startHospital": "CGH",
+	    "endHospital": "TTSH",
+	    "matchId": "015051e7-0c87-4c13-9bb0-dd5e7584aabc-heart-12",
+	    "remarks": "description (if any)"
+
+
+    rabbitMQ Message
+    routing_key = order.new
+    message:
+    {
+    "orderId": "String uuid"
+    }
     """
     hospital_coords_dict = {
         "CGH": {
+            "address": "2 Simei St 3, Singapore 529889",
             "latitude": 1.3402380226275528,
             "longitude": 103.9496741599837
         },
         "SGH": {
+            "address": "Outram Rd, Singapore 169608",
             "latitude": 1.2805689453652151,
             "longitude": 103.83504895409699
         },
         "TTSH": {
+            "address": "11 Jln Tan Tock Seng, Singapore 308433",
             "latitude": 1.3214817166088648,
             "longitude": 103.84583143700398
         },
         "SKGH": {
+            "address": "110 Sengkang E Wy, Singapore 544886",
             "latitude": 1.3956165090489552, 
             "longitude": 103.89350071151229
         },
         "NUH": {
+            "address": "5 Lower Kent Ridge Rd, Singapore 119074",
             "latitude": 1.295203845567723, 
             "longitude": 103.7828300893688
         },
         "KTPH": {
+            "address": "90 Yishun Central, Singapore 768828",
             "latitude": 1.4245009834534053, 
             "longitude": 103.83861215383979
         },
         "NTFGH": {
+            "address": "1 Jurong East Street 21, Singapore 609606",
             "latitude": 1.333905687585315, 
             "longitude": 103.74565971707347
         }

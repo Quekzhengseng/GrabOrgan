@@ -415,6 +415,7 @@ services:
       - DONOR_URL=http://donor:5003/donor
       - ORGAN_URL=http://organ:5010/organ
       - MATCH_URL=http://match:5008/matches
+      - ORDER_URL=http://order:5009/order
       # - PYTHONPATH=/usr/src/app:/usr/src/app/common # Equivalent to export PYTHONPATH
       - PYTHONPATH=/usr/src/app
       - PYTHONUNBUFFERED=1
