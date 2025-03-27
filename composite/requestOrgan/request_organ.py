@@ -5,6 +5,7 @@ from flask import Flask, request, jsonify
 from common import amqp_lib  # Reusable AMQP functions
 from common.invokes import invoke_http  # Import the invoke_http function
 from flask_cors import CORS
+import pika
 
 app = Flask(__name__)
 CORS(app)
@@ -47,117 +48,198 @@ def remove_code_field(response):
 
 @app.route('/request-for-organ', methods=['POST'])
 def request_for_organ():
-    payload = request.get_json() or {}
-    data = payload.get("data", {})
-    recipient_data = data.get("recipient", {})
-    lab_info_data = data.get("labInfo", {})
+    # Set a default for payload in case request.get_json() fails.
+    payload = {}
+    try:
+        payload = request.get_json() or {}
+        data = payload.get("data", {})
+        recipient_data = data.get("recipient", {})
+        lab_info_data = data.get("labInfo", {})
 
-    # Generate a unique ID for this request.
-    new_uuid = str(uuid.uuid4())
+        # Generate a unique ID for this request.
+        new_uuid = str(uuid.uuid4())
 
-    # Send all recipient fields to the pseudonym service (plus generated recipientId)
-    pseudonym_payload = {
-        new_uuid: { **recipient_data, "uuid": new_uuid }
-    }
+        # Prepare payload for the pseudonym service.
+        pseudonym_payload = {
+            new_uuid: {**recipient_data, "uuid": new_uuid}
+        }
+        responses = {}
 
-    responses = {}
+        # --- Call the Pseudonym Service ---
+        pseudonym_resp = invoke_http(PSEUDONYM_URL, method="POST", json=pseudonym_payload)
+        code = pseudonym_resp.get("code", 500)
+        pseudonym_data = pseudonym_resp.get("data", {})
+        message = json.dumps(pseudonym_resp)
 
-    # Call the Pseudonym Service.
-    pseudonym_resp = invoke_http(PSEUDONYM_URL, method="POST", json=pseudonym_payload)
-    code = pseudonym_resp["code"]
-    pseudonym_data = pseudonym_resp["data"]
-    message = json.dumps(pseudonym_resp)
+        if code not in range(200, 300):
+            print("Publishing message with routing key =", "request_pseudo.error")
+            channel.basic_publish(
+                exchange="error_handling_exchange",
+                routing_key="request_pseudo.error",
+                body=message,
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+            return jsonify({
+                "code": 500,
+                "message": pseudonym_resp.get("message", "Error from pseudonym service")
+            }), 500
 
-    if code not in range(200, 300):
-        print("Publishing message with routing key =", "request_pseudo.error")
-        channel.basic_publish(exchange="error_handling_exchange", routing_key="request_pseudo.error", body=message)
-        return jsonify({"code": 500, "message": pseudonym_resp["message"]}), 500
+        # Remove the code field from the pseudonym response.
+        pseudonym_resp = remove_code_field(pseudonym_resp)
+        responses["pseudonym"] = pseudonym_data
 
-    pseudonym_resp = remove_code_field(pseudonym_resp)
-    responses["pseudonym"] = pseudonym_data
+        # --- Extract Masked Data ---
+        masked_data = pseudonym_data.get("maskedData", {}).get(new_uuid, {})
+        if not masked_data:
+            err_msg = "Pseudonym service did not return masked data"
+            print(err_msg)
+            channel.basic_publish(
+                exchange="error_handling_exchange",
+                routing_key="request_pseudo.error",
+                body=err_msg,
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+            return jsonify({"error": err_msg}), 500
 
-    # Extract the full masked record for our recipient from the pseudonym response.
-    masked_data = pseudonym_data.get("maskedData", {}).get(new_uuid, {})
-    if not masked_data:
-        return jsonify({"error": "Pseudonym service did not return masked data"}), 500
+        # --- Build Personal Data Payload ---
+        personal_data_from_ps = pseudonym_data.get("personalData", {})
+        if not personal_data_from_ps:
+            err_msg = "Pseudonym service did not return personalData"
+            print(err_msg)
+            channel.basic_publish(
+                exchange="error_handling_exchange",
+                routing_key="request_pseudo.error",
+                body=err_msg,
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+            return jsonify({"error": err_msg}), 500
 
-    # Build the Personal Data payload using only the key personal fields.
-    personal_data_from_ps = pseudonym_data.get("personalData", {})
-    if not personal_data_from_ps:
-        return jsonify({"error": "Pseudonym service did not return personalData"}), 500
+        personal_payload = {
+            "uuid": new_uuid,
+            "firstName": personal_data_from_ps.get("firstName"),
+            "lastName": personal_data_from_ps.get("lastName"),
+            "dateOfBirth": personal_data_from_ps.get("dateOfBirth"),
+            "nric": personal_data_from_ps.get("nric"),
+            "email": personal_data_from_ps.get("email"),
+            "address": personal_data_from_ps.get("address"),
+            "nokContact": personal_data_from_ps.get("nokContact")
+        }
 
-    personal_payload = {
-        "uuid": new_uuid,
-        "firstName": personal_data_from_ps.get("firstName"),
-        "lastName": personal_data_from_ps.get("lastName"),
-        "dateOfBirth": personal_data_from_ps.get("dateOfBirth"),
-        "nric": personal_data_from_ps.get("nric"),
-        "email": personal_data_from_ps.get("email"),
-        "address": personal_data_from_ps.get("address"),
-        "nokContact": personal_data_from_ps.get("nokContact")
-    }
+        # --- Build Recipient and Lab Payloads ---
+        recipient_payload = {**masked_data, "recipientId": new_uuid}
+        lab_payload = lab_info_data.copy()
+        lab_payload["uuid"] = new_uuid
 
-    # Use the complete masked data as the payload for the Recipient service.
-    recipient_payload = { **masked_data, "recipientId": new_uuid }
+        # --- Call the Personal Data Service ---
+        personal_resp = invoke_http(PERSONAL_DATA_URL, method="POST", json=personal_payload)
+        code = personal_resp.get("code", 500)
+        message = json.dumps(personal_resp.get("message", ""))
+        if code not in range(200, 300):
+            print("Publishing message with routing key =", "request_personalData.error")
+            channel.basic_publish(
+                exchange="error_handling_exchange",
+                routing_key="request_personalData.error",
+                body=message,
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+            return jsonify({
+                "code": 500,
+                "data": {"personal_data_result": pseudonym_resp},
+                "message": "Error handling Personal Data."
+            }), 500
 
-    # Prepare Lab Report Service payload.
-    lab_payload = lab_info_data.copy()
-    lab_payload["uuid"] = new_uuid
+        print("Publishing message with routing key =", "stored_personal_data.info")
+        channel.basic_publish(
+            exchange="activity_log_exchange",
+            routing_key="stored_personal_data.info",
+            body=message,
+            properties=pika.BasicProperties(delivery_mode=2)
+        )
 
-    # Call the Personal Data Service internally (its response is not exposed to the client).
-    _ = invoke_http(PERSONAL_DATA_URL, method="POST", json=personal_payload)
-    code = _["code"]
-    message = json.dumps(_["message"])
+        # --- Call the Recipient Service ---
+        recipient_resp = invoke_http(RECIPIENT_URL, method="POST", json=recipient_payload)
+        code = recipient_resp.get("code", 500)
+        message = json.dumps(recipient_resp)
+        if code not in range(200, 300):
+            print("Publishing message with routing key =", "request_recipient.error")
+            channel.basic_publish(
+                exchange="error_handling_exchange",
+                routing_key="request_recipient.error",
+                body=message,
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+            return jsonify({
+                "code": 500,
+                "data": {"recipient_result": recipient_resp},
+                "message": "Error handling recipient."
+            }), 500
 
-    if code not in range(200, 300):
-        print("Publishing message with routing key =", "request_personalData.error")
-        channel.basic_publish(exchange="error_handling_exchange", routing_key="request_pseudo.error", body=message)
-        return jsonify({"code": 500, "data": {"personal_data_result": pseudonym_resp}, "message": "Error handling Personal Data."}), 500
-    
-    print("Publishing message with routing key =", "stored_personal_data.info")
-    channel.basic_publish(exchange="activity_log_exchange", routing_key="stored_personal_data.info", body=message)
-    # Call the Recipient Service.
-    recipient_resp = invoke_http(RECIPIENT_URL, method="POST", json=recipient_payload)
-    code = recipient_resp["code"]
-    message = json.dumps(recipient_resp)
+        recipient_resp = remove_code_field(recipient_resp)
+        responses["recipient"] = recipient_resp
 
-    if code not in range(200, 300):
-        print("Publishing message with routing key =", "request_recipient.error")
-        channel.basic_publish(exchange="error_handling_exchange", routing_key="request_recipient.error", body=message)
-        return jsonify({"code": 500, "data": {"recipient_result": recipient_resp}, "message": "Error handling recipient."}), 500
+        # --- Call the Lab Report Service ---
+        lab_resp = invoke_http(LAB_REPORT_URL, method="POST", json=lab_payload)
+        code = lab_resp.get("code", 500)
+        message = json.dumps(lab_resp)
+        if code not in range(200, 300):
+            print("Publishing message with routing key =", "request_lab.error")
+            channel.basic_publish(
+                exchange="error_handling_exchange",
+                routing_key="request_lab.error",
+                body=message,
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+            return jsonify({
+                "code": 500,
+                "data": {"lab_result": lab_resp},
+                "message": "Error handling Lab Info."
+            }), 500
 
-    recipient_resp = remove_code_field(recipient_resp)
-    responses["recipient"] = recipient_resp
+        lab_resp = remove_code_field(lab_resp)
+        responses["lab_report"] = lab_resp
 
-    # Call the Lab Report Service.
-    lab_resp = invoke_http(LAB_REPORT_URL, method="POST", json=lab_payload)
-    code = lab_resp["code"]
-    message = json.dumps(lab_resp)
+        # --- Publish Composite Payload for Activity Logging ---
+        composite_for_logging = {}
+        composite_for_logging.update(recipient_data)
+        composite_for_logging.update(lab_info_data)
+        composite_for_logging["recipientId"] = new_uuid
+        message = json.dumps({"recipientId": composite_for_logging["recipientId"]})
+        
+        print("Publishing message with routing key =", routing_key)
+        channel.basic_publish(
+            exchange=exchange_name, 
+            routing_key=routing_key, 
+            body=message,
+            properties=pika.BasicProperties(delivery_mode=2)
+        )
+        print("Publishing message with routing key =", "request_organ.info")
+        channel.basic_publish(
+            exchange="activity_log_exchange",
+            routing_key="request_organ.info",
+            body=message,
+            properties=pika.BasicProperties(delivery_mode=2)
+        )
 
-    if code not in range(200, 300):
-        print("Publishing message with routing key =", "request_lab.error")
-        channel.basic_publish(exchange="error_handling_exchange", routing_key="request_lab.error", body=message)
-        return jsonify({"code": 500, "data": {"lab_result": lab_resp}, "message": "Error handling Lab Info."}), 500
-    
-    lab_resp = remove_code_field(lab_resp)
-    responses["lab_report"] = lab_resp
+        responses["message"] = "Composite request processed successfully."
+        return jsonify(responses), 201
 
-    # Publish composite payload for activity logging.
-    composite_for_logging = {}
-    composite_for_logging.update(recipient_data)
-    composite_for_logging.update(lab_info_data)
-    composite_for_logging["recipientId"] = new_uuid
-    message = json.dumps({"recipientId": composite_for_logging["recipientId"]})
-    
-    print("Publishing message with routing key =", routing_key)
-    channel.basic_publish(exchange=exchange_name, routing_key=routing_key, body=message)
-    print("Publishing message with routing key =", "request_organ.info")
-    channel.basic_publish(exchange="activity_log_exchange", routing_key="request_organ.info", body=message)
-       
-
-
-    responses["message"] = "Composite request processed successfully."
-    return jsonify(responses), 201
+    except Exception as e:
+        error_message = str(e)
+        print("Error in request_for_organ:", error_message)
+        error_payload = json.dumps({
+            "error": error_message,
+            "payload": payload
+        })
+        try:
+            channel.basic_publish(
+                exchange="error_handling_exchange",
+                routing_key="request_organ.exception",
+                body=error_payload,
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+        except Exception as publish_exception:
+            print("Failed to publish error message:", str(publish_exception))
+        return jsonify({"code": 500, "message": "Error processing organ request."}), 500
 
 if __name__ == '__main__':
     connectAMQP()
