@@ -100,10 +100,10 @@ def get_all_organs():
             organ_data["organId"] = doc.id  # Add Firestore document ID
             organ_list.append(organ_data)
 
-        return jsonify({"success": True, "code": 200, "data": organ_list}), 200
+        return jsonify({"code": 200, "data": organ_list,"message": "Successfully get all organs"}), 200
 
     except Exception as e:
-        return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 @app.route("/organ/<string:organId>", methods=['GET'])
 def get_organ(organId):
@@ -113,12 +113,12 @@ def get_organ(organId):
         doc = organ_ref.get()
         if doc.exists:
             organ_obj = Organ.from_dict(organId, doc.to_dict())
-            return {"success" : True, "code":200, "data": organ_obj.to_dict()}  # Convert back to JSON-friendly format
+            return {"code":200, "data": organ_obj.to_dict(), "message": "Successfully get organs by Id"}  # Convert back to JSON-friendly format
         else:
-            return jsonify({"success" : False, "code":404, "error": "Organ does not exist"}), 404
+            return jsonify({"code":404, "message": "Organ does not exist"}), 404
 
     except Exception as e:
-        return jsonify({"success" : False, "code":500, "error": str(e)}), 500
+        return jsonify({"code":500, "message": str(e)}), 500
 
 @app.route("/organ/donor/<string:donorId>", methods=['GET'])
 def get_organs_for_donor(donorId):
@@ -133,10 +133,10 @@ def get_organs_for_donor(donorId):
             organ_data["organId"] = doc.id  # Add Firestore document ID
             organ_list.append(organ_data)
 
-        return jsonify({"success": True, "code": 200, "data": organ_list}), 200
+        return jsonify({"code": 200, "data": organ_list, "message": "Successfully get organs by donor"}), 200
 
     except Exception as e:
-        return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 @app.route("/organ/type/<string:organType>", methods=['GET'])
 def get_organs_by_type(organType):
@@ -151,10 +151,10 @@ def get_organs_by_type(organType):
             organ_data["organId"] = doc.id  # Add Firestore document ID
             organ_list.append(organ_data)
 
-        return jsonify({"success": True, "code": 200, "data": organ_list}), 200
+        return jsonify({"code": 200, "data": organ_list, "message": "Successfully get organs by type"}), 200
 
     except Exception as e:
-        return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 @app.route("/organ/status/<string:status>", methods=['GET'])
 def get_organs_by_status(status):
@@ -169,10 +169,10 @@ def get_organs_by_status(status):
             organ_data["organId"] = doc.id  # Add Firestore document ID
             organ_list.append(organ_data)
 
-        return jsonify({"success": True, "code": 200, "data": organ_list}), 200
+        return jsonify({"code": 200, "data": organ_list, "message": "Successfully get organs by status"}), 200
 
     except Exception as e:
-        return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 @app.route("/organ/condition/<string:condition>", methods=['GET'])
 def get_organs_by_condition(condition):
@@ -187,10 +187,10 @@ def get_organs_by_condition(condition):
             organ_data["organId"] = doc.id  # Add Firestore document ID
             organ_list.append(organ_data)
 
-        return jsonify({"success": True, "code": 200, "data": organ_list}), 200
+        return jsonify({"code": 200, "data": organ_list, "message": "Successfully get organs by condition"}), 200
 
     except Exception as e:
-        return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 @app.route("/organ", methods=['POST'])
 def create_organ():
@@ -242,7 +242,7 @@ def update_organ(organId):
         doc = organ_ref.get()
 
         if not doc.exists:
-            return jsonify({"success": False, "code": 404, "error": "Organ not found"}), 404
+            return jsonify({"code": 404, "message": "Organ not found"}), 404
 
         # Prepare updated data
         updated_data = {
@@ -264,10 +264,10 @@ def update_organ(organId):
         # Update the organ document in Firestore
         organ_ref.update(updated_data)
 
-        return jsonify({"success": True, "code": 200, "message": "Organ updated successfully"}), 200
+        return jsonify({"code": 200, "message": "Organ updated successfully"}), 200
 
     except Exception as e:
-        return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 @app.route("/organ/<string:organId>", methods=['DELETE'])
 def delete_organ(organId):
@@ -277,15 +277,15 @@ def delete_organ(organId):
         doc = organ_ref.get()
 
         if not doc.exists:
-            return jsonify({"success": False, "code": 404, "error": "Organ not found"}), 404
+            return jsonify({"code": 404, "message": "Organ not found"}), 404
 
         # Delete the organ document from Firestore
         organ_ref.delete()
 
-        return jsonify({"success": True, "code": 200, "message": "Organ deleted successfully"}), 200
+        return jsonify({"code": 200, "message": "Organ deleted successfully"}), 200
 
     except Exception as e:
-        return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 if __name__ == '__main__':
     print("Starting Flask server for organ management...")

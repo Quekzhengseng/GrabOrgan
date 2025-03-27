@@ -140,65 +140,144 @@ def ensure_exchange_exists(channel, exchange, exchange_type):
 
 def process_message(message_dict):
     """Process the matching request message as described earlier."""
-    recipient_uuid = message_dict["recipientId"]
-    organ_uuids = message_dict["listOfOrganId"]
-    print(f"Received message for recipientId: {recipient_uuid}, organIds: {organ_uuids}")
+    try:
+        # Extract basic information.
+        recipient_uuid = message_dict["recipientId"]
+        organ_uuids = message_dict["listOfOrganId"]
+        print(f"Received message for recipientId: {recipient_uuid}, organIds: {organ_uuids}")
 
-    organ_data = {}
-    for organ_uuid in organ_uuids:
-        print(f"Fetching organ data for organId: {organ_uuid}...")
-        organ_url = f"{ORGAN_ATOMIC_URL}/{organ_uuid}"
-        organ_result = invoke_http(organ_url, method="GET", json=message_dict)
-        
+        organ_data = {}
+        # Fetch organ data for each organ UUID.
+        for organ_uuid in organ_uuids:
+            try:
+                print(f"Fetching organ data for organId: {organ_uuid}...")
+                organ_url = f"{ORGAN_ATOMIC_URL}/{organ_uuid}"
+                organ_result = invoke_http(organ_url, method="GET", json=message_dict)
+                
+                if 'code' in organ_result and organ_result["code"] in range(200, 300):
+                    # Assume the useful data is in the "data" key if available.
+                    organ_data[organ_uuid] = organ_result.get("data", organ_result)
+                    print(f"Successfully fetched organ data for {organ_uuid}: {organ_result}")
+                else:
+                    error_msg = organ_result.get('message', 'Unknown error')
+                    print(f"Failed to fetch organ data for organId: {organ_uuid}. Error: {error_msg}")
+                    channel.basic_publish(
+                        exchange="error_handling_exchange",
+                        routing_key="process_message.organ.error",
+                        body=json.dumps({
+                            "organId": organ_uuid,
+                            "error": error_msg
+                        }),
+                        properties=pika.BasicProperties(delivery_mode=2)
+                    )
+            except Exception as ex:
+                print(f"Exception fetching organ {organ_uuid}: {str(ex)}")
+                channel.basic_publish(
+                    exchange="error_handling_exchange",
+                    routing_key="process_message.organ.exception",
+                    body=json.dumps({
+                        "organId": organ_uuid,
+                        "error": str(ex)
+                    }),
+                    properties=pika.BasicProperties(delivery_mode=2)
+                )
 
-        if 'code' in organ_result and organ_result["code"] in range(200, 300):
-            organ_data[organ_uuid] = organ_result
-            print(f"Successfully fetched organ data: {organ_result}")
+        # Generate randomized HLA matches.
+        matches = []
+        HLA_THRESHOLD = 4
+        for organ_uuid, organ_info in organ_data.items():
+            try:
+                donor_id = organ_info["donorId"]
+                print(f"Creating match for organId: {organ_uuid} with donorId: {donor_id}")
+
+                # Generate randomized HLA match results.
+                hla_matches = {f"hla-{i+1}": random.choice([True, False]) for i in range(6)}
+                num_of_hla = sum(1 for match in hla_matches.values() if match)
+
+                if num_of_hla >= HLA_THRESHOLD:
+                    match_id = f"{recipient_uuid}-{organ_uuid}"
+                    match_record = {
+                        "matchId": match_id,
+                        "recipientId": recipient_uuid,
+                        "donorId": donor_id,
+                        "organId": organ_uuid,
+                        **hla_matches,
+                        "numOfHLA": num_of_hla,
+                        "testDateTime": datetime.now().isoformat()
+                    }
+                    matches.append(match_record)
+                    print(f"Generated valid match: {match_record}")
+                else:
+                    print(f"OrganId {organ_uuid} did not meet HLA threshold: {num_of_hla}/6")
+            except Exception as ex:
+                print(f"Error processing match for organId {organ_uuid}: {str(ex)}")
+                channel.basic_publish(
+                    exchange="error_handling_exchange",
+                    routing_key="process_message.match_generation.error",
+                    body=json.dumps({
+                        "organId": organ_uuid,
+                        "error": str(ex)
+                    }),
+                    properties=pika.BasicProperties(delivery_mode=2)
+                )
+
+        # Post valid matches to Match Atomic Service.
+        if matches:
+            try:
+                post_matches_to_match_service(matches)
+            except Exception as post_ex:
+                print(f"Error posting matches: {str(post_ex)}")
+                channel.basic_publish(
+                    exchange="error_handling_exchange",
+                    routing_key="process_message.post_matches.error",
+                    body=json.dumps({
+                        "error": str(post_ex),
+                        "matches": matches
+                    }),
+                    properties=pika.BasicProperties(delivery_mode=2)
+                )
         else:
-            print(f"Failed to fetch organ data for organId: {organ_uuid}. Error: {organ_result.get('message', 'Unknown error')}")
-    
-    # Generate randomized HLA matches
-    matches = []
-    HLA_THRESHOLD = 4
-    for organ_uuid, organ_info in organ_data.items():
-        donor_id = organ_info["donorId"]
-        print(f"Creating match for organId: {organ_uuid} with donorId: {donor_id}")
+            print("No valid HLA matches to post.")
 
-        hla_matches = {f"hla-{i+1}": random.choice([True, False]) for i in range(6)}
-        num_of_hla = sum(1 for match in hla_matches.values() if match)
+        # Send match results to matchOrgan composite via AMQP.
+        match_ids = [match["matchId"] for match in matches]
+        try:
+            if match_ids:
+                print(f"Sending match results via AMQP: {match_ids}")
+                send_results_to_match_organ(match_ids)
+            else:
+                print("No matches found. Sending empty list to matchOrgan.")
+                send_results_to_match_organ([])
+        except Exception as amqp_ex:
+            print(f"Error sending match results via AMQP: {str(amqp_ex)}")
+            channel.basic_publish(
+                exchange="error_handling_exchange",
+                routing_key="process_message.amqp.error",
+                body=json.dumps({
+                    "error": str(amqp_ex),
+                    "match_ids": match_ids
+                }),
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
 
-        if num_of_hla >= HLA_THRESHOLD:
-            match_id = f"{recipient_uuid}-{organ_uuid}"
-            match_record = {
-                "matchId": match_id,
-                "recipientId": recipient_uuid,
-                "donorId": donor_id,
-                "organId": organ_uuid,
-                **hla_matches,
-                "numOfHLA": num_of_hla,
-                "testDateTime": datetime.now().isoformat()
-            }
-            matches.append(match_record)
-            print(f"Generated valid match: {match_record}")
-        else:
-            print(f"OrganId {organ_uuid} did not meet HLA threshold: {num_of_hla}/6")
+        return {"listOfMatchId": match_ids}
 
-    # Post valid matches to Match Atomic Service
-    if matches:
-        post_matches_to_match_service(matches)
-    else:
-        print("No valid HLA matches to post.")
-
-    # Send match results to matchOrgan composite via AMQP
-    match_ids = [match["matchId"] for match in matches]
-    if match_ids:
-        print(f"Sending match results via AMQP: {match_ids}")
-        send_results_to_match_organ(match_ids)
-    else:
-        print("No matches found. Sending empty list to matchOrgan.")
-        send_results_to_match_organ([])
-
-    return {"listOfMatchId": match_ids}
+    except Exception as e:
+        print("Error in process_message:", str(e))
+        error_payload = json.dumps({
+            "error": str(e),
+            "message_dict": message_dict
+        })
+        try:
+            channel.basic_publish(
+                exchange="error_handling_exchange",
+                routing_key="process_message.exception",
+                body=error_payload,
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+        except Exception as publish_exception:
+            print("Failed to publish error message:", str(publish_exception))
+        return {"error": "Error processing message."}
 
 def post_matches_to_match_service(matches):
     """POST valid matches to Match Atomic Service."""
