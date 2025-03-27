@@ -59,22 +59,10 @@ for recipient in recipients_data:
                 match = {
                     "matchId": f"{donor_id}-{donor_organ}-{recipient_id}",
                     "recipientId": recipient_id,
-                    "recipient_details": {
-                        "first_name": recipient["first_name"],
-                        "last_name": recipient["last_name"],
-                        "blood_type": recipient["blood_type"],
-                        "gender": recipient["gender"]
-                    },
                     "donorId": donor_id,
-                    "donor_details": {
-                        "first_name": donor_info["firstName"],
-                        "last_name": donor_info["lastName"],
-                        "blood_type": donor_info["bloodType"],
-                        "gender": donor_info["gender"]
-                    },
-                    "OrganId": full_organ,  # Keep full organ ID for tracking
+                    "organId": full_organ,  # Keep full organ ID for tracking
                     "numOfHLA": hla_matches,  # Number of HLA matches
-                    "Test_DateTime": datetime.now().isoformat()
+                    "testDateTime": datetime.now().isoformat()
                 }
                 matches.append(match)
 
