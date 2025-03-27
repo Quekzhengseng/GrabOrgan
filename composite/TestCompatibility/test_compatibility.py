@@ -5,8 +5,9 @@ import json
 import random
 from datetime import datetime
 import os
+import threading
 from common.invokes import invoke_http
-from common import amqp_lib  # Assuming your reusable AMQP functions are here
+from common.amqp_lib import start_consuming  # Import start_consuming from amqp_lib.py
 
 app = Flask(__name__)
 CORS(app)
@@ -19,14 +20,9 @@ rabbit_port = os.getenv("rabbit_port", "5672")
 TEST_COMPATIBILITY_EXCHANGE = "test_compatibility_exchange"
 TEST_COMPATIBILITY_QUEUE = "test_compatibility_queue"
 TEST_RESULT_EXCHANGE = "test_result_exchange"
-TEST_COMPATIBILITY_ROUTING_KEY = "test.compatibility"
 MATCH_TEST_RESULT_ROUTING_KEY = "test.result"
-
-# Lab Info & Match Atomic Service URLs
-RECIPIENT_URL = os.environ.get("RECIPIENT_URL") or "http://localhost:5013/recipient"
-LAB_INFO_URL = os.getenv("LAB_INFO_URL", "http://localhost:5007/lab-reports")
-MATCH_SERVICE_URL = os.getenv("MATCH_SERVICE_URL", "http://localhost:5008/matches")
 ORGAN_ATOMIC_URL = os.getenv("ORGAN_ATOMIC_URL", "http://localhost:5009/organ")
+MATCH_SERVICE_URL = os.getenv("MATCH_SERVICE_URL", "http://localhost:5008/matches")
 
 @app.route("/", methods=['GET'])
 def health_check():
@@ -76,15 +72,6 @@ def process_message(message_dict):
         else:
             print(f"Failed to fetch organ data for organId: {organ_uuid}. Error: {organ_result.get('message', 'Unknown error')}")
     
-    # Fetch recipient's lab report
-    print(f"Fetching lab report for recipientId: {recipient_uuid}...")
-    lab_report = get_lab_report(recipient_uuid)
-    if lab_report:
-        print(f"Successfully fetched lab report: {lab_report}")
-    else:
-        print(f"Failed to fetch lab report for recipientId: {recipient_uuid}")
-        return jsonify({"code": 500, "message": "Failed to fetch lab report"}), 500
-
     # Generate randomized HLA matches
     matches = []
     HLA_THRESHOLD = 4
@@ -128,16 +115,6 @@ def process_message(message_dict):
 
     return {"listOfMatchId": match_ids}
 
-def get_lab_report(recipient_uuid):
-    """Fetch recipient's lab report from Lab Info Atomic using UUID."""
-    lab_info_url = f"{LAB_INFO_URL}/{recipient_uuid}"
-    lab_result = invoke_http(lab_info_url, method="GET")
-    if 'code' in lab_result and lab_result["code"] in range(200, 300):
-        return lab_result
-    else:
-        print(f"Error fetching lab report: {lab_result.get('message', 'Unknown error')}")
-        return None
-
 def post_matches_to_match_service(matches):
     """POST valid matches to Match Atomic Service."""
     payload = {"matches": matches}
@@ -164,8 +141,20 @@ def send_results_to_match_organ(match_ids):
 # Run the Flask app
 if __name__ == "__main__":
     print(f"This is {os.path.basename(__file__)} - Test Compatibility Service")
+
     # Start the RabbitMQ listener in a daemon thread so it doesn't block the main thread.
-    consumer_thread = threading.Thread(target=run_async_consumer, daemon=True)
+    consumer_thread = threading.Thread(
+        target=start_consuming,  # Use the start_consuming function from amqp_lib.py
+        args=(
+            rabbit_host,  # RabbitMQ host
+            rabbit_port,  # RabbitMQ port
+            TEST_COMPATIBILITY_EXCHANGE,  # The exchange you're consuming from
+            'topic',  # Exchange type (change if necessary)
+            TEST_COMPATIBILITY_QUEUE,  # The queue to consume from
+            handle_message  # The function to process incoming messages
+        ),
+        daemon=True
+    )
     consumer_thread.start()
 
     # Start the Flask app in the main thread.

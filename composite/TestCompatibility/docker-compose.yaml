@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.9-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672" # AMQP port
+      - "15672:15672" # RabbitMQ management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - grabOrgan-net
+
+  test-compatibility:
+    build:
+      context: .
+      dockerfile: Dockerfile.test.compatibility
+    container_name: "test-compatibility"
+    environment:
+      - RABBITMQ_HOST=rabbitmq # Connect using RabbitMQ service name
+      - MATCH_SERVICE_URL=http://match-service:5008/matches
+      - ORGAN_SERVICE_URL=http://organ:5009/organ
+      - LAB_INFO_URL=http://labInfo:5007/lab-reports
+    volumes:
+      - ./secrets:/app/secrets # Mount the secrets directory (this will allow match-service to use the keys)
+    networks:
+      - grabOrgan-net
+    ports:
+      - "5022:5022"
+    depends_on:
+      - rabbitmq
+      - match-service
+      - organ
+      - labInfo
+
+networks:
+  grabOrgan-net:
+    external: true

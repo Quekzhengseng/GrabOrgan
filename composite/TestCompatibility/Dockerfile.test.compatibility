@@ -9,7 +9,7 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
-COPY composite/TestCompatibility/test_compatibility.py .
+COPY composite/TestCompatibility/test_compatibility.py ./test_compatibility.py
 
 # Expose Flask port
 EXPOSE 5022
