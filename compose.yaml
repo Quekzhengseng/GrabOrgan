@@ -397,6 +397,8 @@ services:
       - pseudonym
       - recipient
       - labInfo
+      - activity_log
+      - error
     networks:
       - grabOrgan-net
     volumes:
@@ -430,7 +432,7 @@ services:
       - donor
       - match
       - organ
-      - request_organ
+      - notification
 
     container_name: match_organ_service
     networks:
@@ -461,7 +463,6 @@ services:
       - recipient
       - labInfo
       - match
-      - match_organ
 
     networks:
       - grabOrgan-net
