@@ -6,11 +6,12 @@ import string
 from donor import Donor  # Assuming you have a Donor class defined in donor.py
 
 # --- Endpoints (Container URLs) ---
-# PERSONAL_DATA_URL = "http://localhost:5007/person"   # POST endpoint for personal data
+PERSONAL_DATA_URL = "http://PersonalData:5007/person"   # POST endpoint for personal data
 PERSONAL_DATA_URL = "https://personal-gbst4bsa.outsystemscloud.com/PatientAPI/rest/patientAPI/patients/"
 DONOR_URL = "http://donor:5003/donor"              # POST endpoint for donor data
 PSEUDONYM_URL = "http://pseudonym:5012/pseudonymise"     # POST endpoint for pseudonym service
 ORGAN_URL = "http://organ:5010/organ" 
+LAB_INFO_URL="http://labInfo:5007/lab-reports"
 
 # --- Dummy Data Generation Functions ---
 
@@ -31,6 +32,18 @@ def random_blood_type():
 
 def random_gender():
     return random.choice(["Male", "Female"])
+
+def generate_hla_profile():
+    # Simulate two alleles for each of the 3 key loci
+    hla_options = {
+    "A": ["A1", "A2", "A3", "A11", "A24", "A26"],
+    "B": ["B7", "B8", "B27", "B35", "B44", "B51"],
+    "DR": ["DR1", "DR3", "DR4", "DR7", "DR11", "DR15"]
+    }
+    profile = {}
+    for locus, alleles in hla_options.items():
+        profile[locus] = random.sample(alleles, 2) 
+    return profile # output: {'A': 'A1/A24', 'B': 'B8/B27', 'DR': 'DR3/DR15'}
 
 # def random_organs():
 #     organ_types = ["heart", "liver", "lungs", "kidneys", "pancreas"]

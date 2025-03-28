@@ -20,128 +20,178 @@ db = firestore.client()
 
 print("Firestore initialized successfully for Lab Reports!")
 
+
+"""
+LabInfo Class JSON Schema
+{
+  "uuid": "b0241838-3a17-4abc-a80e-530a325a3bec",
+  "testType": "Compatibility",
+  "dateOfReport": "2023-10-18",
+  "report": {
+    "name": "Compatibility Lab Test Report",
+    "url": "https://beonbrand.getbynder.com/m/b351439ebceb7d39/original/Laboratory-Tests-for-Organ-Transplant-Rejection.pdf"
+  },
+  "result": {
+    numOfHLA: 4,
+    "negativeCrossMatch": true,
+    },
+    "comments": "To be reviewed."
+  }
+}
+"""
+class LabInfo:
+    def __init__(self, uuid, test_type, date_of_report, report, result, comments):
+        self.uuid = uuid
+        self.test_type = test_type
+        self.date_of_report = date_of_report
+        self.report = report
+        self.result = result
+        self.comments = comments
+        
+
+    def to_dict(self):
+        """Convert the object to a Firestore-compatible dictionary."""
+        return {
+            "uuid": self.uuid,
+            "testType": self.test_type,
+            "dateOfReport": self.date_of_report,
+            "report": self.report,
+            "result": self.result,
+            "comments": self.comments,
+        }
+
+    @staticmethod
+    def from_dict(uuid, data):
+        """Create a Donor object from Firestore document data."""
+        return LabInfo(
+            uuid=uuid,
+            test_type=data["testType"],
+            date_of_report=data["dateOfReport"],
+            report=data["report"],
+            result=data["result"],
+            comments=data["comments"],
+            
+        )
 @app.route("/lab-reports", methods=['GET'])
-def get_all_lab_reports():
+def get_all():
+    # Read data from firebase
     try:
-        lab_reports_ref = db.collection("lab_reports")
-        docs = lab_reports_ref.get()
-        lab_reports = [doc.to_dict() for doc in docs]
+        lab_info_ref = db.collection("lab_reports")
+        docs = lab_info_ref.get()
+        labInfo = {};
 
-        return jsonify({
-            "code": 200,
-            "data": lab_reports,
-            "message": "Lab reports fetched successfully"
-        }), 200
+        for doc in docs:
+            lab_info_data = doc.to_dict()
+            lab_info_data["uuid"] = doc.id  # Add document ID
+            labInfo[doc.id] = lab_info_data
+        return jsonify({"code":200, "data": labInfo}), 200
     except Exception as e:
-        return jsonify({
-            "code": 500,
-            "data": {"error": str(e)},
-            "message": "An error occurred while fetching lab reports"
-        }), 500
+        return jsonify({"code":500, "message": str(e)}), 500
 
-@app.route("/lab-reports/<string:uuid>", methods=['GET'])
-def get_lab_report(uuid):
+
+@app.route("/lab-reports/<string:uuid>")
+def get_donor(uuid):
     try:
-        lab_reports_ref = db.collection("lab_reports").where("uuid", "==", uuid)
-        docs = lab_reports_ref.get()
-
-        if docs:
-            report_data = docs[0].to_dict()
-            return jsonify({
-                "code": 200,
-                "data": report_data,
-                "message": "Lab report fetched successfully"
-            }), 200
+        lab_info_ref = db.collection("lab_reports").document(uuid)
+        doc = lab_info_ref.get()
+        if doc.exists:
+            lab_info_obj = LabInfo.from_dict(uuid, doc.to_dict())
+            return {"code":200, "data": lab_info_obj.to_dict()}  # Convert back to JSON-friendly format
         else:
-            return jsonify({
-                "code": 404,
-                "data": {"uuid": uuid},
-                "message": "Lab report not found"
-            }), 404
+            return jsonify({"code":404, "message": "LabInfo does not exist"}), 404
 
     except Exception as e:
-        return jsonify({
-            "code": 500,
-            "data": {"error": str(e)},
-            "message": "An error occurred while fetching the lab report"
-        }), 500
+        return jsonify({"code":500, "message": str(e)}), 500
+
 
 @app.route("/lab-reports/<string:uuid>", methods=['PUT'])
-def update_lab_report(uuid):
+def update_donor(uuid):
     try:
-        update_data = request.get_json()
+        lab_info_ref = db.collection("lab_report").document(uuid)
+        doc = lab_info_ref.get()
+        if not doc.exists:
+            return jsonify(
+                {
+                    "code": 404,
+                    "data": {
+                        "uuid": uuid
+                    },
+                    "message": "LabInfo not found."
+                }
+            ), 404
 
-        # Prevent updating the UUID field
-        if "uuid" in update_data:
-            update_data.pop("uuid")
-
-        lab_reports_ref = db.collection("lab_reports").where("uuid", "==", uuid)
-        docs = lab_reports_ref.get()
-
-        if docs:
-            doc_ref = docs[0].reference
-            doc_ref.update(update_data)
-            return jsonify({
-                "code": 200,
-                "data": {"uuid": uuid},
-                "message": "Lab report updated successfully"
-            }), 200
-        else:
-            return jsonify({
-                "code": 404,
-                "data": {"uuid": uuid},
-                "message": "Lab report not found"
-            }), 404
-
+        # update status
+        new_data = request.get_json()
+        if new_data['status'] < 400:
+            db.collection("donors").document(uuid).set(new_data["data"], merge=True)
+            return jsonify(
+                {
+                    "code": 200,
+                    "data": new_data
+                }
+            ), 200
     except Exception as e:
-        return jsonify({
-            "code": 500,
-            "data": {"error": str(e)},
-            "message": "An error occurred while updating the lab report"
-        }), 500
-
-# New POST endpoint to create a lab report
+        print("Error: {}".format(str(e)))
+        return jsonify(
+            {
+                "code": 500,
+                "data": {
+                    "uuid": uuid
+                },
+                "message": "An error occurred while updating the LabInfo information. " + str(e)
+            }
+        ), 500
+    
 @app.route("/lab-reports", methods=['POST'])
-def create_lab_report():
+def create_donor():
     try:
-        data = request.get_json()
-        if not data:
+        # Get the JSON payload from the request
+        lab_info_data = request.get_json()
+
+        # Ensure donorId is provided in the request
+        uuid = lab_info_data.get("uuid")
+        if not uuid:
             return jsonify({
                 "code": 400,
                 "data": {},
-                "message": "Request body must be JSON"
-            }), 400
-        
-        # Ensure a UUID is provided
-        if "uuid" not in data:
-            return jsonify({
-                "code": 400,
-                "data": {},
-                "message": "UUID is required"
+                "message": "LabInfo Id is required."
             }), 400
 
-        # Check if a lab report with the provided UUID already exists
-        doc_ref = db.collection("lab_reports").document(data["uuid"])
-        if doc_ref.get().exists:
+        # Reference to the donor document in Firestore
+        lab_info_ref = db.collection("lab_reports").document(uuid)
+        if lab_info_ref.get().exists:
             return jsonify({
                 "code": 409,
-                "data": {"uuid": data["uuid"]},
-                "message": "Lab report with this UUID already exists"
+                "data": {"uuid": uuid},
+                "message": "LabInfo already exists."
             }), 409
-        
-        # Create the lab report in Firestore
-        doc_ref.set(data)
+
+        # Create a new LabInfo object
+        new_lab_info = LabInfo(
+            uuid=uuid,
+            test_type=lab_info_data["testType"],
+            date_of_report=lab_info_data["dateOfReport"],
+            report=lab_info_data["report"],
+            result=lab_info_data.get("result", ""), # Optional list
+            comments=lab_info_data["comments"],
+        )
+
+        # Save the new donor to Firestore
+        lab_info_ref.set(new_lab_info.to_dict())
+
+        # Return success response
         return jsonify({
             "code": 201,
-            "data": data,
-            "message": "Lab report created successfully"
+            "data": new_lab_info.to_dict(),
+            "message": "LabInfo created successfully."
         }), 201
 
     except Exception as e:
+        print("Error: {}".format(str(e)))
         return jsonify({
             "code": 500,
-            "data": {"error": str(e)},
-            "message": "An error occurred while creating the lab report"
+            "data": {},
+            "message": "An error occurred while creating the LabInfo: " + str(e)
         }), 500
 
 if __name__ == '__main__':

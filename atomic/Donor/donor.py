@@ -207,7 +207,6 @@ def create_donor():
         }), 500
     
 
-# def create_donor(donorId):
 
 if __name__ == '__main__':
     print("This is flask for " + os.path.basename(__file__) + ": manage donors ...")
