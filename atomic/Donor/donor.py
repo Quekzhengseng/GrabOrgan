@@ -205,7 +205,25 @@ def create_donor():
             "data": {},
             "message": "An error occurred while creating the donor: " + str(e)
         }), 500
-    
+
+@app.route("/donors/<string:donorId>", methods=['DELETE'])
+def delete_donor(donorId):
+    """Delete an donor from Firestore."""
+    try:
+        donor_ref = db.collection("donors").document(donorId)
+        doc = donor_ref.get()
+
+        if not doc.exists:
+            return jsonify({"code": 404, "message": "Donor not found"}), 404
+
+        # Delete the organ document from Firestore
+        donor_ref.delete()
+
+        return jsonify({"code": 200, "message": "Donor deleted successfully"}), 200
+
+    except Exception as e:
+        return jsonify({"code": 500, "message": str(e)}), 500
+
 
 
 if __name__ == '__main__':

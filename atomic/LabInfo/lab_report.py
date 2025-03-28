@@ -40,12 +40,12 @@ LabInfo Class JSON Schema
 }
 """
 class LabInfo:
-    def __init__(self, uuid, test_type, date_of_report, report, result, comments):
+    def __init__(self, uuid, test_type, date_of_report, report, hla_typing, comments):
         self.uuid = uuid
         self.test_type = test_type
         self.date_of_report = date_of_report
         self.report = report
-        self.result = result
+        self.hla_typing = hla_typing
         self.comments = comments
         
 
@@ -56,19 +56,19 @@ class LabInfo:
             "testType": self.test_type,
             "dateOfReport": self.date_of_report,
             "report": self.report,
-            "result": self.result,
+            "hlaTyping": self.hla_typing,
             "comments": self.comments,
         }
 
     @staticmethod
     def from_dict(uuid, data):
-        """Create a Donor object from Firestore document data."""
+        """Create a LabInfo object from Firestore document data."""
         return LabInfo(
             uuid=uuid,
             test_type=data["testType"],
             date_of_report=data["dateOfReport"],
             report=data["report"],
-            result=data["result"],
+            hlaTyping=data["hlaTyping"],
             comments=data["comments"],
             
         )
@@ -90,7 +90,7 @@ def get_all():
 
 
 @app.route("/lab-reports/<string:uuid>")
-def get_donor(uuid):
+def get_lab_info(uuid):
     try:
         lab_info_ref = db.collection("lab_reports").document(uuid)
         doc = lab_info_ref.get()
@@ -98,14 +98,14 @@ def get_donor(uuid):
             lab_info_obj = LabInfo.from_dict(uuid, doc.to_dict())
             return {"code":200, "data": lab_info_obj.to_dict()}  # Convert back to JSON-friendly format
         else:
-            return jsonify({"code":404, "message": "LabInfo does not exist"}), 404
+            return jsonify({"code": 404, "message": "LabInfo does not exist"}), 404
 
     except Exception as e:
         return jsonify({"code":500, "message": str(e)}), 500
 
 
 @app.route("/lab-reports/<string:uuid>", methods=['PUT'])
-def update_donor(uuid):
+def update_lab_info(uuid):
     try:
         lab_info_ref = db.collection("lab_report").document(uuid)
         doc = lab_info_ref.get()
@@ -143,7 +143,7 @@ def update_donor(uuid):
         ), 500
     
 @app.route("/lab-reports", methods=['POST'])
-def create_donor():
+def create_lab_info():
     try:
         # Get the JSON payload from the request
         lab_info_data = request.get_json()
@@ -172,7 +172,7 @@ def create_donor():
             test_type=lab_info_data["testType"],
             date_of_report=lab_info_data["dateOfReport"],
             report=lab_info_data["report"],
-            result=lab_info_data.get("result", ""), # Optional list
+            hla_typing=lab_info_data.get("hlaTyping", {}), # Optional dict
             comments=lab_info_data["comments"],
         )
 
@@ -193,6 +193,25 @@ def create_donor():
             "data": {},
             "message": "An error occurred while creating the LabInfo: " + str(e)
         }), 500
+
+
+@app.route("/lab-reports/<string:uuid>", methods=['DELETE'])
+def delete_lab_info(uuid):
+    """Delete an donor from Firestore."""
+    try:
+        lab_info_ref = db.collection("lab_reports").document(uuid)
+        doc = lab_info_ref.get()
+
+        if not doc.exists:
+            return jsonify({"code": 404, "message": "LabInfo not found"}), 404
+
+        # Delete the organ document from Firestore
+        lab_info_ref.delete()
+
+        return jsonify({"code": 200, "message": "LabInfo deleted successfully"}), 200
+
+    except Exception as e:
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 if __name__ == '__main__':
     print("This is Flask for " + os.path.basename(__file__) + ": manage lab reports ...")

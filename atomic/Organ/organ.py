@@ -30,7 +30,7 @@ db = firestore.client()
 class Organ:
     def __init__(
         self, organ_id, donor_id, organ_type, retrieval_datetime, expiry_datetime,
-        status, condition, blood_type, weight_grams, hla_types, histopathology,
+        status, condition, blood_type, weight_grams, histopathology,
         storage_temp_celsius, preservation_solution, notes
     ):
         self.organ_id = organ_id
@@ -42,7 +42,6 @@ class Organ:
         self.condition = condition
         self.blood_type = blood_type
         self.weight_grams = weight_grams
-        self.hla_types = hla_types
         self.histopathology = histopathology
         self.storage_temp_celsius = storage_temp_celsius
         self.preservation_solution = preservation_solution
@@ -60,7 +59,6 @@ class Organ:
             "condition": self.condition,
             "bloodType": self.blood_type,
             "weightGrams": self.weight_grams,
-            "hlaTyping": self.hla_types,
             "histopathology": self.histopathology,
             "storageTempCelsius": self.storage_temp_celsius,
             "preservationSolution": self.preservation_solution,
@@ -80,7 +78,6 @@ class Organ:
             condition=data["condition"],
             blood_type=data["bloodType"],
             weight_grams=data["weightGrams"],
-            hla_types=data["hlaTyping"],
             histopathology=data["histopathology"],
             storage_temp_celsius=data["storageTempCelsius"],
             preservation_solution=data["preservationSolution"],
@@ -216,7 +213,6 @@ def create_organ():
             condition=data['condition'],
             blood_type=data['bloodType'],
             weight_grams=data['weightGrams'],
-            hla_types=data['hlaTyping'],
             histopathology=data['histopathology'],
             storage_temp_celsius=data['storageTempCelsius'],
             preservation_solution=data['preservationSolution'],

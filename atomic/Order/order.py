@@ -186,5 +186,24 @@ def create_order():
             "message": "An error occurred while creating the order: " + str(e)
         }), 500
 
+@app.route("/order/<string:orderId>", methods=['DELETE'])
+def delete_match(orderId):
+    """Delete an order from Firestore."""
+    try:
+        order_ref = db.collection("orders").document(orderId)
+        doc = order_ref.get()
+
+        if not doc.exists:
+            return jsonify({"code": 404, "message": "Order not found"}), 404
+
+        # Delete the organ document from Firestore
+        order_ref.delete()
+
+        return jsonify({"code": 200, "message": "Order deleted successfully"}), 200
+
+    except Exception as e:
+        return jsonify({"code": 500, "message": str(e)}), 500
+
+
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5009, debug=True)

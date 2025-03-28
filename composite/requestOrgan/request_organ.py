@@ -6,6 +6,7 @@ from common import amqp_lib  # Reusable AMQP functions
 from common.invokes import invoke_http  # Import the invoke_http function
 from flask_cors import CORS
 import pika
+import random
 
 app = Flask(__name__)
 CORS(app)
@@ -45,6 +46,18 @@ def remove_code_field(response):
     if isinstance(response, dict) and "code" in response:
          del response["code"]
     return response
+
+def generate_hla_profile():
+    # Simulate two alleles for each of the 3 key loci
+    hla_options = {
+    "A": ["A1", "A2", "A3", "A11", "A24", "A26"],
+    "B": ["B7", "B8", "B27", "B35", "B44", "B51"],
+    "DR": ["DR1", "DR3", "DR4", "DR7", "DR11", "DR15"]
+}
+    profile = {}
+    for locus, alleles in hla_options.items():
+        profile[locus] = random.sample(alleles, 2)
+    return profile # output: {'A': ['A24', 'A3'], 'B': ['B7', 'B27'], 'DR': ['DR11', 'DR1']}
 
 @app.route('/request-for-organ', methods=['POST'])
 def request_for_organ():
@@ -129,6 +142,7 @@ def request_for_organ():
         recipient_payload = {**masked_data, "recipientId": new_uuid}
         lab_payload = lab_info_data.copy()
         lab_payload["uuid"] = new_uuid
+        lab_payload["hlaTyping"] = generate_hla_profile()
 
         # --- Call the Personal Data Service ---
         personal_resp = invoke_http(PERSONAL_DATA_URL, method="POST", json=personal_payload)

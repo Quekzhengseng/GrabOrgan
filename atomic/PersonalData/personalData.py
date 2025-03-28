@@ -158,6 +158,24 @@ def create_person():
             "message": "An error occurred while creating the person: " + str(e)
         }), 500
 
+@app.route("/person/<string:uuid>", methods=['DELETE'])
+def delete_match(uuid):
+    """Delete a PersonalData from Firestore."""
+    try:
+        personal_data_ref = db.collection("PersonalData").document(uuid)
+        doc = personal_data_ref.get()
+
+        if not doc.exists:
+            return jsonify({"code": 404, "message": "PersonalData not found"}), 404
+
+        # Delete the organ document from Firestore
+        personal_data_ref.delete()
+
+        return jsonify({"code": 200, "message": "PersonalData deleted successfully"}), 200
+
+    except Exception as e:
+        return jsonify({"code": 500, "message": str(e)}), 500
+
 
 if __name__ == '__main__':
     print("This is flask for " + os.path.basename(__file__) + ": manage Personal Data ...")

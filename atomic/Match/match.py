@@ -200,6 +200,23 @@ def create_donor():
             "message": "An error occurred while creating the Match: " + str(e)
         }), 500
 
+@app.route("/matches/<string:matchId>", methods=['DELETE'])
+def delete_match(matchId):
+    """Delete an match from Firestore."""
+    try:
+        match_ref = db.collection("matches").document(matchId)
+        doc = match_ref.get()
+
+        if not doc.exists:
+            return jsonify({"code": 404, "message": "Match not found"}), 404
+
+        # Delete the organ document from Firestore
+        match_ref.delete()
+
+        return jsonify({"code": 200, "message": "Match deleted successfully"}), 200
+
+    except Exception as e:
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 
 if __name__ == '__main__':

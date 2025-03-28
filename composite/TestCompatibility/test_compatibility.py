@@ -24,6 +24,7 @@ TEST_RESULT_EXCHANGE = "test_result_exchange"
 MATCH_TEST_RESULT_ROUTING_KEY = "test.result"
 ORGAN_URL = os.environ.get("ORGAN_URL") or "http://localhost:5010/organ"
 MATCH_URL = os.environ.get("MATCH_URL") or "http://localhost:5008/matches"
+LAB_INFO_URL = os.environ.get("LAB_INFO_URL") or "http://localhost:5007/lab-reports"
 
 @app.route("/", methods=['GET'])
 def health_check():
@@ -33,6 +34,8 @@ def health_check():
 channel = None
 
 MAX_RETRIES = 3  # Maximum number of retry attempts
+HLA_THRESHOLD = 4
+
 
 """
 {
@@ -144,6 +147,45 @@ def ensure_exchange_exists(channel, exchange, exchange_type):
     # Declare the exchange (it will only create it if it does not already exist)
     channel.exchange_declare(exchange=exchange, exchange_type=exchange_type, durable=True)
 
+hla_options = {
+    "A": ["A1", "A2", "A3", "A11", "A24", "A26"],
+    "B": ["B7", "B8", "B27", "B35", "B44", "B51"],
+    "DR": ["DR1", "DR3", "DR4", "DR7", "DR11", "DR15"]
+}
+
+def generate_hla_profile():
+    # Simulate two alleles for each of the 3 key loci
+    profile = {}
+    for locus, alleles in hla_options.items():
+        profile[locus] = random.sample(alleles, 2)
+    return profile # output: {'A': ['A24', 'A3'], 'B': ['B7', 'B27'], 'DR': ['DR11', 'DR1']}
+
+def hla_match_score(donor, recipient):
+    match_count = 0
+    for locus in hla_options:
+        donor_alleles = donor[locus]
+        recipient_alleles = recipient[locus]
+        match_count += len(set(donor_alleles) & set(recipient_alleles))
+    return match_count  # max score = 6 (2 per locus)
+
+def create_hla(profile):
+    return {k: f"{v[0]}/{v[1]}" for k, v in profile.items()} # output: {'A': 'A1/A24', 'B': 'B8/B27', 'DR': 'DR3/DR15'}
+
+def generate_hla_match_flags(hla_score):
+    """
+    Generate a dictionary of hla1 to hla6 flags (True/False),
+    with exactly hla_score number of True values.
+    """
+    assert 0 <= hla_score <= 6, "hla_score must be between 0 and 6"
+    
+    # Step 1: Create the boolean list
+    flags = [True] * hla_score + [False] * (6 - hla_score)
+    random.shuffle(flags)  # Randomize their order
+
+    # Step 2: Map to hla1 through hla6
+    result = {f'hla{i+1}': flags[i] for i in range(6)}
+    return result
+
 
 def process_message(message_dict):
     """Process the matching request message as described earlier."""
@@ -153,6 +195,7 @@ def process_message(message_dict):
         organ_uuids = message_dict["listOfOrganId"]
         print(f"Received message for recipientId: {recipient_uuid}, listOfOrganId: {organ_uuids}")
 
+        setOfDonorId = set()
         organ_data = {}
         # Fetch organ data for each organ UUID.
         for organ_uuid in organ_uuids:
@@ -164,8 +207,10 @@ def process_message(message_dict):
                 code = organ_result["code"] 
 
                 if code in range(200, 300):
+                    organ = organ_result["data"]
                     # Assume the useful data is in the "data" key if available.
-                    organ_data[organ_uuid] = organ_result["data"]
+                    organ_data[organ_uuid] = organ
+                    setOfDonorId.add(organ_data["donorId"])
                     print(f"Successfully fetched organ data for {organ_uuid}: {organ_result}")
                 else:
                     error_msg = organ_result.get('message', 'Unknown error')
@@ -190,20 +235,79 @@ def process_message(message_dict):
                     }),
                     properties=pika.BasicProperties(delivery_mode=2)
                 )
+        # Compare Tissue Test from donor & recipient to get hlaScore
+        try:
+            for donor in setOfDonorId:
+                compatibility_uuid = recipient_uuid + "-match-" + donor
+                try:
+                    report_url = "https://beonbrand.getbynder.com/m/b351439ebceb7d39/original/Laboratory-Tests-for-Organ-Transplant-Rejection.pdf"
+                    current_date = time.strftime("%Y-%m-%d")
+                    
+                    # For GET requests, a JSON body is typically not required.
+                    recipient_tissue_test = invoke_http(f"{LAB_INFO_URL}/{recipient_uuid}", "GET")
+                    donor_tissue_test = invoke_http(f"{LAB_INFO_URL}/{donor_id}", "GET")
+                    
+                    # Retrieve response codes (if needed)
+                    recipient_code = recipient_tissue_test["code"]
+                    donor_code = donor_tissue_test["code"]
 
-        # Generate randomized HLA matches.
+                    # Compute the HLA matching score.
+                    hlaScore = hla_match_score(donor_tissue_test["hlaTyping"], recipient_tissue_test["hlaTyping"])
+                    if hlaScore < HLA_THRESHOLD and random.choice([0, 1]) == 1:
+                        hlaScore = HLA_THRESHOLD
+
+                    # Build the new lab info for the compatibility test.
+                    new_lab_info = {
+                        "uuid": compatibility_uuid,
+                        "testType": "Compatibility",
+                        "dateOfReport": current_date,
+                        "report": {
+                            "name": "Compatibility Lab Test Report",
+                            "url": report_url
+                        },
+                        "hlaTyping": {
+                            "numOfHLA": hlaScore
+                        },
+                        "comments": "To be reviewed."
+                    }
+                    
+                except Exception as e:
+                    raise Exception("Failed to invoke HTTP request: ") from e
+                
+        except Exception as e:
+            raise Exception("Failed to iterate through setOfDonorIds") from e
+
+
         matches = []
-        HLA_THRESHOLD = 4
         for organ_uuid, organ_info in organ_data.items():
             try:
                 donor_id = organ_info["donorId"]
-                print(f"Creating match for organId: {organ_uuid} with donorId: {donor_id}")
+                print(f"Checking match for organId: {organ_uuid} with donorId: {donor_id}")
+                uuid = recipient_uuid + "-match-" + donor_id
+                try:
+                    compatibility_test = invoke_http(f"{LAB_INFO_URL}/{uuid}", "GET")
+                    code = compatibility_test["code"]
 
-                # Generate randomized HLA match results.
-                hla_matches = {f"hla-{i+1}": random.choice([True, False]) for i in range(6)}
-                num_of_hla = sum(1 for match in hla_matches.values() if match)
+                    if code not in range(200, 300):
+                        print(f"Publishing error via AMQP: {str(e)}")
+                        channel.basic_publish(
+                            exchange="error_handling_exchange",
+                            routing_key="test_compatibility.error",
+                            body=json.dumps({
+                                "message": str(e),
+                                "data": match_ids
+                            }),
+                            properties=pika.BasicProperties(delivery_mode=2)
+                        )
 
-                if num_of_hla >= HLA_THRESHOLD:
+                    hlaTyping = compatibility_test["hlaTyping"]
+                    score = hlaTyping["numOfHLA"]
+                except Exception as e:
+                    raise Exception("Failed to get compatibility test") from e
+                # Generate randomized HLA match flags based on hlaScore.
+                hla_matches = generate_hla_match_flags(score)
+
+                if score >= HLA_THRESHOLD:
                     match_id = f"{recipient_uuid}-{organ_uuid}"
                     match_record = {
                         "matchId": match_id,
@@ -211,13 +315,13 @@ def process_message(message_dict):
                         "donorId": donor_id,
                         "organId": organ_uuid,
                         **hla_matches,
-                        "numOfHLA": num_of_hla,
+                        "numOfHLA": score,
                         "testDateTime": datetime.now().isoformat()
                     }
                     matches.append(match_record)
                     print(f"Generated valid match: {match_record}")
                 else:
-                    print(f"OrganId {organ_uuid} did not meet HLA threshold: {num_of_hla}/6")
+                    print(f"OrganId {organ_uuid} did not meet HLA threshold: {score}/6")
             except Exception as ex:
                 print(f"Error processing match for organId {organ_uuid}: {str(ex)}")
                 channel.basic_publish(
