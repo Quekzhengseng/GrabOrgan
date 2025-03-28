@@ -170,13 +170,7 @@ def create_organ():
     """Create a new organ in Firestore."""
     try:
         data = request.get_json()
-
-        # Generate a unique organId (can be done using UUID or custom logic)
-        donor_id_part = data['donorId'].split('-')[0]
-        organ_type_part = data['organType'].split('-')[-1]
-        
-        # Generate a unique organId (concatenate parts from donorId and organType)
-        organ_id = f"{donor_id_part}-{organ_type_part}"
+        organ_id = data.get("organId")
 
         # Create Organ object
         organ = Organ(

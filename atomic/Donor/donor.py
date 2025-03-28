@@ -169,7 +169,7 @@ def create_donor():
             return jsonify({
                 "code": 400,
                 "data": {},
-                "message": "Donor ID is required."
+                "message": "Donor Id is required."
             }), 400
 
         # Reference to the donor document in Firestore
@@ -218,7 +218,7 @@ def create_donor():
             "message": "An error occurred while creating the donor: " + str(e)
         }), 500
 
-@app.route("/donors/<string:donorId>", methods=['DELETE'])
+@app.route("/donor/<string:donorId>", methods=['DELETE'])
 def delete_donor(donorId):
     """Delete an donor from Firestore."""
     try:

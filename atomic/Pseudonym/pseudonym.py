@@ -222,7 +222,7 @@ returns
             "phone": "54326789",
             "relationship": "Spouse"
         },
-        "personId": "donorid-1234"
+        "uuid": "donorid-1234"
     }
 }
 """
