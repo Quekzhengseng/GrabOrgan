@@ -250,13 +250,13 @@ def process_message(message_dict):
             else:
                 print("No matches found. Sending empty list to matchOrgan.")
                 send_results_to_match_organ([])
-        except Exception as amqp_ex:
-            print(f"Error sending match results via AMQP: {str(amqp_ex)}")
+        except Exception as e:
+            print(f"Publishing error via AMQP: {str(e)}")
             channel.basic_publish(
                 exchange="error_handling_exchange",
                 routing_key="test_compatibility.error",
                 body=json.dumps({
-                    "message": str(amqp_ex),
+                    "message": str(e),
                     "data": match_ids
                 }),
                 properties=pika.BasicProperties(delivery_mode=2)
@@ -279,7 +279,6 @@ def process_message(message_dict):
             )
         except Exception as publish_exception:
             print("Failed to publish error message:", str(publish_exception))
-        return jsonify({"code": 500, "message": str(e)}), 500
 
 def post_matches_to_match_service(matches):
     """POST valid matches to Match Atomic Service."""
@@ -288,13 +287,13 @@ def post_matches_to_match_service(matches):
         response = invoke_http(MATCH_URL, method="POST", json=payload)
         message = json.dumps(response)
         code = response["code"]
-        if 'code' in response and response["code"] in range(200, 300):
+        if code in range(200, 300):
             print("Matches posted successfully.")
         else:
             print(f"Failed to post matches. Error: {response["message"]}")
+            raise Exception("Failed to store matches in Match DB")
     except Exception as e:
-
-
+        raise
 
 def send_results_to_match_organ(match_ids):
     """Send results back to matchOrgan composite via AMQP (test.result)."""
