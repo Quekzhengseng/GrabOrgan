@@ -4,10 +4,12 @@ import uuid
 import requests
 import string
 from donor import Donor  # Assuming you have a Donor class defined in donor.py
+from invokes import invoke_http
+
 
 # --- Endpoints (Container URLs) ---
 PERSONAL_DATA_URL = "http://PersonalData:5007/person"   # POST endpoint for personal data
-PERSONAL_DATA_URL = "https://personal-gbst4bsa.outsystemscloud.com/PatientAPI/rest/patientAPI/patients/"
+OUTSYSTEMS_PERSONAL_DATA_URL = "https://personal-gbst4bsa.outsystemscloud.com/PatientAPI/rest/patientAPI/patients/" # POST
 DONOR_URL = "http://donor:5003/donor"              # POST endpoint for donor data
 PSEUDONYM_URL = "http://pseudonym:5012/pseudonymise"     # POST endpoint for pseudonym service
 ORGAN_URL = "http://organ:5010/organ" 
@@ -231,10 +233,3 @@ for donor in donors:
     else:
         print(f"Personal data posted successfully for donor {donor.donor_id}")
 
-        # Post the masked donor data to the donor endpoint.
-    organ_resp = requests.post(ORGAN_URL, json=organ)
-    if organ_resp.status_code != 201:
-        # print(masked_donor_data)
-        print(f"Error posting masked donor data for donor {organ["donorId"]}: {organ_resp.text}")
-    else:
-        print(f"Organ data posted successfully for donor {organ["donorId"]}")

@@ -29,23 +29,13 @@ db = firestore.client()
 
 class Organ:
     def __init__(
-        self, organ_id, donor_id, organ_type, retrieval_datetime, expiry_datetime,
-        status, condition, blood_type, weight_grams, histopathology,
-        storage_temp_celsius, preservation_solution, notes
-    ):
+        self, organ_id, donor_id, organ_type, blood_type, condition):
         self.organ_id = organ_id
         self.donor_id = donor_id
         self.organ_type = organ_type
-        self.retrieval_datetime = retrieval_datetime
-        self.expiry_datetime = expiry_datetime
-        self.status = status
-        self.condition = condition
         self.blood_type = blood_type
-        self.weight_grams = weight_grams
-        self.histopathology = histopathology
-        self.storage_temp_celsius = storage_temp_celsius
-        self.preservation_solution = preservation_solution
-        self.notes = notes
+        self.condition = condition
+
 
     def to_dict(self):
         """Convert the object to a Firestore-compatible dictionary."""
@@ -53,16 +43,9 @@ class Organ:
             "organId": self.organ_id,
             "donorId": self.donor_id,
             "organType": self.organ_type,
-            "retrievalDatetime": self.retrieval_datetime,  # Store as ISO string
-            "expiryDatetime": self.expiry_datetime,  # Store as ISO string
-            "status": self.status,
-            "condition": self.condition,
             "bloodType": self.blood_type,
-            "weightGrams": self.weight_grams,
-            "histopathology": self.histopathology,
-            "storageTempCelsius": self.storage_temp_celsius,
-            "preservationSolution": self.preservation_solution,
-            "notes": self.notes,
+            "condition": self.condition,
+
         }
 
     @staticmethod
@@ -72,16 +55,9 @@ class Organ:
             organ_id=organId,
             donor_id=data["donorId"],
             organ_type=data["organType"],
-            retrieval_datetime=data["retrievalDatetime"],
-            expiry_datetime=data["expiryDatetime"],
-            status=data["status"],
-            condition=data["condition"],
             blood_type=data["bloodType"],
-            weight_grams=data["weightGrams"],
-            histopathology=data["histopathology"],
-            storage_temp_celsius=data["storageTempCelsius"],
-            preservation_solution=data["preservationSolution"],
-            notes=data["notes"]
+            condition=data["condition"],
+
         )
 
 @app.route("/organ", methods=['GET'])
@@ -207,16 +183,8 @@ def create_organ():
             organ_id=organ_id,
             donor_id=data['donorId'],
             organ_type=data['organType'],
-            retrieval_datetime=data['retrievalDatetime'],
-            expiry_datetime=data['expiryDatetime'],
-            status=data['status'],
-            condition=data['condition'],
             blood_type=data['bloodType'],
-            weight_grams=data['weightGrams'],
-            histopathology=data['histopathology'],
-            storage_temp_celsius=data['storageTempCelsius'],
-            preservation_solution=data['preservationSolution'],
-            notes=data['notes']
+            condition=data['condition'],
         )
 
         # Save organ to Firestore
