@@ -147,10 +147,29 @@ def request_for_organ():
         lab_payload["hlaTyping"] = generate_hla_profile()
 
         # --- Call the Personal Data Service ---
+        try:
+            os_personal_resp = invoke_http(OUTSYSTEMS_PERSONAL_DATA_URL, method="POST", json=personal_payload)
+            if (os_personal_resp.get("Success") == True):
+                print("Publishing message with routing key =", "stored_os_personal_data.info")
+                channel.basic_publish(
+                    exchange="activity_log_exchange",
+                    routing_key="stored_os_personal_data.info",
+                    body=message,
+                    properties=pika.BasicProperties(delivery_mode=2)
+                )
+        except Exception as e:
+            print("Publishing message with routing key =", "request_personalData.error")
+            channel.basic_publish(
+                exchange="error_handling_exchange",
+                routing_key="request_personalData.error",
+                body=message,
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+            raise Exception("Failed to store PersonalData on OutSystems")
+
         personal_resp = invoke_http(PERSONAL_DATA_URL, method="POST", json=personal_payload) # as a backup for now
-        os_personal_resp = invoke_http(OUTSYSTEMS_PERSONAL_DATA_URL, method="POST", json=personal_payload)
-        code = os_personal_resp.get("code", 500)
-        message = json.dumps(os_personal_resp.get("message", ""))
+        code = personal_resp.get("code", 500)
+        message = json.dumps(personal_resp.get("message", ""))
         if code not in range(200, 300):
             print("Publishing message with routing key =", "request_personalData.error")
             channel.basic_publish(
@@ -198,7 +217,7 @@ def request_for_organ():
         lab_resp = invoke_http(LAB_REPORT_URL, method="POST", json=lab_payload)
         code = lab_resp.get("code", 500)
         message = json.dumps(lab_resp)
-        
+
         if code not in range(200, 300):
             print("Publishing message with routing key =", "request_lab.error")
             channel.basic_publish(

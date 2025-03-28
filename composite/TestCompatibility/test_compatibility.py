@@ -210,7 +210,7 @@ def process_message(message_dict):
                     organ = organ_result["data"]
                     # Assume the useful data is in the "data" key if available.
                     organ_data[organ_uuid] = organ
-                    setOfDonorId.add(organ_data["donorId"])
+                    setOfDonorId.add(organ["donorId"])
                     print(f"Successfully fetched organ data for {organ_uuid}: {organ_result}")
                 else:
                     error_msg = organ_result.get('message', 'Unknown error')
@@ -237,8 +237,10 @@ def process_message(message_dict):
                 )
         # Compare Tissue Test from donor & recipient to get hlaScore
         try:
-            for donor in setOfDonorId:
-                compatibility_uuid = recipient_uuid + "-match-" + donor
+            # print(setOfDonorId)
+            for donor_id in setOfDonorId:
+                # print(f"Processing donor ID: {donor_id}")
+                compatibility_uuid = recipient_uuid + "-match-" + donor_id
                 try:
                     report_url = "https://beonbrand.getbynder.com/m/b351439ebceb7d39/original/Laboratory-Tests-for-Organ-Transplant-Rejection.pdf"
                     current_date = time.strftime("%Y-%m-%d")
@@ -246,13 +248,22 @@ def process_message(message_dict):
                     # For GET requests, a JSON body is typically not required.
                     recipient_tissue_test = invoke_http(f"{LAB_INFO_URL}/{recipient_uuid}", "GET")
                     donor_tissue_test = invoke_http(f"{LAB_INFO_URL}/{donor_id}", "GET")
+                    # print(f"Recipient tissue test for {recipient_uuid}:", recipient_tissue_test)
+                    # print(f"Donor tissue test for {donor_id}:", donor_tissue_test)
+                    
+                    recipient_tissue_data = recipient_tissue_test["data"]
+                    donor_tissue_data = donor_tissue_test["data"]
                     
                     # Retrieve response codes (if needed)
                     recipient_code = recipient_tissue_test["code"]
                     donor_code = donor_tissue_test["code"]
 
+                    # print("hlaTyping_D: ", donor_tissue_data["hlaTyping"])
+                    # print("hlaTyping_R: ", recipient_tissue_data["hlaTyping"])
+
                     # Compute the HLA matching score.
-                    hlaScore = hla_match_score(donor_tissue_test["hlaTyping"], recipient_tissue_test["hlaTyping"])
+                    hlaScore = hla_match_score(donor_tissue_data["hlaTyping"], recipient_tissue_data["hlaTyping"])
+                    # print(f"HLA matching score for donor {donor_id}: {hlaScore}")
                     if hlaScore < HLA_THRESHOLD and random.choice([0, 1]) == 1:
                         hlaScore = HLA_THRESHOLD
 
@@ -270,12 +281,17 @@ def process_message(message_dict):
                         },
                         "comments": "To be reviewed."
                     }
-                    
+
+                    store_compatibility = invoke_http(LAB_INFO_URL, "POST", json=new_lab_info)
+                    # print(store_compatibility)
+                    if store_compatibility["code"] not in range(200,300):
+                        raise Exception("Failed to Store Compatibility Tests")
+
                 except Exception as e:
-                    raise Exception("Failed to invoke HTTP request: ") from e
+                    raise Exception("Failed to invoke HTTP request:") from e
                 
         except Exception as e:
-            raise Exception("Failed to iterate through setOfDonorIds") from e
+            raise Exception(e)
 
 
         matches = []
@@ -286,6 +302,7 @@ def process_message(message_dict):
                 uuid = recipient_uuid + "-match-" + donor_id
                 try:
                     compatibility_test = invoke_http(f"{LAB_INFO_URL}/{uuid}", "GET")
+                    compatibility_data = compatibility_test["data"]
                     code = compatibility_test["code"]
 
                     if code not in range(200, 300):
@@ -300,7 +317,7 @@ def process_message(message_dict):
                             properties=pika.BasicProperties(delivery_mode=2)
                         )
 
-                    hlaTyping = compatibility_test["hlaTyping"]
+                    hlaTyping = compatibility_data["hlaTyping"]
                     score = hlaTyping["numOfHLA"]
                 except Exception as e:
                     raise Exception("Failed to get compatibility test") from e
@@ -394,15 +411,15 @@ def process_message(message_dict):
 def post_matches_to_match_service(matches):
     """POST valid matches to Match Atomic Service."""
     try:
-        payload = {"matches": matches}
-        response = invoke_http(MATCH_URL, method="POST", json=payload)
-        message = json.dumps(response)
-        code = response["code"]
-        if code in range(200, 300):
-            print("Matches posted successfully.")
-        else:
-            print(f"Failed to post matches. Error: {response["message"]}")
-            raise Exception("Failed to store matches in Match DB")
+        for match in matches:
+            response = invoke_http(MATCH_URL, method="POST", json=match)
+            message = json.dumps(response)
+            code = response["code"]
+            if code in range(200, 300):
+                print("Matches posted successfully.")
+            else:
+                print(f"Failed to post matches. Error: {response["message"]}")
+                raise Exception("Failed to store matches in Match DB")
     except Exception as e:
         raise
 

@@ -68,7 +68,7 @@ class LabInfo:
             test_type=data["testType"],
             date_of_report=data["dateOfReport"],
             report=data["report"],
-            hlaTyping=data["hlaTyping"],
+            hla_typing=data["hlaTyping"],
             comments=data["comments"],
             
         )

@@ -280,8 +280,9 @@ def process_match_result(match_test_result_dict):
     try:
         print("Invoking match atomic service...")
         match_result = invoke_http(MATCH_URL, method="GET", json=match_test_result_dict)
+        match_data = match_result["data"]
         message = json.dumps(match_result)
-        code = match_result.get("code", 500)
+        code = match_result["code"]
 
         if code not in range(200, 300):
             print("Publish message with routing_key=match_test_result.error")
@@ -297,12 +298,10 @@ def process_match_result(match_test_result_dict):
                 "message": "Error handling matches."
             }), 500
 
-        match_data = match_result.get("data", [])
-        match_ids = match_test_result_dict.get("listOfMatchId", [])
-        match_test_result_list = [match for match in match_data if match.get("matchId") in match_ids]
-        print(f"match_details: {match_test_result_list}")
+        list_of_match_ids = match_test_result_dict["listOfMatchId"]
+        print(f"Shortlisted Matches: {list_of_match_ids}")
 
-        message = json.dumps(match_test_result_list)
+        message = json.dumps(match_test_result_dict)
         print("Publish message with routing_key=match_result.info")
         channel.basic_publish(
             exchange="activity_log_exchange",

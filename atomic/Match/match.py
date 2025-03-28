@@ -22,7 +22,7 @@ print("Firestore initialized successfully for Matches!")
 
 class Match:
     def __init__(self, match_id, recipient_id, donor_id, organ_id ,test_date_time, 
-                 hla_1, hla_2, hla_3, hla_4, hla_5, hla_6, numofHLA):
+                 hla_1, hla_2, hla_3, hla_4, hla_5, hla_6, num_of_HLA):
         self.match_id = match_id
         self.recipient_id = recipient_id
         self.donor_id = donor_id
@@ -34,7 +34,7 @@ class Match:
         self.hla_4 = hla_4
         self.hla_5 = hla_5
         self.hla_6 = hla_6
-        self.num_of_hla = numofHLA
+        self.num_of_hla = num_of_HLA
 
     def to_dict(self):
         """Convert the object to a Firestore-compatible dictionary."""
@@ -68,7 +68,7 @@ class Match:
         hla_4=data["hla4"],
         hla_5=data["hla5"],
         hla_6=data["hla6"],
-        num_ofHLA=data["numOfHLA"] 
+        num_of_HLA=data["numOfHLA"] 
         )
 
 @app.route("/matches", methods=['GET'])
@@ -82,15 +82,15 @@ def get_all():
 
         for doc in docs:
             match_data = doc.to_dict()
-            match_data["donorID"] = doc.id  # Add document ID
+            match_data["matchId"] = doc.id  # Add document ID
             matches[doc.id] = match_data
-        return jsonify({"code":200, "data": matches}), 200
+        return jsonify({"code":200, "data": matches, "message": "Successfully got all matches"}), 200
     except Exception as e:
         return jsonify({"code":500, "message": str(e)}), 500
 
 
 @app.route("/matches/<string:matchId>")
-def get_donor(matchId):
+def get_match(matchId):
     try:
         match_ref = db.collection("matches").document(matchId)
         doc = match_ref.get()
@@ -105,7 +105,7 @@ def get_donor(matchId):
 
 
 @app.route("/match/<string:matchId>", methods=['PUT'])
-def update_donor(matchId):
+def update_match(matchId):
     try:
         match_ref = db.collection("matches").document(matchId)
         doc = match_ref.get()
@@ -143,7 +143,7 @@ def update_donor(matchId):
         ), 500
     
 @app.route("/matches", methods=['POST'])
-def create_donor():
+def create_match():
     try:
         # Get the JSON payload from the request
         match_data = request.get_json()
@@ -158,7 +158,7 @@ def create_donor():
             }), 400
 
         # Reference to the donor document in Firestore
-        match_ref = db.collection("donors").document(match_id)
+        match_ref = db.collection("matches").document(match_id)
         if match_ref.get().exists:
             return jsonify({
                 "code": 409,
@@ -179,7 +179,7 @@ def create_donor():
         hla_4=match_data["hla4"],
         hla_5=match_data["hla5"],
         hla_6=match_data["hla6"],
-        num_ofHLA=match_data["numOfHLA"] 
+        num_of_HLA=match_data["numOfHLA"] 
         )
 
         # Save the new donor to Firestore
