@@ -452,8 +452,9 @@ services:
       - rabbit_host=rabbitmq # The name of the RabbitMQ container defined in the RabbitMQ compose file
       - rabbit_port=5672
       - LAB_INFO_URL=http://labInfo:5007/lab-reports
-      - MATCH_SERVICE_URL=http://match:5008/matches
+      - MATCH_URL=http://match:5008/matches
       - RECIPIENT_URL=http://recipient:5013/recipient
+      - ORGAN_URL=http://recipient:5010/organ
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/usr/src/app
 

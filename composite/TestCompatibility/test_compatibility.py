@@ -2,85 +2,87 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 import pika
 import json
-import requests
-import os
-import ast
-import threading
-import time
+import random
 from datetime import datetime
-import sys
-from common import amqp_lib  # Assumes your reusable AMQP functions are here
+import os
+import threading
 from common.invokes import invoke_http
-
+import ast
+import time
 
 app = Flask(__name__)
 CORS(app)
 
-"""
-for testing:
-routing_key = test.compatibility
-amqp message:
-{"recipientId": "5RWWwCxq2M2eoXX91Z5BBsONTLs=", 
-"listOfOrganId": ["27e4f60b-cornea", "27e4f60b-lungs", "6b94627a-lungs", "8e32a037-cornea", "8e32a037-liver"]
-}
-
-{
-  "recipientId": "015051e7-0c87-4c13-9bb0-dd5e7584aabc",
-  "listOfOrganId": [
-    "1fdd282d-5eb7-42a8-b672-3dbb44557a29"
-  ]
-}
-"""
-
 # RabbitMQ Connection Details
-rabbit_host = os.getenv("rabbit_host", "localhost")
-rabbit_port = os.getenv("rabbit_port", "5672")
+rabbit_host = os.environ.get("rabbit_host", "localhost") or "localhost"
+rabbit_port = os.environ.get("rabbit_port", "5672")
 
 # RabbitMQ Exchange & Routing Keys
 TEST_COMPATIBILITY_EXCHANGE = "test_compatibility_exchange"
 TEST_COMPATIBILITY_QUEUE = "test_compatibility_queue"
 TEST_RESULT_EXCHANGE = "test_result_exchange"
-TEST_COMPATIBILITY_ROUTING_KEY = "test.compatibility"
 MATCH_TEST_RESULT_ROUTING_KEY = "test.result"
+ORGAN_URL = os.environ.get("ORGAN_URL") or "http://localhost:5009/organ"
+MATCH_URL = os.environ.get("MATCH_URL") or "http://localhost:5008/matches"
 
-# Lab Info & Match Atomic Service URLs
-RECIPIENT_URL = os.environ.get("RECIPIENT_URL") or "http://localhost:5013/recipient"
-LAB_INFO_URL = os.getenv("LAB_INFO_URL", "http://localhost:5007/lab-reports")
-MATCH_SERVICE_URL = os.getenv("MATCH_SERVICE_URL", "http://localhost:5008/matches")
-
-# Global connection and channel variables for reuse
 @app.route("/", methods=['GET'])
 def health_check():
     return jsonify({"code": 200, "status": "ok"}), 200
 
+# Global channel for publishing messages (set when the channel opens)
 channel = None
 
+MAX_RETRIES = 3  # Maximum number of retry attempts
+
 def handle_message(ch, method, properties, body):
-    """Callback function to process incoming messages."""
     try:
-        print("Raw message body:", body)
         message_dict = ast.literal_eval(body.decode())
         print(f"Received message from {method.routing_key}: {message_dict}")
         
-        # Simulate processing
         if method.routing_key == "test.compatibility":
             print("Processing compatibility request...")
             response = process_message(message_dict)
             print("Publishing match results...")
-            channel.basic_publish(
-                exchange=TEST_RESULT_EXCHANGE,
-                routing_key=MATCH_TEST_RESULT_ROUTING_KEY,
-                body=json.dumps(response),
-                properties=pika.BasicProperties(delivery_mode=2)  # Make message persistent
-            )
             print(f"Match results sent: {response}")
         else:
             print("Unknown routing key.")
+        
+        # Acknowledge the message after successful processing.
         ch.basic_ack(delivery_tag=method.delivery_tag)
+    
     except Exception as e:
         print(f"Error while handling message: {e}")
-        ch.basic_nack(delivery_tag=method.delivery_tag)
+        
+        # Retrieve current retry count from headers, defaulting to 0 if not present.
+        retry_count = 0
+        if properties.headers and 'x-retry-count' in properties.headers:
+            retry_count = properties.headers['x-retry-count']
+        print(f"Current retry count: {retry_count}")
 
+        if retry_count < MAX_RETRIES:
+            # Increase the retry count.
+            new_retry_count = retry_count + 1
+
+            # Create new properties with the updated retry count.
+            new_properties = pika.BasicProperties(
+                headers={"x-retry-count": new_retry_count},
+                delivery_mode=properties.delivery_mode  # Preserve persistence if set.
+            )
+
+            # Republish the message with the updated headers.
+            print(f"Republishing message, retry attempt {new_retry_count}")
+            ch.basic_publish(
+                exchange=method.exchange,
+                routing_key=method.routing_key,
+                body=body,
+                properties=new_properties
+            )
+            # Acknowledge the current message so it is removed from the queue.
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+        else:
+            print("Max retries reached. Discarding message or sending to dead-letter queue.")
+            # Here you could also publish the message to a dead-letter queue instead.
+            ch.basic_ack(delivery_tag=method.delivery_tag)
 
 def on_channel_open(ch):
     """Callback when the channel has been opened; set up consumers for all queues."""
@@ -92,7 +94,7 @@ def on_channel_open(ch):
         queue=TEST_COMPATIBILITY_QUEUE,
         on_message_callback=handle_message,
         auto_ack=False
-        )
+    )
     print("Consumers are set up. Waiting for messages...")
 
 def on_connection_open(conn):
@@ -135,118 +137,182 @@ def ensure_exchange_exists(channel, exchange, exchange_type):
     # Declare the exchange (it will only create it if it does not already exist)
     channel.exchange_declare(exchange=exchange, exchange_type=exchange_type, durable=True)
 
-def fetch_lab_info(uuid):
-    """Fetch a lab report from Lab Info Atomic using UUID."""
-    try:
-        response = requests.get(f"{LAB_INFO_URL}/{uuid}")
-        if response.status_code == 200:
-            lab_data = response.json().get("data", {})
-            results = lab_data.get("results", {})
-            lab_data.update(results)
-            return lab_data
-        elif response.status_code == 404:
-            print(f"Lab report for UUID {uuid} not found.")
-            return None
-        else:
-            print(f"Unexpected response from Lab Info Service: {response.status_code}")
-            return None
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching lab report: {str(e)}")
-        return None
 
-def fetch_recipient_lab_report(recipient_uuid):
-    """Fetch recipient's lab report from Lab Info Atomic using UUID."""
-    return fetch_lab_info(recipient_uuid)
+def process_message(message_dict):
+    """Process the matching request message as described earlier."""
+    try:
+        # Extract basic information.
+        recipient_uuid = message_dict["recipientId"]
+        organ_uuids = message_dict["listOfOrganId"]
+        print(f"Received message for recipientId: {recipient_uuid}, organIds: {organ_uuids}")
+
+        organ_data = {}
+        # Fetch organ data for each organ UUID.
+        for organ_uuid in organ_uuids:
+            try:
+                print(f"Fetching organ data for organId: {organ_uuid}...")
+                organ_url = f"{ORGAN_URL}/{organ_uuid}"
+                organ_result = invoke_http(organ_url, method="GET", json=message_dict)
+                message = json.dumps(organ_result)
+                code = organ_result["code"] 
+
+                if code in range(200, 300):
+                    # Assume the useful data is in the "data" key if available.
+                    organ_data[organ_uuid] = organ_result["data"]
+                    print(f"Successfully fetched organ data for {organ_uuid}: {organ_result}")
+                else:
+                    error_msg = organ_result.get('message', 'Unknown error')
+                    print(f"Failed to fetch organ data for organId: {organ_uuid}. Error: {error_msg}")
+                    channel.basic_publish(
+                        exchange="error_handling_exchange",
+                        routing_key="test_compatibility.error",
+                        body=json.dumps({
+                            "organId": organ_uuid,
+                            "message": error_msg
+                        }),
+                        properties=pika.BasicProperties(delivery_mode=2)
+                    )
+            except Exception as ex:
+                print(f"Exception fetching organ {organ_uuid}: {str(ex)}")
+                channel.basic_publish(
+                    exchange="error_handling_exchange",
+                    routing_key="test_compatibility.error",
+                    body=json.dumps({
+                        "organId": organ_uuid,
+                        "message": str(ex)
+                    }),
+                    properties=pika.BasicProperties(delivery_mode=2)
+                )
+
+        # Generate randomized HLA matches.
+        matches = []
+        HLA_THRESHOLD = 4
+        for organ_uuid, organ_info in organ_data.items():
+            try:
+                donor_id = organ_info["donorId"]
+                print(f"Creating match for organId: {organ_uuid} with donorId: {donor_id}")
+
+                # Generate randomized HLA match results.
+                hla_matches = {f"hla-{i+1}": random.choice([True, False]) for i in range(6)}
+                num_of_hla = sum(1 for match in hla_matches.values() if match)
+
+                if num_of_hla >= HLA_THRESHOLD:
+                    match_id = f"{recipient_uuid}-{organ_uuid}"
+                    match_record = {
+                        "matchId": match_id,
+                        "recipientId": recipient_uuid,
+                        "donorId": donor_id,
+                        "organId": organ_uuid,
+                        **hla_matches,
+                        "numOfHLA": num_of_hla,
+                        "testDateTime": datetime.now().isoformat()
+                    }
+                    matches.append(match_record)
+                    print(f"Generated valid match: {match_record}")
+                else:
+                    print(f"OrganId {organ_uuid} did not meet HLA threshold: {num_of_hla}/6")
+            except Exception as ex:
+                print(f"Error processing match for organId {organ_uuid}: {str(ex)}")
+                channel.basic_publish(
+                    exchange="error_handling_exchange",
+                    routing_key="test_compatibility.error",
+                    body=json.dumps({
+                        "organId": organ_uuid,
+                        "message": str(ex)
+                    }),
+                    properties=pika.BasicProperties(delivery_mode=2)
+                )
+
+        # Post valid matches to Match Atomic Service.
+        if matches:
+            try:
+                post_matches_to_match_service(matches)
+            except Exception as post_ex:
+                print(f"Error posting matches: {str(post_ex)}")
+                channel.basic_publish(
+                    exchange="error_handling_exchange",
+                    routing_key="test_compatibility.error",
+                    body=json.dumps({
+                        "message": str(post_ex),
+                        "matches": matches
+                    }),
+                    properties=pika.BasicProperties(delivery_mode=2)
+                )
+        else:
+            print("No valid HLA matches to post.")
+
+        # Send match results to matchOrgan composite via AMQP.
+        match_ids = [match["matchId"] for match in matches]
+        try:
+            if match_ids:
+                print(f"Sending match results via AMQP: {match_ids}")
+                send_results_to_match_organ(match_ids)
+            else:
+                print("No matches found. Sending empty list to matchOrgan.")
+                send_results_to_match_organ([])
+        except Exception as e:
+            print(f"Publishing error via AMQP: {str(e)}")
+            channel.basic_publish(
+                exchange="error_handling_exchange",
+                routing_key="test_compatibility.error",
+                body=json.dumps({
+                    "message": str(e),
+                    "data": match_ids
+                }),
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+
+        return {"listOfMatchId": match_ids}
+
+    except Exception as e:
+        print("Error in process_message:", str(e))
+        error_payload = json.dumps({
+            "message": str(e),
+            "data": message_dict
+        })
+        try:
+            channel.basic_publish(
+                exchange="error_handling_exchange",
+                routing_key="test_compatibility.error",
+                body=error_payload,
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+        except Exception as publish_exception:
+            print("Failed to publish error message:", str(publish_exception))
 
 def post_matches_to_match_service(matches):
     """POST valid matches to Match Atomic Service."""
-    payload = {"matches": matches}
     try:
-        response = requests.post(MATCH_SERVICE_URL, json=payload)
-        if response.status_code == 201:
-            print(f"Matches posted successfully: {json.dumps(payload)}")
+        payload = {"matches": matches}
+        response = invoke_http(MATCH_URL, method="POST", json=payload)
+        message = json.dumps(response)
+        code = response["code"]
+        if code in range(200, 300):
+            print("Matches posted successfully.")
         else:
-            print(f"Failed to post matches. Response: {response.text}")
-    except requests.exceptions.RequestException as e:
-        print(f"Error posting matches: {str(e)}")
-    sys.stdout.flush()
+            print(f"Failed to post matches. Error: {response["message"]}")
+            raise Exception("Failed to store matches in Match DB")
+    except Exception as e:
+        raise
 
-def process_message(message_dict):
-    """
-    Process an HLA matching request message.
-    If the connection is closed, we reconnect (this check is optional).
-    """
-    global connection
+def send_results_to_match_organ(match_ids):
+    """Send results back to matchOrgan composite via AMQP (test.result)."""
+    try:
+        amqp_message = {"listOfMatchId": match_ids}
+        channel.basic_publish(
+            exchange=TEST_RESULT_EXCHANGE,
+            routing_key=MATCH_TEST_RESULT_ROUTING_KEY,
+            body=json.dumps(amqp_message),
+            properties=pika.BasicProperties(delivery_mode=2)  # Make message persistent
+        )
+        print(f"AMQP message sent: {json.dumps(amqp_message)}")
+    except Exception as e:
+        print(f"Failed to send AMQP message: {str(e)}")
 
-    recipient_uuid = message_dict["recipientId"] # "recipientId" : string
-    organ_uuids = message_dict["listOfOrganId"]  # "listOfOrganId": [String organId#1, organId#2 ...] 
-    # check if the recipient exists first
-    recipient_URL = RECIPIENT_URL + "/" + recipient_uuid
-    print("Invoking recipient atomic service...")
-    recipient_result = invoke_http(recipient_URL, method="GET", json=message_dict)
-    message = json.dumps(recipient_result)
-    code = recipient_result["code"]
-
-    if code not in range(200, 300):
-            return jsonify({
-                "code": code,
-                "data": {"recipientId": recipient_uuid},
-                "message": recipient_result["message"]
-            }), code 
-    if len(organ_uuids) == 0:
-        print("No organs specified in request.")
-        return {"listOfMatchId": []}
-
-    recipient_data = fetch_recipient_lab_report(recipient_uuid)
-    if not recipient_data:
-        return {"listOfMatchId": []}
-
-    recipient_hla = recipient_data.get("hlaScore", 0)
-    matches = []
-    HLA_THRESHOLD = 4
-
-    for organ_uuid in organ_uuids:
-        donor_data = fetch_lab_info(organ_uuid)
-        if not donor_data:
-            continue
-
-        donor_hla = donor_data.get("hlaScore", 0)
-        if donor_hla < HLA_THRESHOLD:
-            print(f"HLA mismatch: donor HLA {donor_hla} is below threshold {HLA_THRESHOLD}")
-            continue
-
-        match_id = f"{organ_uuid}-{recipient_uuid}"
-        match_record = {
-            "OrganId": donor_data.get("uuid"),
-            "Test_DateTime": datetime.now().isoformat(),
-            "donorId": donor_data.get("uuid"),
-            "donor_details": {
-                "blood_type": donor_data.get("blood_type", "B+"),
-                "first_name": donor_data.get("first_name", "Chartreuse"),
-                "gender": donor_data.get("gender", "Male"),
-                "last_name": donor_data.get("last_name", "Lavender")
-            },
-            "matchId": match_id,
-            "numOfHLA": donor_hla,
-            "recipientId": recipient_uuid,
-            "recipient_details": {
-                "blood_type": recipient_data.get("blood_type", "AB+"),
-                "first_name": recipient_data.get("first_name", "Nicholas"),
-                "gender": recipient_data.get("gender", "Female"),
-                "last_name": recipient_data.get("last_name", "Lam")
-            }
-        }
-        matches.append(match_record)
-
-    if matches:
-        post_matches_to_match_service(matches)
-
-    matched_ids = [m["matchId"] for m in matches]
-    return {"listOfMatchId": matched_ids}
-
+# Run the Flask app
 if __name__ == "__main__":
     print(f"This is {os.path.basename(__file__)} - Test Compatibility Service")
-    # Start the RabbitMQ listener in a daemon thread so it doesn't block the main thread.
+
     consumer_thread = threading.Thread(target=run_async_consumer, daemon=True)
     consumer_thread.start()
 

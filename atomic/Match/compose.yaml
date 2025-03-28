@@ -3,7 +3,7 @@ services:
   match-service:
     build:
       context: .
-      dockerfile: Dockerfile.match # Specify the custom Dockerfile
+      dockerfile: Dockerfile.match 
     volumes:
       - ./secrets:/app/secrets
     environment:
