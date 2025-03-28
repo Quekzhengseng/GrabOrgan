@@ -432,7 +432,6 @@ services:
       - donor
       - match
       - organ
-      - notification
 
     container_name: match_organ_service
     networks:
@@ -454,7 +453,7 @@ services:
       - LAB_INFO_URL=http://labInfo:5007/lab-reports
       - MATCH_URL=http://match:5008/matches
       - RECIPIENT_URL=http://recipient:5013/recipient
-      - ORGAN_URL=http://recipient:5010/organ
+      - ORGAN_URL=http://organ:5010/organ
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/usr/src/app
 

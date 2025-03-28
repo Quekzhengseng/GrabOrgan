@@ -22,7 +22,7 @@ TEST_COMPATIBILITY_EXCHANGE = "test_compatibility_exchange"
 TEST_COMPATIBILITY_QUEUE = "test_compatibility_queue"
 TEST_RESULT_EXCHANGE = "test_result_exchange"
 MATCH_TEST_RESULT_ROUTING_KEY = "test.result"
-ORGAN_URL = os.environ.get("ORGAN_URL") or "http://localhost:5009/organ"
+ORGAN_URL = os.environ.get("ORGAN_URL") or "http://localhost:5010/organ"
 MATCH_URL = os.environ.get("MATCH_URL") or "http://localhost:5008/matches"
 
 @app.route("/", methods=['GET'])
@@ -34,12 +34,19 @@ channel = None
 
 MAX_RETRIES = 3  # Maximum number of retry attempts
 
+"""
+{
+"recipientId": "7417a1c7-572a-4782-85b4-28cab93e86c9",
+"listOfMatchIds": ["015051e7-heart"]
+}
+"""
+
 def handle_message(ch, method, properties, body):
     try:
         message_dict = ast.literal_eval(body.decode())
         print(f"Received message from {method.routing_key}: {message_dict}")
         
-        if method.routing_key == "test.compatibility":
+        if method.routing_key == "test.compatibility":	
             print("Processing compatibility request...")
             response = process_message(message_dict)
             print("Publishing match results...")
@@ -144,7 +151,7 @@ def process_message(message_dict):
         # Extract basic information.
         recipient_uuid = message_dict["recipientId"]
         organ_uuids = message_dict["listOfOrganId"]
-        print(f"Received message for recipientId: {recipient_uuid}, organIds: {organ_uuids}")
+        print(f"Received message for recipientId: {recipient_uuid}, listOfOrganId: {organ_uuids}")
 
         organ_data = {}
         # Fetch organ data for each organ UUID.
