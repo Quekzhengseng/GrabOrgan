@@ -28,13 +28,16 @@ db = firestore.client()
 
 
 class Donor:
-    def __init__(self, donor_id, first_name, last_name, age ,date_of_birth, datetime_of_death,
+    def __init__(self, donor_id, first_name, last_name ,date_of_birth, age, nric, email, address, datetime_of_death,
                  gender, blood_type, organs, medical_history, allergies, nok_contact):
         self.donor_id = donor_id
         self.first_name = first_name
         self.last_name = last_name
-        self.age = age
         self.date_of_birth = date_of_birth
+        self.age = age
+        self.nric = nric
+        self.email = email
+        self.address = address
         self.datetime_of_death = datetime_of_death
         self.gender = gender
         self.blood_type = blood_type
@@ -48,8 +51,11 @@ class Donor:
         return {
             "firstName": self.first_name,
             "lastName": self.last_name,
-            "age": self.age,
             "dateOfBirth": self.date_of_birth,
+            "age": self.age,
+            "nric": self.nric,
+            "email": self.email,
+            "address": self.address,
             "datetimeOfDeath": self.datetime_of_death,
             "gender": self.gender,
             "bloodType": self.blood_type,
@@ -66,8 +72,11 @@ class Donor:
             donor_id=donor_id,
             first_name=data["firstName"],
             last_name=data["lastName"],
-            age=data["age"],
             date_of_birth=data["dateOfBirth"],
+            age=data["age"],
+            nric=data["nric"],
+            email=data["email"],
+            address=data["address"],
             datetime_of_death=data["datetimeOfDeath"],
             gender=data["gender"],
             blood_type=data["bloodType"],
@@ -177,8 +186,11 @@ def create_donor():
             donor_id=donor_id,
             first_name=donor_data["firstName"],
             last_name=donor_data["lastName"],
-            age=donor_data["age"],
             date_of_birth=donor_data["dateOfBirth"],
+            age=donor_data["age"],
+            nric=donor_data["nric"],
+            email=donor_data["email"],
+            address=donor_data["address"],
             datetime_of_death=donor_data.get("datetimeOfDeath"),  # Optional field
             gender=donor_data["gender"],
             blood_type=donor_data["bloodType"],

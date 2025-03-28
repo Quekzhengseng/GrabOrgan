@@ -232,4 +232,11 @@ for donor in donors:
         print(f"Error posting personal data for donor {donor.donor_id}: {personal_resp.text}")
     else:
         print(f"Personal data posted successfully for donor {donor.donor_id}")
+        
+    # Post the personal data to the personalData endpoint.
+    os_personal_resp = requests.post(OUTSYSTEMS_PERSONAL_DATA_URL, json=personal_data)
+    if os_personal_resp.status_code != 201:
+        print(f"Error posting personal data for donor {donor.donor_id}: {os_personal_resp.text}")
+    else:
+        print(f"Personal data posted successfully for donor {donor.donor_id}")
 
