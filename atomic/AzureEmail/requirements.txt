@@ -1,0 +1,9 @@
+Flask==3.1.0
+Flask-Cors==5.0.0
+azure-common==1.1.28
+azure-core==1.32.0
+azure-mgmt-core==1.5.0
+azure-mgmt-containerservice
+azure-mgmt-communication
+azure-communication-email=1.0.0
+azure-identity
