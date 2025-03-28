@@ -33,6 +33,7 @@ RECIPIENT_URL = os.environ.get("RECIPIENT_URL") or "http://localhost:5013/recipi
 DONOR_URL = os.environ.get("DONOR_URL") or "http://localhost:5003/donor"
 ORGAN_URL = os.environ.get("ORGAN_URL") or "http://localhost:5010/organ"
 MATCH_URL = os.environ.get("MATCH_URL") or "http://localhost:5008/matches"
+ORDER_URL = os.environ.get("ORDER_URL") or "http://localhost:5009/order"
 
 # RabbitMQ connection parameters
 rabbit_host = os.environ.get("rabbit_host", "localhost")
@@ -57,25 +58,59 @@ def health_check():
 # Global channel for publishing messages (set when the channel opens)
 channel = None
 
+MAX_RETRIES = 3  # Maximum number of retry attempts
+
 def handle_message(ch, method, properties, body):
-    """Callback function to process incoming messages."""
     try:
         message_dict = ast.literal_eval(body.decode())
         print(f"Received message from {method.routing_key}: {message_dict}")
+        
+        # Process the message based on the routing key.
+        if method.routing_key == "match.request":
+            print("Processing match request...")
+            process_match_request(message_dict)
+        elif method.routing_key == "test.result":
+            print("Processing test result...")
+            process_match_result(message_dict)
+        else:
+            print("Unknown routing key.")
+        
+        # Acknowledge the message after successful processing.
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+    
     except Exception as e:
-        print(f"Failed to parse message: {e}")
-        ch.basic_nack(delivery_tag=method.delivery_tag)
-        return
+        print(f"Error while handling message: {e}")
+        
+        # Retrieve current retry count from headers, defaulting to 0 if not present.
+        retry_count = 0
+        if properties.headers and 'x-retry-count' in properties.headers:
+            retry_count = properties.headers['x-retry-count']
+        print(f"Current retry count: {retry_count}")
 
-    if method.routing_key == "match.request":
-        print("Processing match request...")
-        process_match_request(message_dict)
-    elif method.routing_key == "test.result":
-        print("Processing test result...")
-        process_match_result(message_dict)
-    else:
-        print("Unknown routing key.")
-    ch.basic_ack(delivery_tag=method.delivery_tag)
+        if retry_count < MAX_RETRIES:
+            # Increase the retry count.
+            new_retry_count = retry_count + 1
+
+            # Create new properties with the updated retry count.
+            new_properties = pika.BasicProperties(
+                headers={"x-retry-count": new_retry_count},
+                delivery_mode=properties.delivery_mode  # Preserve persistence if set.
+            )
+
+            # Republish the message with the updated headers.
+            print(f"Republishing message, retry attempt {new_retry_count}")
+            ch.basic_publish(
+                exchange=method.exchange,
+                routing_key=method.routing_key,
+                body=body,
+                properties=new_properties
+            )
+            # Acknowledge the current message so it is removed from the queue.
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+        else:
+            print("Max retries reached. Discarding message or sending to dead-letter queue.")
+            # Here you could also publish the message to a dead-letter queue instead.
+            ch.basic_ack(delivery_tag=method.delivery_tag)
 
 def on_channel_open(ch):
     """Callback when the channel has been opened; set up consumers for all queues."""
@@ -87,7 +122,7 @@ def on_channel_open(ch):
         ch.basic_consume(
             queue=queue["name"],
             on_message_callback=handle_message,
-            auto_ack=True
+            auto_ack=False
         )
     print("Consumers are set up. Waiting for messages...")
 
@@ -146,107 +181,153 @@ def is_compatible(recipient_bloodType, donor_bloodType):
     return donor_bloodType in blood_transfusion_rules[recipient_bloodType]
 
 def process_match_request(match_request_dict):
-    recipient_id = match_request_dict["recipientId"]
-    recipient_URL = RECIPIENT_URL + "/" + recipient_id
-    print("Invoking recipient atomic service...")
-    recipient_result = invoke_http(recipient_URL, method="GET", json=match_request_dict)
-    message = json.dumps(recipient_result)
-    code = recipient_result["code"]
+    try:
+        recipient_id = match_request_dict["recipientId"]
+        recipient_URL = RECIPIENT_URL + "/" + recipient_id
+        print("Invoking recipient atomic service...")
+        recipient_result = invoke_http(recipient_URL, method="GET", json=match_request_dict)
+        message = json.dumps(recipient_result)
+        code = recipient_result["code"]
 
-    if code not in range(200, 300):
-        print("Publish message with routing_key=match_request.error")
-        channel.basic_publish(
-            exchange="error_handling_exchange",
-            routing_key="match_request.error",
-            body=message,
-            properties=pika.BasicProperties(delivery_mode=2),
-        )
-        return jsonify({"code": 500, "data": {"recipient_result": recipient_result}, "message": "Error handling recipient."}), 500
+        if code not in range(200, 300):
+            print("Publish message with routing_key=match_request.error")
+            channel.basic_publish(
+                exchange="error_handling_exchange",
+                routing_key="match_request.error",
+                body=message,
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+            return jsonify({
+                "code": 500, 
+                "data": {"recipient_result": recipient_result}, 
+                "message": "Error handling recipient."
+            }), 500
 
-    recipient_data = recipient_result["data"]
-    recipient_bloodType = recipient_data["bloodType"]
-    recipient_organsNeeded = recipient_data["organsNeeded"]
-    print(f"Recipient blood type: {recipient_bloodType}")
-    print(f"Recipient organs needed: {recipient_organsNeeded}")
+        recipient_data = recipient_result["data"]
+        recipient_bloodType = recipient_data["bloodType"]
+        recipient_organsNeeded = recipient_data["organsNeeded"]
+        print(f"Recipient blood type: {recipient_bloodType}")
+        print(f"Recipient organs needed: {recipient_organsNeeded}")
 
-    print("Invoking organ atomic service...")
-    organ_result = invoke_http(ORGAN_URL, method="GET", json=match_request_dict)
-    message = json.dumps(organ_result)
-    code = organ_result["code"]
+        print("Invoking organ atomic service...")
+        organ_result = invoke_http(ORGAN_URL, method="GET", json=match_request_dict)
+        message = json.dumps(organ_result)
+        code = organ_result["code"]
 
-    if code not in range(200, 300):
-        print("Publish message with routing_key=match_request.error")
-        channel.basic_publish(
-            exchange="error_handling_exchange",
-            routing_key="match_request.error",
-            body=message,
-            properties=pika.BasicProperties(delivery_mode=2),
-        )
-        return jsonify({"code": 500, "data": {"organ_result": organ_result}, "message": "Error handling organs."}), 500
+        if code not in range(200, 300):
+            print("Publish message with routing_key=match_request.error")
+            channel.basic_publish(
+                exchange="error_handling_exchange",
+                routing_key="match_request.error",
+                body=message,
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+            return jsonify({
+                "code": 500, 
+                "data": {"organ_result": organ_result}, 
+                "message": "Error handling organs."
+            }), 500
 
-    organ_data = organ_result["data"]
-    organList = [organ["organId"] for organ in organ_data
-                 if is_compatible(recipient_bloodType, organ["bloodType"]) and organ["organType"] in recipient_organsNeeded]
-    print(f"Compatible Donor Organs: {organList}")
+        organ_data = organ_result["data"]
+        organList = [organ["organId"] for organ in organ_data
+                     if is_compatible(recipient_bloodType, organ["bloodType"]) and organ["organType"] in recipient_organsNeeded]
+        print(f"Compatible Donor Organs: {organList}")
 
-    message = json.dumps({"recipientId": recipient_id, "listOfOrganId": organList})
+        message = json.dumps({"recipientId": recipient_id, "listOfOrganId": organList})
 
-    if not organList:
+        if not organList:
+            print("Publish message with routing_key=match_request.info")
+            channel.basic_publish(
+                exchange="activity_log_exchange",
+                routing_key="match_request.info",
+                body="No matches available",
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+            return jsonify({"code": 204, "message": "No compatible matches found."}), 204
+
         print("Publish message with routing_key=match_request.info")
         channel.basic_publish(
             exchange="activity_log_exchange",
             routing_key="match_request.info",
-            body="No matches available",
-            properties=pika.BasicProperties(delivery_mode=2),
+            body=message,
+            properties=pika.BasicProperties(delivery_mode=2)
         )
-        return jsonify({"code": 204, "message": "No compatible matches found."}), 204
-
-    print("Publish message with routing_key=match_request.info")
-    channel.basic_publish(
-        exchange="activity_log_exchange",
-        routing_key="match_request.info",
-        body=message,
-        properties=pika.BasicProperties(delivery_mode=2),
-    )
-    print("Publish message with routing_key=test.compatibility")
-    channel.basic_publish(
-        exchange="test_compatibility_exchange",
-        routing_key="test.compatibility",
-        body=message,
-        properties=pika.BasicProperties(delivery_mode=2),
-    )
+        print("Publish message with routing_key=test.compatibility")
+        channel.basic_publish(
+            exchange="test_compatibility_exchange",
+            routing_key="test.compatibility",
+            body=message,
+            properties=pika.BasicProperties(delivery_mode=2)
+        )
+    except Exception as e:
+        print("Error in process_match_request:", str(e))
+        error_payload = json.dumps({
+            "error": str(e),
+            "match_request": match_request_dict
+        })
+        try:
+            channel.basic_publish(
+                exchange="error_handling_exchange",
+                routing_key="match_request.exception",
+                body=error_payload,
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+        except Exception as publish_exception:
+            print("Failed to publish error message:", str(publish_exception))
+        return jsonify({"code": 500, "message": "Error processing match request."}), 500
 
 def process_match_result(match_test_result_dict):
-    print("Invoking match atomic service...")
-    match_result = invoke_http(MATCH_URL, method="GET", json=match_test_result_dict)
-    message = json.dumps(match_result)
-    code = match_result["code"]
+    try:
+        print("Invoking match atomic service...")
+        match_result = invoke_http(MATCH_URL, method="GET", json=match_test_result_dict)
+        match_data = match_result["data"]
+        message = json.dumps(match_result)
+        code = match_result["code"]
 
-    if code not in range(200, 300):
-        print("Publish message with routing_key=match_test_result.error")
+        if code not in range(200, 300):
+            print("Publish message with routing_key=match_test_result.error")
+            channel.basic_publish(
+                exchange="error_handling_exchange",
+                routing_key="match_test_result.error.error",
+                body=message,
+                properties=pika.BasicProperties(delivery_mode=2),
+            )
+            return jsonify({
+                "code": 500,
+                "data": {"matches_result": match_result},
+                "message": "Error handling matches."
+            }), 500
+
+        list_of_match_ids = match_test_result_dict["listOfMatchId"]
+        print(f"Shortlisted Matches: {list_of_match_ids}")
+
+        message = json.dumps(match_test_result_dict)
+        print("Publish message with routing_key=match_result.info")
         channel.basic_publish(
-            exchange="error_handling_exchange",
-            routing_key="match_test_result.error.error",
+            exchange="activity_log_exchange",
+            routing_key="match_result.info",
             body=message,
             properties=pika.BasicProperties(delivery_mode=2),
         )
-        return jsonify({"code": 500, "data": {"matches_result": match_result}, "message": "Error handling matches."}), 500
-
-    match_data = match_result["data"]
-    match_test_result_list = [match for match in match_data if match["matchId"] in match_test_result_dict["listOfMatchId"]]
-    print(f"match_details: {match_test_result_list}")
-
-    message = json.dumps(match_test_result_list)
-
-    print("Publish message with routing_key=match_result.info")
-    channel.basic_publish(
-        exchange="activity_log_exchange",
-        routing_key="match_result.info",
-        body=message,
-        properties=pika.BasicProperties(delivery_mode=2),
-    )
     # Need to somehow notify the frontend that the matches found are done, then allow user to confirm match
     # maybe it goes to a notification service?
+
+    except Exception as e:
+        print("Error in process_match_result:", str(e))
+        error_payload = json.dumps({
+            "error": str(e),
+            "match_test_result_dict": match_test_result_dict
+        })
+        try:
+            channel.basic_publish(
+                exchange="error_handling_exchange",
+                routing_key="match_result.exception",
+                body=error_payload,
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+        except Exception as publish_exception:
+            print("Failed to publish error message:", str(publish_exception))
+        return jsonify({"code": 500, "message": "Error processing match result."}), 500
 
 
 @app.route("/initiate-match/<string:recipientId>", methods=['POST'])
@@ -289,6 +370,65 @@ def initiate_match(recipientId):
 
 @app.route("/confirm-match/<string:matchId>", methods=['POST'])
 def confirm_match(matchId):
+    """
+    Store this in Order DB
+    orderId = recipientId + organId
+    OR
+    orderId = str(uuid.uuid4())
+    orderId = {
+	    "organType": "heart"
+        "doctorId" : "isaidchia@gmail.com"
+	    "transplantDateTime": "2025-03-25T24:08:00+08:00" # GMT+8 or UTC?
+	    "startHospital": "CGH",
+	    "endHospital": "TTSH",
+	    "matchId": "015051e7-0c87-4c13-9bb0-dd5e7584aabc-heart-12",
+	    "remarks": "description (if any)"
+
+
+    rabbitMQ Message
+    routing_key = order.new
+    message:
+    {
+    "orderId": "String uuid"
+    }
+    """
+    hospital_coords_dict = {
+        "CGH": {
+            "address": "2 Simei St 3, Singapore 529889",
+            "latitude": 1.3402380226275528,
+            "longitude": 103.9496741599837
+        },
+        "SGH": {
+            "address": "Outram Rd, Singapore 169608",
+            "latitude": 1.2805689453652151,
+            "longitude": 103.83504895409699
+        },
+        "TTSH": {
+            "address": "11 Jln Tan Tock Seng, Singapore 308433",
+            "latitude": 1.3214817166088648,
+            "longitude": 103.84583143700398
+        },
+        "SKGH": {
+            "address": "110 Sengkang E Wy, Singapore 544886",
+            "latitude": 1.3956165090489552, 
+            "longitude": 103.89350071151229
+        },
+        "NUH": {
+            "address": "5 Lower Kent Ridge Rd, Singapore 119074",
+            "latitude": 1.295203845567723, 
+            "longitude": 103.7828300893688
+        },
+        "KTPH": {
+            "address": "90 Yishun Central, Singapore 768828",
+            "latitude": 1.4245009834534053, 
+            "longitude": 103.83861215383979
+        },
+        "NTFGH": {
+            "address": "1 Jurong East Street 21, Singapore 609606",
+            "latitude": 1.333905687585315, 
+            "longitude": 103.74565971707347
+        }
+    }
 
     try:
         # Extract recipientId from the JSON payload
@@ -317,14 +457,14 @@ def confirm_match(matchId):
             # Return a response immediately
             return jsonify({
                 "code": 202,
-                "message": "Match initiation request accepted. You will be notified once the match is completed."
+                "message": "Match Confirmed. Scheduling Delivery Now."
             }), 202
 
     except Exception as e:
-        print("Error initiating match:", str(e))
+        print("Error confirming match:", str(e))
         return jsonify({
             "code": 500,
-            "message": "An error occurred while initiating the match: " + str(e)
+            "message": "An error occurred while confirmingg the match: " + str(e)
         }), 500
 
 

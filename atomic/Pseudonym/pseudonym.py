@@ -142,7 +142,7 @@ def pseudonymise_service():
         # Assume the JSON contains a single record keyed by an ID.
         record_id, record_data = list(data.items())[0]
 
-        id_field = 'personId'
+        id_field = 'uuid'
 
        # Process the data to pseudonymise/mask PII fields.
         masked_data = process_pii(record_data)
@@ -222,7 +222,7 @@ returns
             "phone": "54326789",
             "relationship": "Spouse"
         },
-        "personId": "donorid-1234"
+        "uuid": "donorid-1234"
     }
 }
 """

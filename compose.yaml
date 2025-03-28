@@ -423,6 +423,7 @@ services:
       - PSEUDONYM_URL=http://pseudonym:5012/pseudonymise
       - RECIPIENT_URL=http://recipient:5013/recipient
       - LAB_REPORT_URL=http://labInfo:5007/lab-reports
+      - OUTSYSTEMS_PERSONAL_DATA_URL=https://personal-gbst4bsa.outsystemscloud.com/PatientAPI/rest/patientAPI/patients/
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
       - RABBITMQ_EXCHANGE=request_organ_exchange
@@ -436,6 +437,8 @@ services:
       - pseudonym
       - recipient
       - labInfo
+      - activity_log
+      - error
     networks:
       - grabOrgan-net
     volumes:
@@ -454,6 +457,7 @@ services:
       - DONOR_URL=http://donor:5003/donor
       - ORGAN_URL=http://organ:5010/organ
       - MATCH_URL=http://match:5008/matches
+      - ORDER_URL=http://order:5009/order
       # - PYTHONPATH=/usr/src/app:/usr/src/app/common # Equivalent to export PYTHONPATH
       - PYTHONPATH=/usr/src/app
       - PYTHONUNBUFFERED=1
@@ -468,7 +472,6 @@ services:
       - donor
       - match
       - organ
-      - request_organ
 
     container_name: match_organ_service
     networks:
@@ -488,8 +491,9 @@ services:
       - rabbit_host=rabbitmq # The name of the RabbitMQ container defined in the RabbitMQ compose file
       - rabbit_port=5672
       - LAB_INFO_URL=http://labInfo:5007/lab-reports
-      - MATCH_SERVICE_URL=http://match:5008/matches
+      - MATCH_URL=http://match:5008/matches
       - RECIPIENT_URL=http://recipient:5013/recipient
+      - ORGAN_URL=http://organ:5010/organ
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/usr/src/app
 
@@ -499,7 +503,6 @@ services:
       - recipient
       - labInfo
       - match
-      - match_organ
 
     networks:
       - grabOrgan-net

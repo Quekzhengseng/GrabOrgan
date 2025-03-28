@@ -24,8 +24,8 @@ db = firestore.client()
 
 
 class Person:
-    def __init__(self, person_id, first_name, last_name, date_of_birth, nok_contact):
-        self.person_id = person_id
+    def __init__(self, uuid, first_name, last_name, date_of_birth, nok_contact):
+        self.uuid = uuid
         self.first_name = first_name
         self.last_name = last_name
         self.date_of_birth = date_of_birth
@@ -41,10 +41,10 @@ class Person:
         }
 
     @staticmethod
-    def from_dict(person_id, data):
+    def from_dict(uuid, data):
         """Create a Person object from Firestore document data."""
         return Person(
-            person_id=person_id,
+            uuid=uuid,
             first_name=data.get("firstName"),
             last_name=data.get("lastName"),
             date_of_birth=data.get("dateOfBirth"),
@@ -62,20 +62,20 @@ def get_all():
 
         for doc in docs:
             person_data = doc.to_dict()
-            person_data["personID"] = doc.id  # Include the document ID
+            person_data["uuid"] = doc.id  # Include the document ID
             persons[doc.id] = person_data
         return jsonify({"code": 200, "data": persons}), 200
     except Exception as e:
         return jsonify({"code": 500, "message": str(e)}), 500
 
 
-@app.route("/person/<string:personId>")
-def get_person(personId):
+@app.route("/person/<string:uuid>")
+def get_person(uuid):
     try:
-        person_ref = db.collection("PersonalData").document(personId)
+        person_ref = db.collection("PersonalData").document(uuid)
         doc = person_ref.get()
         if doc.exists:
-            person_obj = Person.from_dict(personId, doc.to_dict())
+            person_obj = Person.from_dict(uuid, doc.to_dict())
             return jsonify({"code": 200, "data": person_obj.to_dict()})
         else:
             return jsonify({"code": 404, "message": "Person does not exist"}), 404
@@ -84,27 +84,27 @@ def get_person(personId):
         return jsonify({"code": 500, "message": str(e)}), 500
 
 
-@app.route("/person/<string:personId>", methods=['PUT'])
-def update_person(personId):
+@app.route("/person/<string:uuid>", methods=['PUT'])
+def update_person(uuid):
     try:
-        person_ref = db.collection("PersonalData").document(personId)
+        person_ref = db.collection("PersonalData").document(uuid)
         doc = person_ref.get()
         if not doc.exists:
             return jsonify({
                 "code": 404,
-                "data": {"personId": personId},
+                "data": {"uuid": uuid},
                 "message": "Person not found."
             }), 404
 
         new_data = request.get_json()
         if new_data['status'] < 400:
             # Merge update into Firestore document.
-            db.collection("PersonalData").document(personId).set(new_data["data"], merge=True)
+            db.collection("PersonalData").document(uuid).set(new_data["data"], merge=True)
             return jsonify({"code": 200, "data": new_data}), 200
     except Exception as e:
         return jsonify({
             "code": 500,
-            "data": {"personId": personId},
+            "data": {"uuid": uuid},
             "message": "An error occurred while updating the person information: " + str(e)
         }), 500
 
@@ -115,27 +115,27 @@ def create_person():
         # Get the JSON payload from the request
         person_data = request.get_json()
 
-        # Ensure personId is provided in the request payload.
-        person_id = person_data.get("personId")
-        if not person_id:
+        # Ensure uuid is provided in the request payload.
+        uuid = person_data.get("uuid")
+        if not uuid:
             return jsonify({
                 "code": 400,
                 "data": {},
-                "message": "Person ID is required."
+                "message": "uuid is required."
             }), 400
 
         # Reference to the person document in Firestore
-        person_ref = db.collection("PersonalData").document(person_id)
+        person_ref = db.collection("PersonalData").document(uuid)
         if person_ref.get().exists:
             return jsonify({
                 "code": 409,
-                "data": {"personId": person_id},
+                "data": {"uuid": uuid},
                 "message": "Person already exists."
             }), 409
 
         # Create a new Person object from the provided data.
         new_person = Person(
-            person_id=person_id,
+            uuid=uuid,
             first_name=person_data["firstName"],
             last_name=person_data["lastName"],
             date_of_birth=person_data["dateOfBirth"],
@@ -157,6 +157,24 @@ def create_person():
             "data": {},
             "message": "An error occurred while creating the person: " + str(e)
         }), 500
+
+@app.route("/person/<string:uuid>", methods=['DELETE'])
+def delete_match(uuid):
+    """Delete a PersonalData from Firestore."""
+    try:
+        personal_data_ref = db.collection("PersonalData").document(uuid)
+        doc = personal_data_ref.get()
+
+        if not doc.exists:
+            return jsonify({"code": 404, "message": "PersonalData not found"}), 404
+
+        # Delete the organ document from Firestore
+        personal_data_ref.delete()
+
+        return jsonify({"code": 200, "message": "PersonalData deleted successfully"}), 200
+
+    except Exception as e:
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 
 if __name__ == '__main__':
