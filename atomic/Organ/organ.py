@@ -30,7 +30,7 @@ db = firestore.client()
 class Organ:
     def __init__(
         self, organ_id, donor_id, organ_type, retrieval_datetime, expiry_datetime,
-        status, condition, blood_type, weight_grams, hla_typing, histopathology,
+        status, condition, blood_type, weight_grams, hla_types, histopathology,
         storage_temp_celsius, preservation_solution, notes
     ):
         self.organ_id = organ_id
@@ -42,7 +42,7 @@ class Organ:
         self.condition = condition
         self.blood_type = blood_type
         self.weight_grams = weight_grams
-        self.hla_typing = hla_typing
+        self.hla_types = hla_types
         self.histopathology = histopathology
         self.storage_temp_celsius = storage_temp_celsius
         self.preservation_solution = preservation_solution
@@ -60,7 +60,7 @@ class Organ:
             "condition": self.condition,
             "bloodType": self.blood_type,
             "weightGrams": self.weight_grams,
-            "hlaTyping": self.hla_typing,
+            "hlaTypes": self.hla_types,
             "histopathology": self.histopathology,
             "storageTempCelsius": self.storage_temp_celsius,
             "preservationSolution": self.preservation_solution,
@@ -80,7 +80,7 @@ class Organ:
             condition=data["condition"],
             blood_type=data["bloodType"],
             weight_grams=data["weightGrams"],
-            hla_typing=data["hlaTyping"],
+            hla_typing=data["hlaTypes"],
             histopathology=data["histopathology"],
             storage_temp_celsius=data["storageTempCelsius"],
             preservation_solution=data["preservationSolution"],
@@ -199,8 +199,8 @@ def create_organ():
         data = request.get_json()
 
         # Generate a unique organId (can be done using UUID or custom logic)
-        donor_id_part = data['donorId'].split('-')[0] if 'donorId' in data else ''
-        organ_type_part = data['organType'].split('-')[-1] if 'organType' in data else ''
+        donor_id_part = data['donorId'].split('-')[0]
+        organ_type_part = data['organType'].split('-')[-1]
         
         # Generate a unique organId (concatenate parts from donorId and organType)
         organ_id = f"{donor_id_part}-{organ_type_part}"
@@ -216,7 +216,7 @@ def create_organ():
             condition=data['condition'],
             blood_type=data['bloodType'],
             weight_grams=data['weightGrams'],
-            hla_typing=data['hlaTyping'],
+            hla_types=data['hlaTypes'],
             histopathology=data['histopathology'],
             storage_temp_celsius=data['storageTempCelsius'],
             preservation_solution=data['preservationSolution'],
@@ -235,39 +235,40 @@ def create_organ():
 def update_organ(organId):
     """Update an existing organ in Firestore."""
     try:
-        data = request.get_json()
-
-        # Check if organ exists
         organ_ref = db.collection("organs").document(organId)
         doc = organ_ref.get()
-
         if not doc.exists:
-            return jsonify({"code": 404, "message": "Organ not found"}), 404
+            return jsonify(
+                {
+                    "code": 404,
+                    "data": {
+                        "organId": organId
+                    },
+                    "message": "Organ not found."
+                }
+            ), 404
 
-        # Prepare updated data
-        updated_data = {
-            "donorId": data.get('donorId', doc.to_dict().get('donorId')),
-            "organType": data.get('organType', doc.to_dict().get('organType')),
-            "retrievalDatetime": data.get('retrievalDatetime', doc.to_dict().get('retrievalDatetime')),
-            "expiryDatetime": data.get('expiryDatetime', doc.to_dict().get('expiryDatetime')),
-            "status": data.get('status', doc.to_dict().get('status')),
-            "condition": data.get('condition', doc.to_dict().get('condition')),
-            "bloodType": data.get('bloodType', doc.to_dict().get('bloodType')),
-            "weightGrams": data.get('weightGrams', doc.to_dict().get('weightGrams')),
-            "hlaTyping": data.get('hlaTyping', doc.to_dict().get('hlaTyping')),
-            "histopathology": data.get('histopathology', doc.to_dict().get('histopathology')),
-            "storageTempCelsius": data.get('storageTempCelsius', doc.to_dict().get('storageTempCelsius')),
-            "preservationSolution": data.get('preservationSolution', doc.to_dict().get('preservationSolution')),
-            "notes": data.get('notes', doc.to_dict().get('notes')),
-        }
-
-        # Update the organ document in Firestore
-        organ_ref.update(updated_data)
-
-        return jsonify({"code": 200, "message": "Organ updated successfully"}), 200
-
+        # update status
+        new_data = request.get_json()
+        if new_data['status'] < 400:
+            db.collection("organs").document(organId).set(new_data["data"], merge=True)
+            return jsonify(
+                {
+                    "code": 200,
+                    "data": new_data
+                }
+            ), 200
     except Exception as e:
-        return jsonify({"code": 500, "message": str(e)}), 500
+        print("Error: {}".format(str(e)))
+        return jsonify(
+            {
+                "code": 500,
+                "data": {
+                    "organId": organId
+                },
+                "message": "An error occurred while updating the organ information. " + str(e)
+            }
+        ), 500
 
 @app.route("/organ/<string:organId>", methods=['DELETE'])
 def delete_organ(organId):
