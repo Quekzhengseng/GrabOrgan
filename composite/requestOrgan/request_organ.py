@@ -19,6 +19,8 @@ PERSONAL_DATA_URL = os.getenv("PERSONAL_DATA_URL", "http://personalData:5011/per
 PSEUDONYM_URL = os.getenv("PSEUDONYM_URL", "http://pseudonym:5012/pseudonymise")
 RECIPIENT_URL = os.getenv("RECIPIENT_URL", "http://recipient:5013/recipient")
 LAB_REPORT_URL = os.getenv("LAB_REPORT_URL", "http://labInfo:5007/lab-reports")
+LAB_REPORT_URL = os.getenv("LAB_REPORT_URL", "http://labInfo:5007/lab-reports")
+OUTSYSTEMS_PERSONAL_DATA_URL = os.getenv("OUTSYSTEMS_PERSONAL_DATA_URL", "https://personal-gbst4bsa.outsystemscloud.com/PatientAPI/rest/patientAPI/patients/")
 
 connection = None 
 channel = None
@@ -145,9 +147,10 @@ def request_for_organ():
         lab_payload["hlaTyping"] = generate_hla_profile()
 
         # --- Call the Personal Data Service ---
-        personal_resp = invoke_http(PERSONAL_DATA_URL, method="POST", json=personal_payload)
-        code = personal_resp.get("code", 500)
-        message = json.dumps(personal_resp.get("message", ""))
+        personal_resp = invoke_http(PERSONAL_DATA_URL, method="POST", json=personal_payload) # as a backup for now
+        os_personal_resp = invoke_http(OUTSYSTEMS_PERSONAL_DATA_URL, method="POST", json=personal_payload)
+        code = os_personal_resp.get("code", 500)
+        message = json.dumps(os_personal_resp.get("message", ""))
         if code not in range(200, 300):
             print("Publishing message with routing key =", "request_personalData.error")
             channel.basic_publish(
@@ -195,6 +198,7 @@ def request_for_organ():
         lab_resp = invoke_http(LAB_REPORT_URL, method="POST", json=lab_payload)
         code = lab_resp.get("code", 500)
         message = json.dumps(lab_resp)
+        
         if code not in range(200, 300):
             print("Publishing message with routing key =", "request_lab.error")
             channel.basic_publish(
