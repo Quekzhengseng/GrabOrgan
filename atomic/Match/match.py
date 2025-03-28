@@ -20,6 +20,57 @@ db = firestore.client()
 
 print("Firestore initialized successfully for Matches!")
 
+class Match:
+    def __init__(self, match_id, recipient_id, donor_id, organ_id ,test_date_time, 
+                 hla_1, hla_2, hla_3, hla_4, hla_5, hla_6, numofHLA):
+        self.match_id = match_id
+        self.recipient_id = recipient_id
+        self.donor_id = donor_id
+        self.organ_id = organ_id
+        self.test_date_time = test_date_time
+        self.hla_1 = hla_1
+        self.hla_2 = hla_2
+        self.hla_3 = hla_3
+        self.hla_4 = hla_4
+        self.hla_5 = hla_5
+        self.hla_6 = hla_6
+        self.num_of_hla = numofHLA
+
+    def to_dict(self):
+        """Convert the object to a Firestore-compatible dictionary."""
+        return {
+        "matchId": self.match_id, 
+        "recipientId": self.recipient_id,
+        "donorId": self.donor_id,
+        "organId": self.organ_id,
+        "testDateTime": self.test_date_time,
+        "hla1": self.hla_1,
+        "hla2": self.hla_2,
+        "hla3": self.hla_3,
+        "hla4": self.hla_4,
+        "hla5": self.hla_5,
+        "hla6": self.hla_6,
+        "numOfHLA": self.num_of_hla,
+        }
+
+    @staticmethod
+    def from_dict(match_id, data):
+        """Create a Match object from Firestore document data."""
+        return Match(
+        match_id=match_id, 
+        recipient_id=data["recipientId"],
+        donor_id=data["donorId"],
+        organ_id=data["organId"],
+        test_date_time=data["testDateTime"],
+        hla_1=data[ "hla1": ],
+        hla_2=data["hla2"],
+        hla_3=data["hla3"],
+        hla_4=data["hla4"],
+        hla_5=data[ "hla5"],
+        hla_6=data["hla6"],
+        num_ofHLA=data["numOfHLA"] 
+        )
+
 @app.route("/matches", methods=['GET'])
 def get_all_matches():
     try:
