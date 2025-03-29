@@ -112,7 +112,7 @@ def update_order(orderId):
 
         new_data = request.get_json()
         # You might include a status code in the payload to indicate if processing is OK.
-        if new_data.get('status', 200) < 400:
+        if new_data:
             # Merge the provided data into the existing document.
             order_ref.set(new_data["data"], merge=True)
             return jsonify({
@@ -122,10 +122,9 @@ def update_order(orderId):
             }), 200
         else:
             return jsonify({
-                "code": new_data.get('status', 400),
-                "data": {},
-                "message": "Update aborted due to status."
-            }), new_data.get('status', 400)
+                "code": 400,
+                "message": "No data provided for update."
+            }), 400
     except Exception as e:
         return jsonify({
             "code": 500,

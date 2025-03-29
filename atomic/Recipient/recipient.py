@@ -131,7 +131,7 @@ def update_recipient(recipientId):
 
         # update status
         new_data = request.get_json()
-        if new_data['status'] < 400:
+        if new_data:
             db.collection("recipients").document(recipientId).set(new_data["data"], merge=True)
             return jsonify(
                 {
@@ -139,6 +139,11 @@ def update_recipient(recipientId):
                     "data": new_data
                 }
             ), 200
+        else:
+            return jsonify({
+                "code": 400,
+                "message": "No data provided for update."
+            }), 400
     except Exception as e:
         print("Error: {}".format(str(e)))
         return jsonify(

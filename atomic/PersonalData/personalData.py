@@ -24,11 +24,14 @@ db = firestore.client()
 
 
 class Person:
-    def __init__(self, uuid, first_name, last_name, date_of_birth, nok_contact):
+    def __init__(self, uuid, first_name, last_name, date_of_birth, nric, email, address, nok_contact):
         self.uuid = uuid
         self.first_name = first_name
         self.last_name = last_name
         self.date_of_birth = date_of_birth
+        self.nric = nric
+        self.email = email
+        self.address = address
         self.nok_contact = nok_contact  # Next of kin contact details
 
     def to_dict(self):
@@ -37,6 +40,9 @@ class Person:
             "firstName": self.first_name,
             "lastName": self.last_name,
             "dateOfBirth": self.date_of_birth,
+            "nric": self.nric,
+            "email": self.email,
+            "address": self.address,
             "nokContact": self.nok_contact
         }
 
@@ -48,6 +54,9 @@ class Person:
             first_name=data.get("firstName"),
             last_name=data.get("lastName"),
             date_of_birth=data.get("dateOfBirth"),
+            nric=data.get("nric"),
+            email=data.get("email"),
+            address=data.get("address"),
             nok_contact=data.get("nokContact")
         )
 
@@ -97,10 +106,15 @@ def update_person(uuid):
             }), 404
 
         new_data = request.get_json()
-        if new_data['status'] < 400:
+        if new_data:
             # Merge update into Firestore document.
             db.collection("PersonalData").document(uuid).set(new_data["data"], merge=True)
             return jsonify({"code": 200, "data": new_data}), 200
+        else:
+            return jsonify({
+                "code": 400,
+                "message": "No data provided for update."
+            }), 400
     except Exception as e:
         return jsonify({
             "code": 500,
@@ -139,6 +153,9 @@ def create_person():
             first_name=person_data["firstName"],
             last_name=person_data["lastName"],
             date_of_birth=person_data["dateOfBirth"],
+            nric=person_data["nric"],
+            email=person_data["email"],
+            address=person_data["address"],
             nok_contact=person_data["nokContact"]
         )
 
