@@ -16,6 +16,30 @@ SERVICE_URLS = {
     "location": "https://zsq.outsystemscloud.com/Location/rest/Location/"
 }
 
+hospital_coords_dict = {
+        "CGH": {
+            "address": "2 Simei St 3, Singapore 529889",
+        },
+        "SGH": {
+            "address": "Outram Rd, Singapore 169608",
+        },
+        "TTSH": {
+            "address": "11 Jln Tan Tock Seng, Singapore 308433",
+        },
+        "SKGH": {
+            "address": "110 Sengkang E Wy, Singapore 544886",
+        },
+        "NUH": {
+            "address": "5 Lower Kent Ridge Rd, Singapore 119074",
+        },
+        "KTPH": {
+            "address": "90 Yishun Central, Singapore 768828",
+        },
+        "NTFGH": {
+            "address": "1 Jurong East Street 21, Singapore 609606",
+        }
+    }
+
 HEADERS = {'Content-Type': 'application/json'}
 TIMEOUT = 10  # API timeout for requests
 
@@ -83,7 +107,7 @@ def get_driver(driver_id):
     return None
 
 
-def create_delivery(origin, destination, polyline, driver_coord, driver_id, doctor_id):
+def create_delivery(origin, destination, polyline, driver_coord, driver_id, organ_type):
     """ Create a new delivery entry. """
     payload = {
         "pickup": origin,
@@ -93,8 +117,8 @@ def create_delivery(origin, destination, polyline, driver_coord, driver_id, doct
         "status": "Assigned",
         "polyline": polyline,
         "driverCoord": driver_coord,
-        "driverID": driver_id,
-        "doctorID": doctor_id,
+        "driverId": driver_id,
+        "organType": organ_type
     }
     
     response = make_request(SERVICE_URLS["delivery"] + "/deliveryinfo", payload=payload)
@@ -112,10 +136,10 @@ def create_delivery_composite():
         if not data:
             return jsonify({"error": "No JSON data received"}), 400
 
-        origin_address = data.get("startHospital")
-        destination_address = data.get("endHospital")
-        doctor_id = data.get("DoctorId")
+        origin_address = hospital_coords_dict[data.get("startHospital")]
+        destination_address = hospital_coords_dict[data.get("endHospital")]
         destination_time = data.get("transplantDateTime")
+        organ_type = data.get("organType")
 
         # Convert addresses to coordinates
         origin_coord = address_to_coord(origin_address)
@@ -145,7 +169,7 @@ def create_delivery_composite():
             return jsonify({"error": "Failed to retrieve driver coordinates"}), 400
 
         # Create delivery
-        delivery_id = create_delivery(origin_address, destination_address, encoded_polyline, driver_coord, driver_id, doctor_id)
+        delivery_id = create_delivery(origin_address, destination_address, encoded_polyline, driver_coord, driver_id, organ_type)
         if not delivery_id:
             return jsonify({"error": "Failed to create delivery"}), 400
 

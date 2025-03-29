@@ -91,12 +91,7 @@ export const fetchLabReports = async (recipientId) => {
  * @returns {Promise<Array>} Array of match objects
  */
 export const findOrganMatches = async (recipientId) => {
-  // Extract just the number portion from the recipient ID
-  // Then convert to a number to remove leading zeros
-  const idMatch = recipientId.match(/\d+/);
-  const idNumber = idMatch ? parseInt(idMatch[0], 10).toString() : recipientId;
-
-  console.log("Searching for matches with recipient number:", idNumber);
+  console.log("Searching for matches with recipient number:", recipientId);
 
   // Use the endpoint to get matches by recipient ID number
   const response = await fetch(
