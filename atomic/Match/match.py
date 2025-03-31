@@ -103,6 +103,27 @@ def get_match(matchId):
     except Exception as e:
         return jsonify({"code":500, "message": str(e)}), 500
 
+@app.route("/matches/recipient/<string:recipientId>", methods=['GET'])
+def get_matches_by_recipient(recipientId):
+    try:
+        # Query the Firestore collection filtering by recipientId
+        match_ref = db.collection("matches")
+        docs = match_ref.where("recipientId", "==", recipientId).get()
+        matches = []
+
+        for doc in docs:
+            match_data = doc.to_dict()
+            matches.append(match_data)
+
+        return jsonify({
+            "code": 200,
+            "data": matches,
+            "message": f"Successfully got matches for recipient {recipientId}"
+        }), 200
+
+    except Exception as e:
+        return jsonify({"code": 500, "message": str(e)}), 500
+
 
 @app.route("/match/<string:matchId>", methods=['PUT'])
 def update_match(matchId):

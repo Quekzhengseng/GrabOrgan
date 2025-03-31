@@ -17,6 +17,7 @@ import {
   createOrganOrder,
   createDeliveryRequest,
   requestNewOrgans,
+  getPersonalData,
 } from "@/utils/recipientUtils";
 
 export default function RecipientsDashboard() {
@@ -191,7 +192,10 @@ export default function RecipientsDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Recipient Information Panel */}
           <div className="md:col-span-1">
-            <RecipientProfile recipient={selectedRecipient} />
+            <RecipientProfile
+              recipient={selectedRecipient}
+              getPersonalData={getPersonalData}
+            />
           </div>
 
           {/* Right Panel (Lab Reports, Matches, Timeline) */}

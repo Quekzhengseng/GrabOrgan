@@ -33,7 +33,7 @@ export default function RecipientCard({ recipient, onClick }) {
         <div className="space-y-2 text-sm text-gray-600">
           <div className="flex items-center">
             <Calendar className="h-4 w-4 text-green-600 mr-2" />
-            <span>{formatDate(recipient.dateOfBirth)}</span>
+            <span>{recipient.dateOfBirth}</span>
           </div>
 
           <div className="flex items-center">
