@@ -19,7 +19,6 @@ PERSONAL_DATA_URL = os.getenv("PERSONAL_DATA_URL", "http://personalData:5011/per
 PSEUDONYM_URL = os.getenv("PSEUDONYM_URL", "http://pseudonym:5012/pseudonymise")
 RECIPIENT_URL = os.getenv("RECIPIENT_URL", "http://recipient:5013/recipient")
 LAB_REPORT_URL = os.getenv("LAB_REPORT_URL", "http://labInfo:5007/lab-reports")
-LAB_REPORT_URL = os.getenv("LAB_REPORT_URL", "http://labInfo:5007/lab-reports")
 OUTSYSTEMS_PERSONAL_DATA_URL = os.getenv("OUTSYSTEMS_PERSONAL_DATA_URL", "https://personal-gbst4bsa.outsystemscloud.com/PatientAPI/rest/patientAPI/patients/")
 
 connection = None 

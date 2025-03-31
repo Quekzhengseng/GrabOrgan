@@ -78,30 +78,51 @@ def get_all():
     try:
         lab_info_ref = db.collection("lab_reports")
         docs = lab_info_ref.get()
-        labInfo = {};
+        labInfo = [];
 
         for doc in docs:
             lab_info_data = doc.to_dict()
-            lab_info_data["uuid"] = doc.id  # Add document ID
-            labInfo[doc.id] = lab_info_data
+            labInfo.append(lab_info_data)
         return jsonify({"code":200, "data": labInfo}), 200
     except Exception as e:
         return jsonify({"code":500, "message": str(e)}), 500
 
 
+# @app.route("/lab-reports/<string:uuid>")
+# def get_lab_info(uuid):
+#     try:
+#         lab_info_ref = db.collection("lab_reports").document(uuid)
+#         doc = lab_info_ref.get()
+#         if doc.exists:
+#             lab_info_obj = LabInfo.from_dict(uuid, doc.to_dict())
+#             return {"code":200, "data": lab_info_obj.to_dict()}  # Convert back to JSON-friendly format
+#         else:
+#             return jsonify({"code": 404, "message": "LabInfo does not exist"}), 404
+
+#     except Exception as e:
+#         return jsonify({"code":500, "message": str(e)}), 500
+
 @app.route("/lab-reports/<string:uuid>")
-def get_lab_info(uuid):
+def get_lab_info_by_recipient(uuid):
     try:
-        lab_info_ref = db.collection("lab_reports").document(uuid)
-        doc = lab_info_ref.get()
-        if doc.exists:
-            lab_info_obj = LabInfo.from_dict(uuid, doc.to_dict())
-            return {"code":200, "data": lab_info_obj.to_dict()}  # Convert back to JSON-friendly format
+        lab_info_ref = db.collection("lab_reports")
+        # Query for documents where the "uuid" field starts with the provided uuid.
+        # This uses Firestore range queries:
+        # Any string that is >= uuid and <= uuid + "\uf8ff" will have the provided uuid as its prefix.
+        query = lab_info_ref.where("uuid", ">=", uuid).where("uuid", "<=", uuid + "\uf8ff")
+        docs = query.get()
+        
+        if docs:
+            lab_infos = []
+            for doc in docs:
+                lab_info_obj = LabInfo.from_dict(doc.id, doc.to_dict())
+                lab_infos.append(lab_info_obj.to_dict())
+            return jsonify({"code": 200, "data": lab_infos, "message": f"Found {len(lab_infos)} lab report(s) matching uuid"}), 200
         else:
             return jsonify({"code": 404, "message": "LabInfo does not exist"}), 404
 
     except Exception as e:
-        return jsonify({"code":500, "message": str(e)}), 500
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 
 @app.route("/lab-reports/<string:uuid>", methods=['PUT'])

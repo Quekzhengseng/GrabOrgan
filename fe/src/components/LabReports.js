@@ -22,7 +22,8 @@ export default function LabReports({ labReports, loading }) {
             </p>
           </div>
         ) : (
-          <div className="space-y-6">
+          // Wrap the list in a scrollable container with a fixed max-height
+          <div className="max-h-96 overflow-y-auto space-y-4">
             {labReports.map((report, index) => (
               <div
                 key={report.uuid || index}
@@ -44,12 +45,18 @@ export default function LabReports({ labReports, loading }) {
                       {report.testType || "Not specified"}
                     </p>
                   </div>
+                  <div className="mb-4">
+                    <p className="font-medium text-gray-700">Id:</p>
+                    <p className="text-gray-600">
+                      {report.uuid || "Not specified"}
+                    </p>
+                  </div>
 
-                  {report.results && (
+                  {report.report && (
                     <div>
-                      <p className="font-medium text-gray-700 mb-2">Results:</p>
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        {Object.entries(report.results).map(([key, value]) => (
+                      <p className="font-medium text-gray-700 mb-2">Report:</p>
+                      <div className="bg-gray-50 rounded-lg p-4 break-words whitespace-normal">
+                        {Object.entries(report.report).map(([key, value]) => (
                           <div
                             key={key}
                             className="grid grid-cols-2 mb-2 pb-2 border-b border-gray-200 last:border-0"

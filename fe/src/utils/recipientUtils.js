@@ -44,7 +44,7 @@ export const getUrgencyColor = (organsNeeded) => {
  * @returns {Promise<Array>} Array of recipient objects
  */
 export const fetchRecipients = async () => {
-  const response = await fetch("http://localhost:5013/recipient");
+  const response = await fetch("http://localhost:8000/api/v1/recipient");
 
   if (!response.ok) {
     throw new Error(`API request failed with status ${response.status}`);
@@ -59,6 +59,28 @@ export const fetchRecipients = async () => {
     throw new Error("Invalid response format");
   }
 };
+/**
+ * Fetches a recipient from the API
+ * @returns {Promise<Object>} a recipient object
+ */
+export const getPersonalData = async (recipientId, passcode) => {
+  const response = await fetch(
+    `http://localhost:8000/api/v1/personal/${recipientId}`
+  );
+
+  if (!response.ok) {
+    throw new Error(`API request failed with status ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  if (data.Result.Success === true && data.patient) {
+    // Convert the object of recipients into an array
+    return data.patient;
+  } else {
+    throw new Error("Invalid response format");
+  }
+};
 
 /**
  * Fetches lab reports for a specific recipient
@@ -66,7 +88,9 @@ export const fetchRecipients = async () => {
  * @returns {Promise<Array>} Array of lab report objects
  */
 export const fetchLabReports = async (recipientId) => {
-  const response = await fetch("http://localhost:5007/lab-reports");
+  const response = await fetch(
+    `http://localhost:8000/api/v1/lab-reports/${recipientId}`
+  );
 
   if (!response.ok) {
     throw new Error(`API request failed with status ${response.status}`);
@@ -76,10 +100,8 @@ export const fetchLabReports = async (recipientId) => {
 
   if (data.code === 200 && data.data) {
     // Filter lab reports for the selected recipient
-    return data.data.filter(
-      (report) =>
-        report.patientId === recipientId || report.recipientId === recipientId
-    );
+    console.log(data.data);
+    return data.data || [];
   }
 
   return [];
@@ -93,14 +115,12 @@ export const fetchLabReports = async (recipientId) => {
 export const findOrganMatches = async (recipientId) => {
   // Extract just the number portion from the recipient ID
   // Then convert to a number to remove leading zeros
-  const idMatch = recipientId.match(/\d+/);
-  const idNumber = idMatch ? parseInt(idMatch[0], 10).toString() : recipientId;
 
-  console.log("Searching for matches with recipient number:", idNumber);
+  console.log("Searching for matches with recipient number:", recipientId);
 
   // Use the endpoint to get matches by recipient ID number
   const response = await fetch(
-    `http://localhost:5008/matches/recipient/${idNumber}`,
+    `http://localhost:5008/matches/recipient/${recipientId}`,
     {
       method: "GET",
       headers: {
@@ -116,6 +136,7 @@ export const findOrganMatches = async (recipientId) => {
   const data = await response.json();
 
   if (data && data.code === 200) {
+    console.log(data.data);
     return data.data || [];
   }
 
@@ -129,7 +150,7 @@ export const findOrganMatches = async (recipientId) => {
  * @returns {Promise<Object>} Response from the order API
  */
 export const createOrganOrder = async (selectedMatch, selectedRecipient) => {
-  const orderResponse = await fetch("http://localhost:5009/order", {
+  const orderResponse = await fetch("http://localhost:8000/api/v1/order", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -179,30 +200,44 @@ export const createDeliveryRequest = async () => {
  * @returns {Promise<Object>} Response from the request_for_organ API
  */
 export const requestNewOrgans = async (recipient) => {
-  const response = await fetch("http://localhost:5021/request_for_organ", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      recipientId: recipient.recipientId,
-      firstName: recipient.firstName,
-      lastName: recipient.lastName,
-      dateOfBirth: recipient.dateOfBirth,
-      gender: recipient.gender,
-      bloodType: recipient.bloodType,
-      organsNeeded: recipient.organsNeeded,
-      nokContact: recipient.nokContact || {},
-      // Lab report data
-      reportName: "Transplant Eligibility",
-      testType: "Organ Request",
-      dateOfReport: new Date().toISOString(),
-      uuid: `report-${Date.now()}`,
-      results: {
-        status: "Requested",
+  const response = await fetch(
+    "http://localhost:8000/api/v1/request-for-organ",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-    }),
-  });
+      body: JSON.stringify({
+        recipient: {
+          recipientId: recipient.recipientId,
+          firstName: recipient.firstName,
+          lastName: recipient.lastName,
+          dateOfBirth: recipient.dateOfBirth,
+          nric: recipient.nric,
+          email: recipient.email,
+          address: recipient.address,
+          gender: recipient.gender,
+          bloodType: recipient.bloodType,
+          organsNeeded: recipient.organsNeeded,
+          nokContact: recipient.nokContact || {},
+        },
+        labInfo: {
+          // Lab report data
+          testType: "Tissue",
+          reportName: "Transplant Eligibility",
+          testType: "Organ Request",
+          dateOfReport: new Date().toISOString().split("T")[0], // YYYY-MM-DD formate
+          report: {
+            name: "Tissue Lab Test Report",
+            url: "https://www.parkwaylabs.com.sg/docs/parkwaylablibraries/test-catalogues/pls-tissue-forms.pdf?sfvrsn=1418faf5_1",
+          },
+          hlaTyping: {},
+          comments: "To be reviewed",
+          uuid: recipient.recipientId,
+        },
+      }),
+    }
+  );
 
   if (!response.ok) {
     throw new Error(`Request failed with status ${response.status}`);
@@ -210,3 +245,50 @@ export const requestNewOrgans = async (recipient) => {
 
   return response.json();
 };
+
+// {
+//   "data": {
+//     "recipient": {
+//       "firstName": "Isaiah",
+//       "lastName": "Jackson",
+//       "dateOfBirth": "1990-05-20",
+//     "nric": "S1234567Z",
+//       "email": "isaiahloo@gmail.com",
+//       "address": "31 Victoria Street",
+//       "bloodType": "O+",
+//       "gender": "Male",
+//       "organsNeeded": [
+//         "kidney",
+//         "liver"
+//       ],
+//       "medicalHistory": [
+//         {
+//           "condition": "Hypertension",
+//           "dateDiagnosed": "2015-03-15",
+//           "description": "Mild high blood pressure managed with lifestyle changes",
+//           "treatment": "Diet and exercise"
+//         }
+//       ],
+//       "allergies": [
+//         "penicillin"
+//       ],
+//       "nokContact": {
+//         "firstName": "Bob",
+//         "lastName": "Smith",
+//         "phone": "98765432",
+//         "relationship": "Spouse"
+//       }
+//     },
+//     "labInfo": {
+//         "testType": "Tissue",
+//         "dateOfReport": "2023-12-01",
+//         "report": {
+//             "name": "Tissue Lab Test Report",
+//             "url": "https://www.parkwaylabs.com.sg/docs/parkwaylablibraries/test-catalogues/pls-tissue-forms.pdf?sfvrsn=1418faf5_1"
+//         },
+//         "hlaTyping":  {
+//         },
+//         "comments": "To be reviewed"
+//     }
+//   }
+// }

@@ -101,7 +101,7 @@ export default function OrganMatches({
                 >
                   <div className="flex justify-between items-start mb-2">
                     <span className="font-medium text-gray-800">
-                      {match.OrganId.split("-")[1] || "Organ"}
+                      {match.organId.split("-")[0] || "Organ"}
                     </span>
                     <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs">
                       {match.numOfHLA}/6 HLA Match
@@ -112,7 +112,7 @@ export default function OrganMatches({
                     <p>
                       Donor ID: {match.donorId?.substring(0, 8) || "Unknown"}
                     </p>
-                    <p>
+                    {/* <p>
                       Donor: {match.donor_details?.first_name || "Unknown"}{" "}
                       {match.donor_details?.last_name || ""}
                       {match.donor_details?.gender &&
@@ -120,9 +120,9 @@ export default function OrganMatches({
                     </p>
                     <p>
                       Blood Type: {match.donor_details?.blood_type || "Unknown"}
-                    </p>
+                    </p> */}
                     <p className="text-xs text-gray-500">
-                      Match Date: {formatDate(match.Test_DateTime)}
+                      Match Date: {formatDate(match.testDateTime)}
                     </p>
                   </div>
                 </div>
@@ -142,7 +142,7 @@ export default function OrganMatches({
                       Processing Request...
                     </>
                   ) : (
-                    "Request Organ Transplant"
+                    "Confirm Match"
                   )}
                 </button>
               </div>
