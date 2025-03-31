@@ -41,6 +41,7 @@ export default function RecipientsDashboard() {
       try {
         setLoading(true);
         const recipientsData = await fetchRecipients();
+        console.log(recipientsData);
         setRecipients(recipientsData);
       } catch (err) {
         console.error("Error fetching recipients:", err);

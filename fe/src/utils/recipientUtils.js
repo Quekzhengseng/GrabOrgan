@@ -113,8 +113,6 @@ export const fetchLabReports = async (recipientId) => {
  * @returns {Promise<Array>} Array of match objects
  */
 export const findOrganMatches = async (recipientId) => {
-  // Extract just the number portion from the recipient ID
-  // Then convert to a number to remove leading zeros
 
   console.log("Searching for matches with recipient number:", recipientId);
 
