@@ -231,6 +231,7 @@ export default function RecipientProfile({ recipient, getPersonalData }) {
                 className="w-full border border-gray-300 rounded px-3 py-2 mb-4"
               />
               <div className="flex justify-end">
+                
                 <button
                   type="button"
                   onClick={handleCloseModal}

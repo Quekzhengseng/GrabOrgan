@@ -65,7 +65,7 @@ export const fetchRecipients = async () => {
  */
 export const getPersonalData = async (recipientId, passcode) => {
   const response = await fetch(
-    `http://localhost:8000/api/v1/personal/${recipientId}`
+    `http://localhost:8000/api/v1/personal/${recipientId}?apikey=${passcode}`
   );
 
   if (!response.ok) {
@@ -113,7 +113,6 @@ export const fetchLabReports = async (recipientId) => {
  * @returns {Promise<Array>} Array of match objects
  */
 export const findOrganMatches = async (recipientId) => {
-
   console.log("Searching for matches with recipient number:", recipientId);
 
   // Use the endpoint to get matches by recipient ID number
