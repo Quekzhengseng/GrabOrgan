@@ -55,6 +55,14 @@ export default function RecipientsDashboard() {
     loadRecipients();
   }, []);
 
+  const [userEmail, setUserEmail] = useState("");
+
+  useEffect(() => {
+    const email = sessionStorage.getItem("userEmail");
+    setUserEmail(email);
+  }, []);
+  // console.log("Doctor Page:",userEmail);
+
   // Handle loading lab reports for a recipient
   const loadLabReports = async (recipientId) => {
     try {
