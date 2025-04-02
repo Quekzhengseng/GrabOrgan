@@ -7,6 +7,8 @@ import threading
 from flask import Flask, jsonify
 from flask_cors import CORS
 import pika
+import uuid
+import requests
 
 from common.invokes import invoke_http
 
@@ -431,6 +433,10 @@ def confirm_match(matchId):
     }
 
     try:
+        data =  requests.get_json()
+        orderId = str(uuid.uuid4())
+        
+
         # Extract recipientId from the JSON payload
         print("Invoking match atomic service...")
         match_url = MATCH_URL + "/" + matchId
@@ -445,6 +451,10 @@ def confirm_match(matchId):
                 "message": match_result["message"]
             }), code 
         else:
+            try:
+            except Exception as e:
+                raise Exception("Error Invoking Order Service")
+
             print("Publishing message with routing_key=", "match.confirm")
             # Prepare the message as a JSON string
             message_body = json.dumps({"matchId": matchId})
