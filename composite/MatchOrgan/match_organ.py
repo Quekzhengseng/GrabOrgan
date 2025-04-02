@@ -437,7 +437,7 @@ def confirm_match(matchId):
         orderId = str(uuid.uuid4())
         
 
-        # Extract recipientId from the JSON payload
+        # check if matchId exists first 
         print("Invoking match atomic service...")
         match_url = MATCH_URL + "/" + matchId
         match_result = invoke_http(match_url, method="GET")
@@ -452,7 +452,28 @@ def confirm_match(matchId):
             }), code 
         else:
             try:
-                print("test")
+                order_payload = {
+                    "orderId": orderId,
+                    "organType": data["organType"],
+                    "doctorId" : data["doctorId"],
+                    "transplantDateTime": data["transplantDateTime"], # GMT+8 or UTC?
+                    "startHospital": data["startHospital"],
+                    "endHospital": data["endHospital"],
+                    "matchId": matchId,
+                    "remarks": data["remarks"]
+                }
+                order_url = ORDER_URL + "/" + orderId
+                order_resp = invoke_http(order_url, method="POST", json=data)
+                message = json.dumps(order_resp)
+                code = order_resp["code"]
+
+                if code not in range(200, 300):
+                    return jsonify({
+                        "code": code,
+                        "data": {"matchId": matchId},
+                        "message": order_resp["message"]
+                    }), code 
+
             except Exception as e:
                 raise Exception("Error Invoking Order Service")
 

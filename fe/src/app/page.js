@@ -17,7 +17,8 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     setError("");
-
+    // Save the email to sessionStorage
+    sessionStorage.setItem("userEmail", email);
     // Simulate login process
     setTimeout(() => {
       setIsLoading(false);

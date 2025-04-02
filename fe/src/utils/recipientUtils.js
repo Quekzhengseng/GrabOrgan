@@ -194,7 +194,7 @@ export const createDeliveryRequest = async () => {
 /**
  * Requests new organs for a recipient
  * @param {Object} recipient - The recipient object
- * @returns {Promise<Object>} Response from the request_for_organ API
+ * @returns {Promise<Object>} Response from the request-for-organ API
  */
 export const requestNewOrgans = async (recipient) => {
   const response = await fetch(
@@ -235,6 +235,35 @@ export const requestNewOrgans = async (recipient) => {
       }),
     }
   );
+
+  if (!response.ok) {
+    throw new Error(`Request failed with status ${response.status}`);
+  }
+
+  return response.json();
+};
+
+/**
+ * Confirm match for a recipient
+ * @param {Object} confirmedMatch - The recipient object
+ * @returns {Promise<Object>} Response from the confirm-match API
+ */
+export const confirmMatch = async (confirmedMatch) => {
+  const response = await fetch("http://localhost:8000/api/v1/confirm-match", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      organType: confirmedMatch.organType,
+      doctorId: confirmedMatch.doctorId,
+      transplantDateTime: confirmedMatch.transplantDateTime,
+      startHospital: confirmedMatch.startHospital,
+      endHospital: confirmedMatch.endHospital,
+      matchId: confirmedMatch.matchId,
+      remarks: confirmedMatch.remarks,
+    }),
+  });
 
   if (!response.ok) {
     throw new Error(`Request failed with status ${response.status}`);

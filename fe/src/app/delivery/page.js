@@ -81,6 +81,14 @@ export default function DeliveryOrdersPage() {
     setFilteredDeliveries(filtered);
   }, [searchTerm, filterStatus, deliveries]);
 
+  const [userEmail, setUserEmail] = useState("");
+
+  useEffect(() => {
+    const email = sessionStorage.getItem("userEmail");
+    setUserEmail(email);
+  }, []);
+  // console.log("Driver Page:", userEmail);
+
   // Handle track delivery button click
   const handleTrackDelivery = (delivery) => {
     setSelectedDelivery(delivery);
