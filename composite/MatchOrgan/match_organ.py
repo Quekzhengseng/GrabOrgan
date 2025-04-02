@@ -452,6 +452,7 @@ def confirm_match(matchId):
             }), code 
         else:
             try:
+                print("test")
             except Exception as e:
                 raise Exception("Error Invoking Order Service")
 

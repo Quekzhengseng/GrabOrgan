@@ -77,6 +77,19 @@ services:
       - "8000:8000" # Takes incoming HTTP traffic from Consumers, and forwards it to upstream Services.
       - "8001:8001" # Admin API. Listens for calls from the command line over HTTP.
       - "8002:8002" # Kong Manager (GUI). Listens for HTTP traffic.
+  deck-sync:
+    image: kong/deck:latest
+    volumes:
+      - ./kong-data:/deck
+    entrypoint: >
+      /bin/sh -c "
+      until curl -s http://host.docker.internal:8001/status; do
+        echo 'Waiting for Kong to be ready...';
+        sleep 2;
+      done;
+      deck sync --state /deck/kong.yaml --kong-addr http://host.docker.internal:8001"
+    depends_on:
+      - kong
   rabbitmq:
     image: rabbitmq:3-management
     hostname: grabOrgan-rabbit
