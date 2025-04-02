@@ -337,7 +337,7 @@ const DoctorDeliveryTracker = ({ deliveryId }) => {
         <CardContent className="p-0">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-0">
             {/* Mapbox container */}
-            <div className="col-span-2 h-[28rem] relative">
+            <div className="col-span-2 h-[28rem] relative ml-4">
               <div ref={mapContainer} className="w-full h-full" />
 
               {/* Loading overlay */}
@@ -446,44 +446,6 @@ const DoctorDeliveryTracker = ({ deliveryId }) => {
                       </div>
                     </div>
                   </div>
-                </div>
-
-                <div className="bg-white p-4 rounded-lg border border-gray-100">
-                  <h3 className="font-semibold mb-2 text-blue-700">
-                    {organType} Viability
-                  </h3>
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">
-                      Cold ischemic time remaining:
-                    </p>
-                    <div className="w-full bg-gray-200 rounded-full h-2.5">
-                      <div
-                        className="bg-green-600 h-2.5 rounded-full"
-                        style={{ width: "70%" }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span>0 hours</span>
-                      <span className="font-medium">3.5 hours remaining</span>
-                      <span>5 hours</span>
-                    </div>
-
-                    <p className="text-sm mt-4">
-                      <span className="font-medium">Temperature:</span> 4°C
-                      (optimal)
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-white p-4 rounded-lg border border-gray-100">
-                  <h3 className="font-semibold mb-2 text-blue-700">
-                    Preparation Instructions
-                  </h3>
-                  <p className="text-sm">
-                    Please ensure the transplant team is ready 30 minutes before
-                    estimated arrival time. Organ preservation solution and
-                    equipment should be prepared in advance.
-                  </p>
                 </div>
               </div>
             </div>
