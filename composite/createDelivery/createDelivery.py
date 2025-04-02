@@ -16,29 +16,29 @@ SERVICE_URLS = {
     "location": "https://zsq.outsystemscloud.com/Location/rest/Location/"
 }
 
-hospital_coords_dict = {
-        "CGH": {
-            "address": "2 Simei St 3, Singapore 529889",
-        },
-        "SGH": {
-            "address": "Outram Rd, Singapore 169608",
-        },
-        "TTSH": {
-            "address": "11 Jln Tan Tock Seng, Singapore 308433",
-        },
-        "SKGH": {
-            "address": "110 Sengkang E Wy, Singapore 544886",
-        },
-        "NUH": {
-            "address": "5 Lower Kent Ridge Rd, Singapore 119074",
-        },
-        "KTPH": {
-            "address": "90 Yishun Central, Singapore 768828",
-        },
-        "NTFGH": {
-            "address": "1 Jurong East Street 21, Singapore 609606",
-        }
-    }
+# hospital_coords_dict = {
+#         "CGH": {
+#             "address": "2 Simei St 3, Singapore 529889",
+#         },
+#         "SGH": {
+#             "address": "Outram Rd, Singapore 169608",
+#         },
+#         "TTSH": {
+#             "address": "11 Jln Tan Tock Seng, Singapore 308433",
+#         },
+#         "SKGH": {
+#             "address": "110 Sengkang E Wy, Singapore 544886",
+#         },
+#         "NUH": {
+#             "address": "5 Lower Kent Ridge Rd, Singapore 119074",
+#         },
+#         "KTPH": {
+#             "address": "90 Yishun Central, Singapore 768828",
+#         },
+#         "NTFGH": {
+#             "address": "1 Jurong East Street 21, Singapore 609606",
+#         }
+#     }
 
 HEADERS = {'Content-Type': 'application/json'}
 TIMEOUT = 10  # API timeout for requests
@@ -136,8 +136,8 @@ def create_delivery_composite():
         if not data:
             return jsonify({"error": "No JSON data received"}), 400
 
-        origin_address = hospital_coords_dict[data.get("startHospital")]
-        destination_address = hospital_coords_dict[data.get("endHospital")]
+        origin_address = data.get("startHospital")
+        destination_address = data.get("endHospital")
         destination_time = data.get("transplantDateTime")
         organ_type = data.get("organType")
 
