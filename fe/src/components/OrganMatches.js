@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { formatDate } from "@/utils/recipientUtils";
 import TransplantDateTimePicker from "./TransplantDateTime";
+import { confirmMatch } from "@/utils/recipientUtils";
 
 export default function OrganMatches({
   matches,
@@ -15,7 +16,6 @@ export default function OrganMatches({
   requestLoading,
   requestSuccess,
   recipientId,
-  confirmMatch,
 }) {
   // Dialog state
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -58,7 +58,7 @@ export default function OrganMatches({
     };
 
     console.log(payload);
-    // confirmMatch(payload);
+    confirmMatch(payload);
 
     // Close the dialog
     setShowConfirmDialog(false);
