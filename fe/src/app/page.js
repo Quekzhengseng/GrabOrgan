@@ -26,7 +26,7 @@ export default function LoginPage() {
       if (userType === "doctor") {
         router.push("/doctor");
       } else {
-        router.push("/delivery");
+        router.push(`/delivery?id=${email}`);
       }
     }, 1500);
   };
@@ -86,15 +86,15 @@ export default function LoginPage() {
                   className="block text-gray-700 text-sm font-medium mb-2"
                   htmlFor="email"
                 >
-                  Email Address
+                  Login ID
                 </label>
                 <input
                   id="email"
-                  type="email"
+                  type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="you@example.com"
+                  placeholder="1234"
                 />
               </div>
 

@@ -241,11 +241,7 @@ const DeliveryMapbox = ({ deliveryData }) => {
         // Create truck marker if not already created
         if (!truckMarker.current) {
           // Start at origin or driver position if available
-          const initialPosition = deliveryData?.driverCoord
-            ? [deliveryData.driverCoord.lng, deliveryData.driverCoord.lat]
-            : routePoints.length > 0
-            ? [routePoints[0].lng, routePoints[0].lat]
-            : originCoords;
+          const initialPosition = originCoords;
 
           const el = document.createElement("div");
           el.className = "truck-marker";

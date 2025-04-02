@@ -10,6 +10,7 @@ import RecipientProfile from "@/components/RecipientProfile";
 import LabReports from "@/components/LabReports";
 import OrganMatches from "@/components/OrganMatches";
 import ActivityTimeline from "@/components/ActivityTimeline";
+import DoctorDeliveryTracker from "@/components/DoctorDeliveryTracker";
 import {
   fetchRecipients,
   fetchLabReports,
@@ -229,7 +230,9 @@ export default function RecipientsDashboard() {
             <div className="mt-6 bg-white rounded-lg shadow-lg overflow-hidden">
               <div className="lg:col-span-2">
                 {/* Insert the map component with delivery data */}
-                {deliveryInfo("Test")}
+                <DoctorDeliveryTracker
+                  deliveryId={"83529021-fe44-4614-912c-5a6357e1b910"}
+                />
               </div>
             </div>
           </div>

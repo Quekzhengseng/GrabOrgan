@@ -265,6 +265,29 @@ export const fetchDeliveries = async () => {
 };
 
 /**
+ * Get a specific Delivery
+ * @param {string} deliveryId - The driver ID to retrieve
+ * @returns {Promise<boolean>} Success status
+ */
+export const getSpecificDelivery = async (deliveryId) => {
+  const response = await fetch(
+    `http://localhost:5002/deliveryinfo/${deliveryId}`
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to retrieve driver data");
+  }
+
+  const data = await response.json();
+
+  if (data) {
+    return data.data;
+  } else {
+    throw new Error("Invalid response format");
+  }
+};
+
+/**
  * Delete a delivery
  * @param {string} deliveryId - The delivery ID to delete
  * @returns {Promise<boolean>} Success status
@@ -287,3 +310,28 @@ export const deleteDelivery = async (deliveryId) => {
 
   return true;
 };
+
+/**
+ * Get a Driver
+ * @param {string} driverId - The driver ID to retrieve
+ * @returns {Promise<boolean>} Success status
+ */
+export const getDriver = async (driverId) => {
+  const response = await fetch(`http://localhost:5004/drivers/${driverId}`);
+
+  if (!response.ok) {
+    throw new Error("Failed to retrieve driver data");
+  }
+
+  const data = await response.json();
+
+  if (data) {
+    // Convert the object of recipients into an array
+    return data;
+  } else {
+    throw new Error("Invalid response format");
+  }
+};
+
+
+//Insert function to call back selectDriver to update delivery/driver

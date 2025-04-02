@@ -1,6 +1,7 @@
 import firebase_admin
 from firebase_admin import credentials, firestore
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 import os
 
 key_path = os.getenv("DRIVERINFO_DB_KEY", "./secrets/driverInfo_Key.json")  # Default for local testing
@@ -11,6 +12,7 @@ firebase_admin.initialize_app(cred)
 
 db = firestore.client()
 app = Flask(__name__)
+CORS(app)
 
 #landing page
 @app.route("/", methods=["GET"])
