@@ -245,23 +245,23 @@ export const requestNewOrgans = async (recipient) => {
 
 /**
  * Confirm match for a recipient
- * @param {Object} confirmedMatch - The recipient object
+ * @param {Object} confirmedMatch_load - The recipient object
  * @returns {Promise<Object>} Response from the confirm-match API
  */
-export const confirmMatch = async (confirmedMatch) => {
+export const confirmMatch = async (confirmedMatch_payload) => {
   const response = await fetch("http://localhost:8000/api/v1/confirm-match", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      organType: confirmedMatch.organType,
-      doctorId: confirmedMatch.doctorId,
-      transplantDateTime: confirmedMatch.transplantDateTime,
-      startHospital: confirmedMatch.startHospital,
-      endHospital: confirmedMatch.endHospital,
-      matchId: confirmedMatch.matchId,
-      remarks: confirmedMatch.remarks,
+      organType: confirmedMatch_payload.organType, // "liver"
+      doctorId: confirmedMatch_payload_payload.doctorId, // "example@gmail.com"
+      transplantDateTime: confirmedMatch_payload.transplantDateTime, // "2025-03-31T05:30:00.000Z" UTC
+      startHospital: confirmedMatch_payload.startHospital, // "CGH"
+      endHospital: confirmedMatch_payload.endHospital, // "TTSH"
+      matchId: confirmedMatch_payload.matchId, // "string ID"
+      remarks: confirmedMatch_payload.remarks, // "To be reviewed"
     }),
   });
 
