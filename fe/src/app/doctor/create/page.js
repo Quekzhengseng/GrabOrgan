@@ -200,12 +200,21 @@ export default function CreateRecipient() {
                 <label className="block text-sm font-medium mb-1">
                   Blood Type
                 </label>
-                <input
-                  type="text"
+                <select
                   value={formData.recipient.bloodType}
                   onChange={(e) => handleChange(e, "recipient", "bloodType")}
                   className="w-full border rounded p-2"
-                />
+                >
+                  <option value="">Select Blood Type</option>
+                  <option value="O+">O+</option>
+                  <option value="O-">O-</option>
+                  <option value="A-">A-</option>
+                  <option value="A+">A+</option>
+                  <option value="B-">B-</option>
+                  <option value="B+">B+</option>
+                  <option value="AB-">AB-</option>
+                  <option value="A+">AB+</option>
+                </select>
               </div>
               {/* Gender */}
               <div>
@@ -543,14 +552,22 @@ export default function CreateRecipient() {
                   <label className="block text-sm font-medium mb-1">
                     Relationship
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.recipient.nokContact.relationship}
                     onChange={(e) =>
                       handleChange(e, "recipient", "nokContact", "relationship")
                     }
                     className="w-full border rounded p-2"
-                  />
+                  >
+                    <option value="">Select Relationship</option>
+                    <option value="Spouse">Spouse</option>
+                    <option value="Sibling">Sibling</option>
+                    <option value="Son">Son</option>
+                    <option value="Daughter">Daughter</option>
+                    <option value="Father">Father</option>
+                    <option value="Mother">Mother</option>
+                    <option value="Guardian">Guardian</option>
+                  </select>
                 </div>
               </div>
             </div>
