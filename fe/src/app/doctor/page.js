@@ -407,7 +407,17 @@ export default function RecipientsDashboard() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Organ Recipients</h1>
+        <div className="inline-flex justify-content-center">
+          <h1 className="text-2xl font-bold text-gray-800 ">
+            Organ Recipients
+          </h1>
+          <Link
+            href="/doctor/create"
+            className="mx-4  px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          >
+            Create New
+          </Link>
+        </div>
         <Link
           href="/"
           className="px-4 py-2 bg-gray-100 rounded-md text-gray-600 hover:bg-gray-200 transition-colors"

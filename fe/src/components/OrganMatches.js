@@ -2,17 +2,15 @@ import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { formatDate } from "@/utils/recipientUtils";
 import TransplantDateTimePicker from "./TransplantDateTime";
-import { confirmMatch } from "@/utils/recipientUtils";
+import { confirmMatch, initiateMatch } from "@/utils/recipientUtils";
 
 export default function OrganMatches({
   matches,
   loading,
   error,
   onRefresh,
-  onRequestNewOrgans,
   selectedMatch,
   onSelectMatch,
-  onRequestOrgan,
   requestLoading,
   requestSuccess,
   recipientId,
@@ -64,6 +62,12 @@ export default function OrganMatches({
     setShowConfirmDialog(false);
     setConfirmedMatch(null);
   };
+
+  const handleInitiateMatch = () =>{
+    if (!recipientId) return;
+    initiateMatch(recipientId)
+  }
+
   return (
     <div className="bg-white rounded-lg shadow-lg overflow-hidden">
       <div className="bg-green-600 text-white p-6 flex justify-between items-center">
@@ -71,7 +75,7 @@ export default function OrganMatches({
         <div className="flex gap-2">
           {matches.length === 0 && !loading && (
             <button
-              onClick={onRequestNewOrgans}
+              onClick={handleInitiateMatch}
               className="px-4 py-2 bg-white text-orange-600 rounded-md hover:bg-gray-100 transition-colors flex items-center"
               disabled={requestLoading}
             >
@@ -81,7 +85,7 @@ export default function OrganMatches({
                   Requesting...
                 </>
               ) : (
-                "Request New Organs"
+                "Find Matches"
               )}
             </button>
           )}

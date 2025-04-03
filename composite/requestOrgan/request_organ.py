@@ -11,15 +11,15 @@ import random
 app = Flask(__name__)
 CORS(app)
 
-rabbitmq_host = os.getenv("RABBITMQ_HOST", "rabbitmq")
-rabbitmq_port = int(os.getenv("RABBITMQ_PORT", "5672"))
-exchange_name = os.getenv("RABBITMQ_EXCHANGE", "request_organ_exchange")
-routing_key = os.getenv("RABBITMQ_ROUTING_KEY", "match.request")
-PERSONAL_DATA_URL = os.getenv("PERSONAL_DATA_URL", "http://personalData:5011/person")
-PSEUDONYM_URL = os.getenv("PSEUDONYM_URL", "http://pseudonym:5012/pseudonymise")
-RECIPIENT_URL = os.getenv("RECIPIENT_URL", "http://recipient:5013/recipient")
-LAB_REPORT_URL = os.getenv("LAB_REPORT_URL", "http://labInfo:5007/lab-reports")
-OUTSYSTEMS_PERSONAL_DATA_URL = os.getenv("OUTSYSTEMS_PERSONAL_DATA_URL", "https://personal-gbst4bsa.outsystemscloud.com/PatientAPI/rest/patientAPI/patients/")
+rabbitmq_host = os.environ.get("RABBITMQ_HOST") or "localhost"
+rabbitmq_port = int(os.environ.get("RABBITMQ_PORT")) or "5672"
+exchange_name = os.environ.get("RABBITMQ_EXCHANGE") or "request_organ_exchange"
+routing_key = os.environ.get("RABBITMQ_ROUTING_KEY") or "match.request"
+PERSONAL_DATA_URL = os.environ.get("PERSONAL_DATA_URL", "http://personalData:5011/person") or "http://localhost:5011/person"
+PSEUDONYM_URL = os.environ.get("PSEUDONYM_URL", "http://pseudonym:5012/pseudonymise") or "http://localhost:5012/pseudonymise"
+RECIPIENT_URL = os.environ.get("RECIPIENT_URL", "http://recipient:5013/recipient") or "http://localhost:5013/recipient"
+LAB_REPORT_URL = os.environ.get("LAB_REPORT_URL", "http://labInfo:5007/lab-reports") or "http://localhost:5007/lab-reports"
+OUTSYSTEMS_PERSONAL_DATA_URL = os.environ.get("OUTSYSTEMS_PERSONAL_DATA_URL" ) or "https://personal-gbst4bsa.outsystemscloud.com/PatientAPI/rest/patientAPI/patients/"
 
 connection = None 
 channel = None
