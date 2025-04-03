@@ -3,10 +3,13 @@ from flask_cors import CORS
 import requests
 import random
 
+from common import invoke_http
+
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
 DRIVER_INFO_ENDPOINT = "http://driverInfo_service:5004/drivers"
+DELIVERY_ENDPOINT = "http://delivery_service:5002/deliveryinfo"
 PlaceToCoord_ENDPOINT = "https://zsq.outsystemscloud.com/Location/rest/Location/PlaceToCoord"
 Route_ENDPOINT = "https://zsq.outsystemscloud.com/Location/rest/Location/route"
 
@@ -51,7 +54,7 @@ def select_driver():
 
         print(f"origin address available_drivers: {available_drivers}")
 
-
+        #drivers available at origin address
         if available_drivers:
             driver = random.choice(available_drivers)
             print(f"Chosen driver first round {driver}")
@@ -65,18 +68,11 @@ def select_driver():
                 "data": {"DriverId": driver_id}
             }), 200
         
+        #need start finding drivers from other hospitals
         else:
             replacement_driver = ""
-
-            hospital_address_dict = {
-                "CGH": "2 Simei St 3, Singapore 529889",
-                "SGH": "Outram Rd, Singapore 169608",
-                "TTSH": "11 Jln Tan Tock Seng, Singapore 308433",
-                "SKGH": "110 Sengkang E Wy, Singapore 544886",
-                "NUH": "5 Lower Kent Ridge Rd, Singapore 119074",
-                "KTPH": "90 Yishun Central, Singapore 768828",
-                "NTFGH": "1 Jurong East Street 21, Singapore 609606"
-            }
+            hospital_address_dict = get_other_hospitals()
+            
 
             sorted_dict_hospital_distances= get_sorted_hospital_distances(origin_address, hospital_address_dict)
 
@@ -115,6 +111,60 @@ def select_driver():
         return jsonify({"error": f"Driver service request failed: {str(e)}"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/acknowledge-driver", methods=['POST'])
+def acknowledge_driver():
+    """
+    Expected input JSON:
+    {
+        driverID: XXX,
+        deliveryId: XXX
+    }
+    """
+    try:
+        data = request.json()
+        driverId = data.get("driverId")
+        deliveryId = data.get("deliveryId")
+
+        if not driverId:
+            return jsonify({"error": "Missing driverId in request body."}), 400
+
+        if not deliveryId:
+            return jsonify({"error": "Missing deliveryId in request body."}), 400
+
+        # Update Delivery atomic service
+        delivery_url = f"{DELIVERY_ENDPOINT}/{deliveryId}"
+        delivery_update = {"driverId": driverId, "status": "Assigned"}
+        delivery_resp = invoke_http(delivery_url, method="PUT", json=delivery_update)
+        
+
+        # Update DriverInfo atomic service
+        driver_url = f"{DRIVER_INFO_ENDPOINT}/{driverId}"
+        
+        driver_update = {"isBooked": True, "awaitingAcknowledgement": False}
+        driver_resp = invoke_http(driver_url, method="PATCH", json=driver_update)
+
+        return jsonify({
+            "code": 200,
+            "message": "Driver acknowledged and updated Driver & Delivery successfully."
+        }), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
+def get_other_hospitals():
+    return {
+                "CGH": "2 Simei St 3, Singapore 529889",
+                "SGH": "Outram Rd, Singapore 169608",
+                "TTSH": "11 Jln Tan Tock Seng, Singapore 308433",
+                "SKGH": "110 Sengkang E Wy, Singapore 544886",
+                "NUH": "5 Lower Kent Ridge Rd, Singapore 119074",
+                "KTPH": "90 Yishun Central, Singapore 768828",
+                "NTFGH": "1 Jurong East Street 21, Singapore 609606"
+            }
 
 
 def get_lat(longname):
