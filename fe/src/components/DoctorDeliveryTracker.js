@@ -49,7 +49,7 @@ const DoctorDeliveryTracker = ({ deliveryId }) => {
     fetchDeliveryData();
 
     // Set up polling every 30 seconds
-    pollingInterval.current = setInterval(fetchDeliveryData, 30000);
+    pollingInterval.current = setInterval(fetchDeliveryData, 2000);
 
     return () => {
       if (pollingInterval.current) {
@@ -238,9 +238,9 @@ const DoctorDeliveryTracker = ({ deliveryId }) => {
         }
 
         // Fit map to show the entire route
-        const bounds = new window.mapboxgl.LngLatBounds();
-        mapboxCoords.forEach((coord) => bounds.extend(coord));
-        map.current.fitBounds(bounds, { padding: 50 });
+        // const bounds = new window.mapboxgl.LngLatBounds();
+        // mapboxCoords.forEach((coord) => bounds.extend(coord));
+        // map.current.fitBounds(bounds, { padding: 50 });
       } catch (err) {
         console.error("Error setting up route:", err);
         setError(`Failed to set up route: ${err.message}`);
@@ -278,11 +278,11 @@ const DoctorDeliveryTracker = ({ deliveryId }) => {
           .addTo(map.current);
 
         // Center the map on the driver's location
-        map.current.flyTo({
-          center: [driverLocation.lng, driverLocation.lat],
-          zoom: 14,
-          speed: 1.5,
-        });
+        // map.current.flyTo({
+        //   center: [driverLocation.lng, driverLocation.lat],
+        //   zoom: 14,
+        //   speed: 1.5,
+        // });
       } else {
         truckMarker.current.setLngLat([driverLocation.lng, driverLocation.lat]);
       }

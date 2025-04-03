@@ -1,3 +1,5 @@
+import { fetchDeliveries } from "./routeUtils";
+
 // utils/recipientUtils.js
 
 /**
@@ -318,3 +320,46 @@ export const confirmMatch = async (confirmedMatch) => {
 //     }
 //   }
 // }
+
+
+/**
+ * Find all deliveries that match a specific recipient ID
+ * @param {string} recipientId - The ID of the recipient to match
+ * @returns {Promise<Array>} Array of delivery objects that match the recipient
+ */
+export const matchDeliveries = async (recipientId) => {
+  if (!recipientId) {
+    throw new Error("Recipient ID is required");
+  }
+
+  try {
+    // Step 1: Use the existing findOrganMatches function to get all matches for this recipient
+    const matches = await findOrganMatches(recipientId);
+    
+    if (!matches || matches.length === 0) {
+      return []; // No matches found for this recipient
+    }
+    
+    // Step 2: Fetch all deliveries using the existing fetchDeliveries function
+    const deliveries = await fetchDeliveries();
+    
+    // Step 3: Find all deliveries with matchIds that correspond to our matches
+    const matchIds = matches.map(match => match.matchId);
+    
+    const matchingDeliveries = deliveries.filter(delivery => 
+      delivery.matchId && matchIds.includes(delivery.matchId)
+    ).map(delivery => {
+      // Find the corresponding match details
+      const matchDetails = matches.find(match => match.matchId === delivery.matchId);
+      return {
+        ...delivery,
+        matchDetails
+      };
+    });
+    
+    return matchingDeliveries;
+  } catch (error) {
+    console.error("Error in matchDeliveries:", error);
+    throw error;
+  }
+}
