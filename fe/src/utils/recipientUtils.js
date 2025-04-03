@@ -247,7 +247,26 @@ export const requestNewOrgans = async (payload) => {
 
 /**
  * Confirm match for a recipient
- * @param {Object} confirmedMatch_load - The recipient object
+ * @param {Object} recipientId - The recipient object
+ * @returns {Promise<Object>} Response from the confirm-match API
+ */
+export const initiateMatch = async (recipientId) => {
+  const response = await fetch(
+    `http://localhost:8000/api/v1/initiate-match/${recipientId}`,
+    {
+      method: "POST",
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Request failed with status ${response.status}`);
+  }
+
+  return response.json();
+};
+/**
+ * Confirm match for a recipient
+ * @param {Object} payload - The recipient object
  * @returns {Promise<Object>} Response from the confirm-match API
  */
 export const confirmMatch = async (payload) => {
