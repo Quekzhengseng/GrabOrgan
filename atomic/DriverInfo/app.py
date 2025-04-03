@@ -44,7 +44,8 @@ def add_driver():
             "currentAssignedDeliveryId",
             "isBooked",
             "name",
-            "stationed_hospital"
+            "stationed_hospital",
+            "email"
         }
 
         received_fields = set(driver_info.keys())
