@@ -317,7 +317,9 @@ export const deleteDelivery = async (deliveryId) => {
  * @returns {Promise<boolean>} Success status
  */
 export const getDriver = async (driverId) => {
-  const response = await fetch(`http://localhost:5004/drivers/${driverId}`);
+  const response = await fetch(
+    `http://localhost:8000/api/v1/drivers/${driverId}`
+  );
 
   if (!response.ok) {
     throw new Error("Failed to retrieve driver data");
@@ -333,5 +335,50 @@ export const getDriver = async (driverId) => {
   }
 };
 
-
 //Insert function to call back selectDriver to update delivery/driver
+
+//Function to update delivery
+export const trackDelivery = async (deliveryId, driverCoord) => {
+  try {
+    // Log the exact data being sent for debugging
+    const requestBody = {
+      deliveryId: deliveryId,
+      driverCoord: {
+        lat: driverCoord["lat"],
+        lng: driverCoord["lng"],
+      },
+    };
+    console.log("Sending request:", requestBody);
+
+    const response = await fetch("http://localhost:5025/trackDelivery", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      // Try to get error details from the response
+      try {
+        const errorData = await response.json();
+        throw new Error(
+          `API error: ${response.status} - ${JSON.stringify(errorData)}`
+        );
+      } catch {
+        throw new Error(`API error: ${response.status}`);
+      }
+    }
+
+    const data = await response.json();
+    console.log("Response data:", data);
+
+    return {
+      polyline: data.data.polyline,
+      deviation: data.data.deviation,
+    };
+  } catch (error) {
+    console.error("Error Updating Delivery:", error);
+    return null;
+  }
+};

@@ -12,7 +12,7 @@ firebase_admin.initialize_app(cred)
 
 db = firestore.client()
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 #landing page
 @app.route("/", methods=["GET"])

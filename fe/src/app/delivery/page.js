@@ -46,8 +46,9 @@ export default function DeliveryOrdersPage() {
 
         for (let i = 0; i < allDeliveryData.length; i++) {
           if (
-            allDeliveryData[i].driverId == id &&
-            allDeliveryData[i].status == "Assigned"
+            (allDeliveryData[i].driverId == id &&
+              allDeliveryData[i].status == "Assigned") ||
+            allDeliveryData[i].status == "In Progress"
           ) {
             deliveryData.push(allDeliveryData[i]);
           }
@@ -169,7 +170,10 @@ export default function DeliveryOrdersPage() {
 
           <div className="lg:col-span-2">
             {/* Insert the map component with delivery data */}
-            <DeliveryMapbox deliveryData={selectedDelivery} />
+            <DeliveryMapbox
+              deliveryId={orderIdParam}
+              deliveryData={selectedDelivery}
+            />
           </div>
         </div>
       </div>
@@ -190,7 +194,7 @@ export default function DeliveryOrdersPage() {
       </div>
 
       {/* Driver Status Monitor */}
-      <DriverStatusMonitor driverId={id} />
+      <DriverStatusMonitor driverId={driverId} />
 
       {/* Search and Filter Section */}
       <SearchAndFilter

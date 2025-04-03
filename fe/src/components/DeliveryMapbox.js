@@ -11,9 +11,11 @@ import {
   calculateEstimatedDeliveryTime,
   addressToCoordinates,
   calculateProgressByDistance,
+  trackDelivery,
 } from "@/utils/routeUtils";
+import next from "next";
 
-const DeliveryMapbox = ({ deliveryData }) => {
+const DeliveryMapbox = ({ deliveryId, deliveryData }) => {
   const mapContainer = useRef(null);
   const map = useRef(null);
   const truckMarker = useRef(null);
@@ -41,6 +43,9 @@ const DeliveryMapbox = ({ deliveryData }) => {
     },
     progress: 0,
   });
+
+  console.log("Received deliveryId:", deliveryId);
+  console.log("Received deliveryData:", deliveryData);
 
   // Clean up resources when component unmounts
   useEffect(() => {
@@ -318,17 +323,14 @@ const DeliveryMapbox = ({ deliveryData }) => {
       const nextPoint = routePoints[index];
 
       // Check for deviation
-      checkRouteDeviation(basePolyline, nextPoint)
+      trackDelivery(deliveryId, nextPoint)
         .then((result) => {
-          if (result.deviated) {
+          if (result.deviation) {
             console.log("Route deviation detected at position:", nextPoint);
             setRouteDeviation(true);
 
             // Request new route from current position to destination
-            requestNewRoute(nextPoint, {
-              lat: destinationCoords[1],
-              lng: destinationCoords[0],
-            })
+            decodePolyline(result.polyline)
               .then((newCoords) => {
                 if (newCoords && newCoords.length > 0) {
                   console.log(

@@ -1,4 +1,3 @@
-// File: app/doctor/page.js
 "use client";
 
 import { useState, useEffect } from "react";
@@ -19,6 +18,7 @@ import {
   createDeliveryRequest,
   requestNewOrgans,
   getPersonalData,
+  matchDeliveries,
 } from "@/utils/recipientUtils";
 
 export default function RecipientsDashboard() {
@@ -36,6 +36,11 @@ export default function RecipientsDashboard() {
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [requestLoading, setRequestLoading] = useState(false);
   const [requestSuccess, setRequestSuccess] = useState(false);
+
+  // Delivery tracking states
+  const [matchedDeliveries, setMatchedDeliveries] = useState([]);
+  const [deliveriesLoading, setDeliveriesLoading] = useState(false);
+  const [deliveriesError, setDeliveriesError] = useState(null);
 
   useEffect(() => {
     async function loadRecipients() {
@@ -77,6 +82,26 @@ export default function RecipientsDashboard() {
     }
   };
 
+  // Handle fetching delivery information for a recipient
+  const loadDeliveries = async (recipientId) => {
+    if (!recipientId) return;
+
+    setDeliveriesLoading(true);
+    setDeliveriesError(null);
+
+    try {
+      const deliveries = await matchDeliveries(recipientId);
+      console.log("Matched deliveries:", deliveries);
+      setMatchedDeliveries(deliveries || []);
+    } catch (err) {
+      console.error("Error finding delivery matches:", err);
+      setDeliveriesError(err.message);
+      setMatchedDeliveries([]);
+    } finally {
+      setDeliveriesLoading(false);
+    }
+  };
+
   // Handle click on a recipient to view details
   const handleRecipientClick = (recipient) => {
     setSelectedRecipient(recipient);
@@ -84,6 +109,8 @@ export default function RecipientsDashboard() {
     setMatches([]);
     setMatchError(null);
     setRequestSuccess(false);
+    setMatchedDeliveries([]);
+    setDeliveriesError(null);
 
     if (recipient.recipientId) {
       // Fetch lab reports
@@ -91,6 +118,9 @@ export default function RecipientsDashboard() {
 
       // Automatically find matches for this recipient
       handleFindMatches(recipient.recipientId);
+
+      // Find matching deliveries
+      loadDeliveries(recipient.recipientId);
     }
   };
 
@@ -101,6 +131,7 @@ export default function RecipientsDashboard() {
     setMatches([]);
     setSelectedMatch(null);
     setRequestSuccess(false);
+    setMatchedDeliveries([]);
   };
 
   // Find potential organ matches for a recipient
@@ -142,6 +173,11 @@ export default function RecipientsDashboard() {
 
       // Show success message
       setRequestSuccess(true);
+
+      // Refresh delivery info after request
+      setTimeout(() => {
+        loadDeliveries(selectedRecipient.recipientId);
+      }, 2000);
     } catch (err) {
       console.error("Error requesting organ:", err);
       alert(`Failed to request organ: ${err.message}`);
@@ -178,12 +214,135 @@ export default function RecipientsDashboard() {
     }
   };
 
-  const deliveryInfo = (deliveryData) => {
-    if (deliveryData) {
-      return <DeliveryMapbox deliveryData={deliveryData} />;
-    } else {
-      return "Tough";
+  // Render delivery trackers section
+  const renderDeliveryTrackers = () => {
+    if (deliveriesLoading) {
+      return (
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-green-500" />
+          <span className="ml-2 text-gray-600">
+            Loading delivery information...
+          </span>
+        </div>
+      );
     }
+
+    if (deliveriesError) {
+      return (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4 text-sm text-red-600">
+          <p>Error loading delivery information: {deliveriesError}</p>
+        </div>
+      );
+    }
+
+    if (matchedDeliveries.length === 0) {
+      return (
+        <div className="bg-gray-50 rounded-md p-6 text-center">
+          <p className="text-gray-500">
+            No active deliveries found for this recipient.
+          </p>
+          {requestSuccess && (
+            <p className="text-green-600 mt-2">
+              A new organ has been requested. Delivery information will appear
+              here when available.
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        <div className="border-b pb-4">
+          <h3 className="text-lg font-medium text-gray-900">
+            Active Organ Deliveries
+          </h3>
+          <p className="text-sm text-gray-500">
+            {matchedDeliveries.length} deliveries in progress
+          </p>
+        </div>
+
+        {matchedDeliveries.map((delivery, index) => (
+          <div
+            key={delivery.orderID}
+            className="bg-white rounded-lg shadow-md overflow-hidden"
+          >
+            <div className="bg-gray-50 px-4 py-3 border-b">
+              <div className="flex justify-between items-center">
+                <h4 className="font-medium text-gray-900">
+                  Delivery #{index + 1}: {delivery.organType} Organ
+                </h4>
+                <span
+                  className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    delivery.status === "In Progress"
+                      ? "bg-green-100 text-green-800"
+                      : delivery.status === "Assigned"
+                      ? "bg-blue-100 text-blue-800"
+                      : "bg-gray-100 text-gray-800"
+                  }`}
+                >
+                  {delivery.status}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-4">
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <p className="text-xs text-gray-500">Pickup Location</p>
+                  <p className="text-sm font-medium">{delivery.pickup}</p>
+                  <p className="text-xs text-gray-500">
+                    {new Date(
+                      delivery.pickup_time.replace(" ", "T")
+                    ).toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Destination</p>
+                  <p className="text-sm font-medium">{delivery.destination}</p>
+                  <p className="text-xs text-gray-500">
+                    {new Date(
+                      delivery.destination_time.replace(" ", "T")
+                    ).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
+              {/* Map for this delivery */}
+              <DoctorDeliveryTracker deliveryId={delivery.orderID} />
+
+              {/* Match details if available */}
+              {delivery.matchDetails && (
+                <div className="mt-4 bg-blue-50 p-3 rounded-md">
+                  <p className="text-xs text-blue-500 font-medium">
+                    MATCH DETAILS
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 mt-1">
+                    <p className="text-xs text-gray-700">
+                      HLA Compatibility: {delivery.matchDetails.numOfHLA}/6
+                    </p>
+                    <p className="text-xs text-gray-700">
+                      Match ID: {delivery.matchDetails.matchId.substring(0, 8)}
+                      ...
+                    </p>
+                    <p className="text-xs text-gray-700">
+                      Donor ID: {delivery.matchDetails.donorId.substring(0, 8)}
+                      ...
+                    </p>
+                    <p className="text-xs text-gray-700">
+                      Test Date:{" "}
+                      {new Date(
+                        delivery.matchDetails.testDateTime
+                      ).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   // Render recipient detail view
@@ -234,14 +393,9 @@ export default function RecipientsDashboard() {
               <ActivityTimeline requestSuccess={requestSuccess} />
             </div>
 
-            {/* Delivery Map Section */}
+            {/* Delivery Tracking Section */}
             <div className="mt-6 bg-white rounded-lg shadow-lg overflow-hidden">
-              <div className="lg:col-span-2">
-                {/* Insert the map component with delivery data */}
-                <DoctorDeliveryTracker
-                  deliveryId={"83529021-fe44-4614-912c-5a6357e1b910"}
-                />
-              </div>
+              <div className="p-4">{renderDeliveryTrackers()}</div>
             </div>
           </div>
         </div>
