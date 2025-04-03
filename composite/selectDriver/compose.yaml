@@ -1,10 +1,28 @@
 services:
   selectDriver:
     build:
-      context: ./
+      context: ../..
+      # context: ../../composite/selectDriver
       dockerfile: Dockerfile.selectDriver
     image: GrabOrgan/selectDriver:1.0
     # restart: always
     container_name: selectDriver
+    environment:
+      - RABBITMQ_HOST=rabbitmq # Connect using RabbitMQ service name
+      - PYTHONPATH=/usr/src/app
     ports:
       - "5024:5000"
+    depends_on:
+      - rabbitmq
+
+  rabbitmq:
+    image: rabbitmq:3.9-management
+    container_name: rabbitmq
+    ports:
+      - "5673:5672"
+      - "15673:15672"  # Changed host port to avoid conflicts if needed
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - graborgan-net

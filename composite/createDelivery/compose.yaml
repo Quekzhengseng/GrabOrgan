@@ -1,10 +1,36 @@
 services:
+  rabbitmq:
+    image: rabbitmq:3.9-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672" # AMQP port
+      - "15672:15672" # RabbitMQ management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - grabOrgan-net
+
   createDelivery:
     build:
       context: ./
       dockerfile: Dockerfile.createDelivery
+    volumes:
+      - C:\Users\angwe\OneDrive\Documents\GitHub\GrabOrgan\composite\createDelivery:/usr/src/app
     image: GrabOrgan/deliveryinfo:1.0
     # restart: always
     container_name: createDelivery
     ports:
       - "5000:5000"
+    environment:
+      - RABBITMQ_HOST=rabbitmq # Connect using RabbitMQ service name
+      - RABBITMQ_PORT=5672 # Default RabbitMQ port
+    depends_on:
+      - rabbitmq
+      - delivery_info
+    networks:
+      - grabOrgan-net
+
+networks:
+  grabOrgan-net:
+    external: true
