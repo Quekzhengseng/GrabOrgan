@@ -116,10 +116,9 @@ export const fetchLabReports = async (recipientId) => {
  */
 export const findOrganMatches = async (recipientId) => {
   console.log("Searching for matches with recipient number:", recipientId);
-
   // Use the endpoint to get matches by recipient ID number
   const response = await fetch(
-    `http://localhost:5008/matches/recipient/${recipientId}`,
+    `http://localhost:8000/api/v1/organ-matches/${recipientId}`,
     {
       method: "GET",
       headers: {
