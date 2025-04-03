@@ -13,6 +13,36 @@ consumers:
   - keyauth_credentials:
       - key: reader
     username: reader
+plugins:
+- config:
+    credentials: true
+    exposed_headers: []
+    headers:
+    - Accept
+    - Content-Type
+    - Authorization
+    max_age: null
+    methods:
+    - GET
+    - HEAD
+    - PUT
+    - PATCH
+    - POST
+    - DELETE
+    - OPTIONS
+    - TRACE
+    - CONNECT
+    origins:
+    - http://localhost:3000
+    preflight_continue: false
+    private_network: false
+  enabled: true
+  name: cors
+  protocols:
+  - grpc
+  - grpcs
+  - http
+  - https
 services:
   - connect_timeout: 60000
     enabled: true

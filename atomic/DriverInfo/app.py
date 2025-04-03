@@ -37,10 +37,37 @@ def add_driver():
         driver_info = request.json
         if not driver_info:
             return jsonify({"error": "Request body cannot be empty"}), 400
-        
-        doc_ref = db.collection("drivers").add(driver_info) #auto generate ID
-        return jsonify({"message": "Driver added successfully"}), 201
-    
+
+        # Define allowed fields
+        required_fields = {
+            "awaitingAcknowledgement",
+            "currentAssignedDeliveryId",
+            "isBooked",
+            "name",
+            "stationed_hospital"
+        }
+
+        received_fields = set(driver_info.keys())
+
+        # Check for missing fields
+        missing_fields = required_fields - received_fields
+        if missing_fields:
+            return jsonify({"error": f"Missing required fields: {', '.join(missing_fields)}"}), 400
+
+        # Check for unwanted fields
+        extra_fields = received_fields - required_fields
+        if extra_fields:
+            return jsonify({"error": f"Unwanted fields detected: {', '.join(extra_fields)}"}), 400
+
+        # Add driver and get ID
+        doc_ref = db.collection("drivers").add(driver_info)
+        doc_id = doc_ref[1].id
+
+        return jsonify({
+            "message": "Driver added successfully",
+            "driver_id": doc_id
+        }), 201
+
     except Exception as error:
         return jsonify({"error": str(error)}), 500
 
@@ -75,28 +102,21 @@ def get_one_driver(driver_id):
         if doc.exists:
             return jsonify(doc.to_dict()), 200
         else:
-            return jsonify({"error": "Driver not found"}), 404
+            return jsonify({"error": f"Driver (id: {driver_id}) not found"}), 404
         
     except Exception as error:
         return jsonify({"error": str(error)}), 500
         
 
-#updates NON ARRAY fields
+#updates specific fields
 @app.route("/drivers/<driver_id>", methods=["PATCH"])
 def update_driver(driver_id):
     try:
-
-        #check if document exist
-        #if exist then use arrayunion
-        #if not js create
-        #bring bottom func up
-
-
         #check if driver_id exists
         doc_ref = db.collection("drivers").document(driver_id)
         doc = doc_ref.get()
         if not doc.exists:
-            return jsonify({"error": "Driver not found"}), 404
+            return jsonify({"error": f"Driver (id: {driver_id}) not found"}), 404
         
         data = request.json
         doc_ref.update(data) #can only update non array fields
@@ -109,30 +129,13 @@ def update_driver(driver_id):
         return jsonify({"error": str(error)}), 500
     
 
-#updates ARRAY fields (trip history)
-@app.route("/drivers/<driver_id>/trip", methods=["PATCH"])
-def add_trip(driver_id):
-    try:
-        data = request.json  # Expecting a dictionary like {"trip": "trip data"}
-        trip_info = data.get("trip")
-        
-        if not trip_info:
-            return jsonify({"error": "Trip data is required"}), 400
-
-        doc_ref = db.collection("drivers").document(driver_id)
-        doc_ref.update({"trip_history": firestore.ArrayUnion([trip_info])})
-
-        return jsonify({"message": "Trip added to history"}), 200
-    except Exception as error:
-        return jsonify({"error": str(error)}), 500
-
 #delete driver
 @app.route("/drivers/<driver_id>", methods=["DELETE"])
 def delete_driver(driver_id):
     try:
         doc_ref = db.collection("drivers").document(driver_id)
         doc_ref.delete()
-        return jsonify({"message": "Driver deleted successfully"}), 200
+        return jsonify({"message": f"Driver (id: {driver_id}) deleted successfully"}), 200
     except Exception as error:
         return jsonify({"error": str(error)}), 500
     
