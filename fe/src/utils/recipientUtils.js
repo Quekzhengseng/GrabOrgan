@@ -198,7 +198,8 @@ export const createDeliveryRequest = async () => {
  * @param {Object} recipient - The recipient object
  * @returns {Promise<Object>} Response from the request-for-organ API
  */
-export const requestNewOrgans = async (recipient) => {
+export const requestNewOrgans = async (payload) => {
+  console.log(payload);
   const response = await fetch(
     "http://localhost:8000/api/v1/request-for-organ",
     {
@@ -207,32 +208,32 @@ export const requestNewOrgans = async (recipient) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        recipient: {
-          recipientId: recipient.recipientId,
-          firstName: recipient.firstName,
-          lastName: recipient.lastName,
-          dateOfBirth: recipient.dateOfBirth,
-          nric: recipient.nric,
-          email: recipient.email,
-          address: recipient.address,
-          gender: recipient.gender,
-          bloodType: recipient.bloodType,
-          organsNeeded: recipient.organsNeeded,
-          nokContact: recipient.nokContact || {},
-        },
-        labInfo: {
-          // Lab report data
-          testType: "Tissue",
-          reportName: "Transplant Eligibility",
-          testType: "Organ Request",
-          dateOfReport: new Date().toISOString().split("T")[0], // YYYY-MM-DD formate
-          report: {
-            name: "Tissue Lab Test Report",
-            url: "https://www.parkwaylabs.com.sg/docs/parkwaylablibraries/test-catalogues/pls-tissue-forms.pdf?sfvrsn=1418faf5_1",
+        data: {
+          recipient: {
+            firstName: payload.recipient.firstName,
+            lastName: payload.recipient.lastName,
+            dateOfBirth: payload.recipient.dateOfBirth,
+            nric: payload.recipient.nric,
+            email: payload.recipient.email,
+            address: payload.recipient.address,
+            gender: payload.recipient.gender,
+            bloodType: payload.recipient.bloodType,
+            organsNeeded: payload.recipient.organsNeeded,
+            medicalHistory: payload.recipient.medicalHistory,
+            allergies: payload.recipient.allergies,
+            nokContact: payload.recipient.nokContact,
           },
-          hlaTyping: {},
-          comments: "To be reviewed",
-          uuid: recipient.recipientId,
+          labInfo: {
+            // Lab report data
+            testType: payload.labInfo.testType,
+            dateOfReport: payload.labInfo.dateOfReport, // YYYY-MM-DD formate
+            report: {
+              name: payload.labInfo.reportName,
+              url: payload.labInfo.reportUrl,
+            },
+            hlaTyping: {},
+            comments: payload.labInfo.comments,
+          },
         },
       }),
     }
@@ -274,54 +275,6 @@ export const confirmMatch = async (payload) => {
   return response.json();
 };
 
-// {
-//   "data": {
-//     "recipient": {
-//       "firstName": "Isaiah",
-//       "lastName": "Jackson",
-//       "dateOfBirth": "1990-05-20",
-//     "nric": "S1234567Z",
-//       "email": "isaiahloo@gmail.com",
-//       "address": "31 Victoria Street",
-//       "bloodType": "O+",
-//       "gender": "Male",
-//       "organsNeeded": [
-//         "kidney",
-//         "liver"
-//       ],
-//       "medicalHistory": [
-//         {
-//           "condition": "Hypertension",
-//           "dateDiagnosed": "2015-03-15",
-//           "description": "Mild high blood pressure managed with lifestyle changes",
-//           "treatment": "Diet and exercise"
-//         }
-//       ],
-//       "allergies": [
-//         "penicillin"
-//       ],
-//       "nokContact": {
-//         "firstName": "Bob",
-//         "lastName": "Smith",
-//         "phone": "98765432",
-//         "relationship": "Spouse"
-//       }
-//     },
-//     "labInfo": {
-//         "testType": "Tissue",
-//         "dateOfReport": "2023-12-01",
-//         "report": {
-//             "name": "Tissue Lab Test Report",
-//             "url": "https://www.parkwaylabs.com.sg/docs/parkwaylablibraries/test-catalogues/pls-tissue-forms.pdf?sfvrsn=1418faf5_1"
-//         },
-//         "hlaTyping":  {
-//         },
-//         "comments": "To be reviewed"
-//     }
-//   }
-// }
-
-
 /**
  * Find all deliveries that match a specific recipient ID
  * @param {string} recipientId - The ID of the recipient to match
@@ -335,31 +288,35 @@ export const matchDeliveries = async (recipientId) => {
   try {
     // Step 1: Use the existing findOrganMatches function to get all matches for this recipient
     const matches = await findOrganMatches(recipientId);
-    
+
     if (!matches || matches.length === 0) {
       return []; // No matches found for this recipient
     }
-    
+
     // Step 2: Fetch all deliveries using the existing fetchDeliveries function
     const deliveries = await fetchDeliveries();
-    
+
     // Step 3: Find all deliveries with matchIds that correspond to our matches
-    const matchIds = matches.map(match => match.matchId);
-    
-    const matchingDeliveries = deliveries.filter(delivery => 
-      delivery.matchId && matchIds.includes(delivery.matchId)
-    ).map(delivery => {
-      // Find the corresponding match details
-      const matchDetails = matches.find(match => match.matchId === delivery.matchId);
-      return {
-        ...delivery,
-        matchDetails
-      };
-    });
-    
+    const matchIds = matches.map((match) => match.matchId);
+
+    const matchingDeliveries = deliveries
+      .filter(
+        (delivery) => delivery.matchId && matchIds.includes(delivery.matchId)
+      )
+      .map((delivery) => {
+        // Find the corresponding match details
+        const matchDetails = matches.find(
+          (match) => match.matchId === delivery.matchId
+        );
+        return {
+          ...delivery,
+          matchDetails,
+        };
+      });
+
     return matchingDeliveries;
   } catch (error) {
     console.error("Error in matchDeliveries:", error);
     throw error;
   }
-}
+};

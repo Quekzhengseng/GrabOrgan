@@ -192,8 +192,7 @@ def process_delivery_status(message_dict, routing_key):
 
     amqp message example:
     {
-        "driverId": "driver123",
-        "email": "example@gmail.com"
+        "doctorId": "example@gmail.com",
     }
     """
     try:

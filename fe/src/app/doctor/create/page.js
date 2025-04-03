@@ -7,40 +7,43 @@ import { requestNewOrgans } from "@/utils/recipientUtils";
 import { Plus, Trash2 } from "lucide-react";
 
 export default function CreateRecipient() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState(null); // "success" | "error" | null
   const [formData, setFormData] = useState({
     recipient: {
-      firstName: "",
-      lastName: "",
-      dateOfBirth: "",
-      nric: "",
-      email: "",
-      address: "",
-      bloodType: "",
-      gender: "",
-      organsNeeded: [], // comma-separated string; will convert to array
+      firstName: "Isaiah",
+      lastName: "Chia",
+      dateOfBirth: "2001-10-12",
+      nric: "T1234567K",
+      email: "isaiah@gmail.com",
+      address: "31 Victoria St",
+      bloodType: "O+",
+      gender: "Male",
+      organsNeeded: ["heart", "kidneys"], // comma-separated string; will convert to array
       medicalHistory: [
         {
-          condition: "",
-          dateDiagnosed: "",
-          description: "",
-          treatment: "",
+          condition: "Scoliosis",
+          dateDiagnosed: "2018-05-12",
+          description:
+            "Double scoliosis with bends at the mid back and lower back",
+          treatment: "Physiotherapy",
         },
       ],
-      allergies: [], // comma-separated string; will convert to array
+      allergies: ["penicillin", "nuts"], // comma-separated string; will convert to array
       nokContact: {
-        firstName: "",
-        lastName: "",
-        phone: "",
-        relationship: "",
+        firstName: "Sophia",
+        lastName: "Chia",
+        phone: "88882222",
+        relationship: "Sibling",
       },
     },
     labInfo: {
       testType: "Tissue",
-      dateOfReport: "",
+      dateOfReport: "2022-03-04",
       reportName: "Tissue Lab Test Report",
       reportUrl:
         "https://www.parkwaylabs.com.sg/docs/parkwaylablibraries/test-catalogues/pls-tissue-forms.pdf?sfvrsn=1418faf5_1",
-      comments: "",
+      comments: "To be reviewed",
     },
   });
 
@@ -61,42 +64,45 @@ export default function CreateRecipient() {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitStatus(null); // reset any previous status
+    // console.log(formData);
 
-    // Convert comma-separated strings into arrays
-    const recipientData = {
-      ...formData.recipient,
-      organsNeeded: formData.recipient.organsNeeded
-        .split(",")
-        .map((item) => item.trim())
-        .filter((item) => item),
-      allergies: formData.recipient.allergies
-        .split(",")
-        .map((item) => item.trim())
-        .filter((item) => item),
-      medicalHistory: [formData.recipient.medicalHistory], // wrap in an array
-    };
+    // const payload = {
+    //   data: {
+    //     recipient: formData.recipient,
+    //     labInfo: {
+    //       testType: formData.labInfo.testType,
+    //       dateOfReport: formData.labInfo.dateOfReport,
+    //       report: {
+    //         name: formData.labInfo.reportName,
+    //         url: formData.labInfo.reportUrl,
+    //       },
+    //       hlaTyping: {},
+    //       comments: formData.labInfo.comments,
+    //     },
+    //   },
+    // };
 
-    const payload = {
-      data: {
-        recipient: recipientData,
-        labInfo: {
-          testType: formData.labInfo.testType,
-          dateOfReport: formData.labInfo.dateOfReport,
-          report: {
-            name: formData.labInfo.reportName,
-            url: formData.labInfo.reportUrl,
-          },
-          hlaTyping: {},
-          comments: formData.labInfo.comments,
-        },
-      },
-    };
+    // console.log("Final Payload:", JSON.stringify(payload, null, 2));
+    try {
+      const response = await requestNewOrgans(formData);
 
-    console.log("Final Payload:", JSON.stringify(payload, null, 2));
-    // Here you can call your API, e.g.:
-    // fetch('/api/recipient', { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
+      if (response && response.code >= 200 && response.code < 300) {
+        setSubmitStatus("success");
+        // Optionally refresh or reset form:
+        // window.location.reload();
+      } else {
+        setSubmitStatus("error");
+      }
+    } catch (err) {
+      console.error(err);
+      setSubmitStatus("error");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -617,12 +623,27 @@ export default function CreateRecipient() {
             </div>
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex flex-col items-end space-y-2">
+            {submitStatus === "success" && (
+              <p className="text-green-600 font-medium">
+                Recipient created successfully!
+              </p>
+            )}
+            {submitStatus === "error" && (
+              <p className="text-red-600 font-medium">
+                Error creating recipient.
+              </p>
+            )}
+
             <button
               type="submit"
-              className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700"
+              className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 flex items-center"
+              disabled={isSubmitting}
             >
-              Create Recipient
+              {isSubmitting && (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              )}
+              {isSubmitting ? "Creating..." : "Create Recipient"}
             </button>
           </div>
         </form>
