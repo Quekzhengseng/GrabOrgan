@@ -377,14 +377,15 @@ def confirm_match():
     OR
     orderId = str(uuid.uuid4())
     orderId = {
-	    "organType": "heart"
-        "doctorId" : "isaidchia@gmail.com"
-	    "transplantDateTime": "2025-03-30T23:30:00.000Z" # UTC
+        "orderId" : str(uuid.uuid4()),
+	    "organType": "heart",
+        "doctorId" : "isaidchia@gmail.com",
+	    "transplantDateTime": "2025-03-30T23:30:00.000Z", # UTC
 	    "startHospital": "CGH",
 	    "endHospital": "TTSH",
 	    "matchId": "015051e7-0c87-4c13-9bb0-dd5e7584aabc-heart-12",
 	    "remarks": "description (if any)"
-
+    }
 
     rabbitMQ Message
     routing_key = order.new
