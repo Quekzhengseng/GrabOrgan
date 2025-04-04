@@ -373,8 +373,6 @@ def initiate_match(recipientId):
 def confirm_match():
     """
     Store this in Order DB
-    orderId = recipientId + organId
-    OR
     orderId = str(uuid.uuid4())
     orderId = {
         "orderId" : str(uuid.uuid4()),
@@ -388,6 +386,8 @@ def confirm_match():
     }
 
     rabbitMQ Message
+    exchange: order_exchange
+    queue: order_queue
     routing_key = order.organ
     message:
     {
