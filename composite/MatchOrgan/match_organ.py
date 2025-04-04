@@ -388,7 +388,7 @@ def confirm_match():
     }
 
     rabbitMQ Message
-    routing_key = order.new
+    routing_key = order.organ
     message:
     {
     "orderId": "String uuid"
@@ -491,8 +491,8 @@ def confirm_match():
             # Prepare the message as a JSON string
             message_body = json.dumps({"matchId": matchId})
             channel.basic_publish(
-                exchange="confirm_match_exchange",
-                routing_key="match.confirm",
+                exchange="order_organ_exchange",
+                routing_key="order.organ",
                 body=message_body,
                 properties=pika.BasicProperties(delivery_mode=2)  # make message persistent
             )
