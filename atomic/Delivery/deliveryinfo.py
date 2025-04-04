@@ -159,10 +159,11 @@ def get_delivery(order_id):
 def create_delivery():
     try:
         data = request.get_json()
-        required_fields = ["status", "pickup", "pickup_time", "destination", "destination_time", "polyline", "driverCoord", "driverId", "organType", "matchId"]
+        # required_fields = ["status", "pickup", "pickup_time", "destination", "destination_time", "polyline", "driverCoord", "driveArId", "organType", "matchId"]
         
-        if not all(field in data for field in required_fields):
-            return jsonify({"code": 400, "message": "Missing required fields"}), 400
+        # if not all(field in data for field in required_fields):
+        #     print("Missing required fields in request data")
+        #     return jsonify({"code": 400, "message": "Missing required fields"}), 400
             
         # Prepare delivery data
         delivery_data = {

@@ -413,6 +413,8 @@ services:
       - "5024:5024"
     networks:
       - grabOrgan-net
+    volumes:
+      - ./common:/usr/src/app/common # Shared volume for common code
 
   trackDelivery:
     build:
