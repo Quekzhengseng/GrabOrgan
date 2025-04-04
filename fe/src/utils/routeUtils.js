@@ -265,6 +265,29 @@ export const fetchDeliveries = async () => {
 };
 
 /**
+ * Get a specific Delivery
+ * @param {string} deliveryId - The driver ID to retrieve
+ * @returns {Promise<boolean>} Success status
+ */
+export const getSpecificDelivery = async (deliveryId) => {
+  const response = await fetch(
+    `http://localhost:5002/deliveryinfo/${deliveryId}`
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to retrieve driver data");
+  }
+
+  const data = await response.json();
+
+  if (data) {
+    return data.data;
+  } else {
+    throw new Error("Invalid response format");
+  }
+};
+
+/**
  * Delete a delivery
  * @param {string} deliveryId - The delivery ID to delete
  * @returns {Promise<boolean>} Success status
@@ -286,4 +309,76 @@ export const deleteDelivery = async (deliveryId) => {
   }
 
   return true;
+};
+
+/**
+ * Get a Driver
+ * @param {string} driverId - The driver ID to retrieve
+ * @returns {Promise<boolean>} Success status
+ */
+export const getDriver = async (driverId) => {
+  const response = await fetch(
+    `http://localhost:8000/api/v1/drivers/${driverId}`
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to retrieve driver data");
+  }
+
+  const data = await response.json();
+
+  if (data) {
+    // Convert the object of recipients into an array
+    return data;
+  } else {
+    throw new Error("Invalid response format");
+  }
+};
+
+//Insert function to call back selectDriver to update delivery/driver
+
+//Function to update delivery
+export const trackDelivery = async (deliveryId, driverCoord) => {
+  try {
+    // Log the exact data being sent for debugging
+    const requestBody = {
+      deliveryId: deliveryId,
+      driverCoord: {
+        lat: driverCoord["lat"],
+        lng: driverCoord["lng"],
+      },
+    };
+    console.log("Sending request:", requestBody);
+
+    const response = await fetch("http://localhost:5025/trackDelivery", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      // Try to get error details from the response
+      try {
+        const errorData = await response.json();
+        throw new Error(
+          `API error: ${response.status} - ${JSON.stringify(errorData)}`
+        );
+      } catch {
+        throw new Error(`API error: ${response.status}`);
+      }
+    }
+
+    const data = await response.json();
+    console.log("Response data:", data);
+
+    return {
+      polyline: data.data.polyline,
+      deviation: data.data.deviation,
+    };
+  } catch (error) {
+    console.error("Error Updating Delivery:", error);
+    return null;
+  }
 };

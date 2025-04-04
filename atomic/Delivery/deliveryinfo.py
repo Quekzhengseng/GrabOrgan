@@ -73,7 +73,7 @@ DELIVERY_COLLECTION = "delivery_orders"
 
 # DeliveryInfo Class
 class DeliveryInfo:
-    def __init__(self, order_id, status, pickup, pickup_time, destination, destination_time, polyline, driverCoord, driverId, organType):
+    def __init__(self, order_id, status, pickup, pickup_time, destination, destination_time, polyline, driverCoord, driverId, organType, matchId):
         self.order_id = order_id
         self.status = status
         self.pickup = pickup
@@ -84,6 +84,7 @@ class DeliveryInfo:
         self.driverCoord = driverCoord
         self.driverId = driverId
         self.organType = organType
+        self.matchId = matchId
 
     def to_dict(self):
         """Convert the object to a Firestore-compatible dictionary."""
@@ -97,7 +98,8 @@ class DeliveryInfo:
             "polyline": self.polyline,
             "driverCoord": self.driverCoord,
             "driverId": self.driverId,
-            "organType": self.organType
+            "organType": self.organType,
+            "matchId": self.matchId
         }
 
     @staticmethod
@@ -113,7 +115,8 @@ class DeliveryInfo:
             polyline=data["polyline"],
             driverCoord=data["driverCoord"],
             driverId=data["driverID"],
-            organType=data["organType"]
+            organType=data["organType"],
+            matchId=data.get("matchId", "") 
         )
 
 # 📌 Route: Get all delivery orders
@@ -156,7 +159,7 @@ def get_delivery(order_id):
 def create_delivery():
     try:
         data = request.get_json()
-        required_fields = ["status", "pickup", "pickup_time", "destination", "destination_time", "polyline", "driverCoord", "driverId", "organType"]
+        required_fields = ["status", "pickup", "pickup_time", "destination", "destination_time", "polyline", "driverCoord", "driverId", "organType", "matchId"]
         
         if not all(field in data for field in required_fields):
             return jsonify({"code": 400, "message": "Missing required fields"}), 400
@@ -171,7 +174,8 @@ def create_delivery():
             "polyline": data["polyline"],
             "driverCoord": data["driverCoord"],
             "driverID": data["driverId"],
-            "organType": data["organType"]
+            "organType": data["organType"],
+            "matchId": data["matchId"]
         }
         
         # Add document to Firestore with auto-generated ID
@@ -204,7 +208,7 @@ def update_delivery(order_id):
         update_data = request.get_json()
 
         # Ensure the update follows the expected structure
-        valid_fields = ["status", "pickup_time", "destination_time", "polyline", "driverCoord", "driverId", "organType"]
+        valid_fields = ["status", "pickup_time", "destination_time", "polyline", "driverCoord", "driverId", "organType", "matchId"]
         filtered_data = {key: update_data[key] for key in valid_fields if key in update_data}
 
         if not filtered_data:

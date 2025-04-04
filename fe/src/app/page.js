@@ -17,7 +17,8 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     setError("");
-
+    // Save the email to sessionStorage
+    sessionStorage.setItem("userEmail", email);
     // Simulate login process
     setTimeout(() => {
       setIsLoading(false);
@@ -26,7 +27,7 @@ export default function LoginPage() {
       if (userType === "doctor") {
         router.push("/doctor");
       } else {
-        router.push("/delivery");
+        router.push(`/delivery?id=${email}`);
       }
     }, 1500);
   };
@@ -86,18 +87,20 @@ export default function LoginPage() {
                   className="block text-gray-700 text-sm font-medium mb-2"
                   htmlFor="email"
                 >
-                  Email Address
+                  {userType === "doctor" ? "Email" : "ID"}
                 </label>
                 <input
                   id="email"
-                  type="email"
+                  type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  placeholder="you@example.com"
+                  placeholder={
+                    userType === "doctor" ? "example@gmail.com" : "1234"
+                  }
                 />
               </div>
-
+              
               <div className="mb-6">
                 <label
                   className="block text-gray-700 text-sm font-medium mb-2"
@@ -114,13 +117,11 @@ export default function LoginPage() {
                   placeholder="••••••••"
                 />
               </div>
-
               {error && (
                 <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
                   {error}
                 </div>
               )}
-
               <button
                 type="submit"
                 disabled={isLoading}

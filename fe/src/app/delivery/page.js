@@ -9,6 +9,7 @@ import DeliveryMapbox from "@/components/DeliveryMapbox";
 import DeliveryDetails from "@/components/DeliveryDetails";
 import SearchAndFilter from "@/components/SearchAndFilter";
 import DeliveryList from "@/components/DeliveryList";
+import DriverStatusMonitor from "@/components/DriverStatusMonitor";
 import { fetchDeliveries, deleteDelivery } from "@/utils/routeUtils";
 
 export default function DeliveryOrdersPage() {
@@ -19,17 +20,40 @@ export default function DeliveryOrdersPage() {
   const [selectedDelivery, setSelectedDelivery] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
+  const [id, setId] = useState(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
   // Check if we have an orderId in the URL to display details
   const orderIdParam = searchParams?.get("orderId");
+  const driverId = searchParams?.get("id");
+
+  // Set the driver ID from URL parameters
+  useEffect(() => {
+    if (driverId) {
+      setId(driverId);
+      console.log("Driver ID set from URL:", driverId);
+    }
+  }, [driverId]);
 
   useEffect(() => {
     async function loadDeliveries() {
       try {
         setLoading(true);
-        const deliveryData = await fetchDeliveries();
+        const allDeliveryData = await fetchDeliveries();
+
+        let deliveryData = [];
+
+        for (let i = 0; i < allDeliveryData.length; i++) {
+          if (
+            (allDeliveryData[i].driverId == id &&
+              allDeliveryData[i].status == "Assigned") ||
+            allDeliveryData[i].status == "In Progress"
+          ) {
+            deliveryData.push(allDeliveryData[i]);
+          }
+        }
+
         setDeliveries(deliveryData);
         setFilteredDeliveries(deliveryData);
 
@@ -51,7 +75,7 @@ export default function DeliveryOrdersPage() {
     }
 
     loadDeliveries();
-  }, [orderIdParam]);
+  }, [id, orderIdParam]);
 
   // Apply filters when search term or filter status changes
   useEffect(() => {
@@ -81,11 +105,21 @@ export default function DeliveryOrdersPage() {
     setFilteredDeliveries(filtered);
   }, [searchTerm, filterStatus, deliveries]);
 
+  const [userEmail, setUserEmail] = useState("");
+
+  useEffect(() => {
+    const email = sessionStorage.getItem("userEmail");
+    setUserEmail(email);
+  }, []);
+  // console.log("Driver Page:", userEmail);
+
   // Handle track delivery button click
   const handleTrackDelivery = (delivery) => {
     setSelectedDelivery(delivery);
-    // Update URL with orderId but without refreshing the page
-    router.push(`/delivery?orderId=${delivery.orderID}`, { scroll: false });
+    // Update URL with both driverId and orderId without refreshing the page
+    router.push(`/delivery?id=${id}&orderId=${delivery.orderID}`, {
+      scroll: false,
+    });
   };
 
   // Go back to delivery list
@@ -136,7 +170,10 @@ export default function DeliveryOrdersPage() {
 
           <div className="lg:col-span-2">
             {/* Insert the map component with delivery data */}
-            <DeliveryMapbox deliveryData={selectedDelivery} />
+            <DeliveryMapbox
+              deliveryId={orderIdParam}
+              deliveryData={selectedDelivery}
+            />
           </div>
         </div>
       </div>
@@ -155,6 +192,9 @@ export default function DeliveryOrdersPage() {
           Logout
         </Link>
       </div>
+
+      {/* Driver Status Monitor */}
+      <DriverStatusMonitor driverId={driverId} />
 
       {/* Search and Filter Section */}
       <SearchAndFilter

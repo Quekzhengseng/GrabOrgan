@@ -4,15 +4,16 @@ import json
 import ast
 import threading
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 import pika
+import uuid
+import requests
 
 from common.invokes import invoke_http
 
 app = Flask(__name__)
-CORS(app)
-
+CORS(app, origins="http://localhost:3000")  # or origins="*"
 """
 for testing:
 routing_key = match.request
@@ -268,7 +269,7 @@ def process_match_request(match_request_dict):
         try:
             channel.basic_publish(
                 exchange="error_handling_exchange",
-                routing_key="match_request.exception",
+                routing_key="match_request.error",
                 body=error_payload,
                 properties=pika.BasicProperties(delivery_mode=2)
             )
@@ -321,7 +322,7 @@ def process_match_result(match_test_result_dict):
         try:
             channel.basic_publish(
                 exchange="error_handling_exchange",
-                routing_key="match_result.exception",
+                routing_key="match_result.error",
                 body=error_payload,
                 properties=pika.BasicProperties(delivery_mode=2)
             )
@@ -368,8 +369,8 @@ def initiate_match(recipientId):
             "message": "An error occurred while initiating the match: " + str(e)
         }), 500
 
-@app.route("/confirm-match/<string:matchId>", methods=['POST'])
-def confirm_match(matchId):
+@app.route("/confirm-match", methods=['POST', 'OPTIONS'])
+def confirm_match():
     """
     Store this in Order DB
     orderId = recipientId + organId
@@ -378,7 +379,7 @@ def confirm_match(matchId):
     orderId = {
 	    "organType": "heart"
         "doctorId" : "isaidchia@gmail.com"
-	    "transplantDateTime": "2025-03-25T24:08:00+08:00" # GMT+8 or UTC?
+	    "transplantDateTime": "2025-03-30T23:30:00.000Z" # UTC
 	    "startHospital": "CGH",
 	    "endHospital": "TTSH",
 	    "matchId": "015051e7-0c87-4c13-9bb0-dd5e7584aabc-heart-12",
@@ -431,9 +432,23 @@ def confirm_match(matchId):
     }
 
     try:
-        # Extract recipientId from the JSON payload
+        data =  request.get_json()
+        # print(data)
+        orderId = str(uuid.uuid4())
+        matchId = data.get("matchId")
+        startHosp_data = data.get("startHospital")
+        endHosp_data = data.get("endHospital")
+        startHospital = hospital_coords_dict.get(startHosp_data, {}).get("address")
+        endHospital = hospital_coords_dict.get(endHosp_data, {}).get("address")
+
+        if startHospital is None:
+            raise ValueError(f"Invalid startHospital key: {startHosp_data}")
+        if endHospital is None:
+            raise ValueError(f"Invalid startHospital key: {endHosp_data}")
+  
+        # check if matchId exists first 
         print("Invoking match atomic service...")
-        match_url = MATCH_URL + "/" + matchId
+        match_url = f"{MATCH_URL}/{matchId}"
         match_result = invoke_http(match_url, method="GET")
         message = json.dumps(match_result)
         code = match_result["code"]
@@ -441,16 +456,51 @@ def confirm_match(matchId):
         if code not in range(200, 300):
             return jsonify({
                 "code": code,
-                "data": {"recipientId": matchId},
+                "data": {"matchId": matchId},
                 "message": match_result["message"]
             }), code 
         else:
+            try:
+                order_payload = {
+                    "orderId": orderId,
+                    "organType": data.get("organType"),
+                    "doctorId" : data.get("doctorId"),
+                    "transplantDateTime": data.get("transplantDateTime"), # UTC
+                    "startHospital": startHospital,
+                    "endHospital": endHospital,
+                    "matchId": matchId,
+                    "remarks": data.get("remarks", "")
+                }
+                print("Invoking order atomic service...")
+                order_resp = invoke_http(ORDER_URL, method="POST", json=order_payload)
+                message = json.dumps(order_resp)
+                code = order_resp["code"]
+
+                if code not in range(200, 300):
+                    return jsonify({
+                        "code": code,
+                        "data": {"matchId": matchId},
+                        "message": order_resp["message"]
+                    }), code 
+
+            except Exception as e:
+                raise Exception("Error invoking Order Service") from e
+
             print("Publishing message with routing_key=", "match.confirm")
             # Prepare the message as a JSON string
             message_body = json.dumps({"matchId": matchId})
             channel.basic_publish(
                 exchange="confirm_match_exchange",
                 routing_key="match.confirm",
+                body=message_body,
+                properties=pika.BasicProperties(delivery_mode=2)  # make message persistent
+            )
+            print("Publishing message with routing_key=", "order.info")
+            # Prepare the message as a JSON string
+            message_body = json.dumps({"matchId": matchId})
+            channel.basic_publish(
+                exchange="activity_log_exchange",
+                routing_key="order.info",
                 body=message_body,
                 properties=pika.BasicProperties(delivery_mode=2)  # make message persistent
             )
@@ -462,9 +512,15 @@ def confirm_match(matchId):
 
     except Exception as e:
         print("Error confirming match:", str(e))
+        channel.basic_publish(
+            exchange="error_handling_exchange",
+            routing_key="order.error",
+            body=e,
+            properties=pika.BasicProperties(delivery_mode=2)
+        )
         return jsonify({
             "code": 500,
-            "message": "An error occurred while confirmingg the match: " + str(e)
+            "message": "An error occurred while confirming the match: " + str(e)
         }), 500
 
 
