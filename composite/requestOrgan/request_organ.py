@@ -257,7 +257,7 @@ def request_for_organ():
         )
 
         responses["message"] = "Composite request processed successfully."
-        return jsonify(responses), 201
+        return jsonify({"code": 201, "data": responses}), 201
 
     except Exception as e:
         error_message = str(e)
