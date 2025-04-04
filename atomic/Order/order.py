@@ -98,7 +98,7 @@ def get_order(orderId):
 def update_order(orderId):
     """
     Update an existing Order document. The request should contain a JSON payload with the fields to update.
-    For example, { "status": 200, "data": { ... updated fields ... } }.
+    Example response: { "code": 200, "data": { ...updated fields... }, "message": "Order updated successfully" }
     """
     try:
         order_ref = db.collection("orders").document(orderId)
@@ -111,13 +111,12 @@ def update_order(orderId):
             }), 404
 
         new_data = request.get_json()
-        # You might include a status code in the payload to indicate if processing is OK.
-        if new_data:
-            # Merge the provided data into the existing document.
-            order_ref.set(new_data["data"], merge=True)
+        if new_data and "data" in new_data:
+            update_fields = new_data["data"]
+            order_ref.set(update_fields, merge=True)
             return jsonify({
                 "code": 200,
-                "data": new_data,
+                "data": update_fields,
                 "message": "Order updated successfully."
             }), 200
         else:
