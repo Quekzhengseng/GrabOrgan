@@ -1,12 +1,193 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import requests
+import os
+import pika
+import json
+import threading
+import time
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
 DRIVER_INFO_ENDPOINT = "http://driverInfo_service:5004/drivers"
 
+# RabbitMQ connection parameters
+rabbit_host = os.environ.get("rabbit_host", "rabbitmq")
+rabbit_port = int(os.environ.get("rabbit_port", "5672"))
+
+# Exchanges and queues configuration
+EXCHANGES = {
+    "driver_match_exchange": "direct", # Publish driver match request
+    "notification_status_exchange": "topic"  # Add exchange for notification status
+}
+
+SUBSCRIBE_QUEUES = [
+    {"name": "driver_match_request_queue", "exchange": "driver_match_exchange", "routing_key": "driver.request", "type": "direct"}
+]
+
+# Global connection and channel variables
+connection = None
+channel = None
+
+def on_message(ch, method, properties, body):
+    """Process incoming messages from RabbitMQ"""
+    try:
+        print(f"Received message: {body}")
+        message = json.loads(body)
+        
+        delivery_id = message.get("deliveryId")
+        origin_address = message.get("origin_address")
+        destination_address = message.get("destination_address")
+        
+        print(f"Processing delivery request: id={delivery_id}, origin={origin_address}, destination={destination_address}")
+        
+        # Here you would implement any asynchronous processing needed
+        # For example, updating driver status, sending notifications, etc.
+        
+        # Acknowledge the message to remove it from the queue
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+        
+    except Exception as e:
+        print(f"Error processing message: {e}")
+        # Negative acknowledgment - message will be requeued
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+
+def on_channel_open(ch):
+    """Callback when the channel has been opened"""
+    global channel
+    channel = ch
+    print("Channel opened for consuming")
+    
+    # Declare exchanges
+    for exchange_name, exchange_type in EXCHANGES.items():
+        print(f"Declaring exchange: {exchange_name} of type {exchange_type}")
+        ch.exchange_declare(exchange=exchange_name, exchange_type=exchange_type, durable=True)
+    
+    # Declare queue and bind to exchange
+    for queue_config in SUBSCRIBE_QUEUES:
+        queue_name = queue_config["name"]
+        
+        ch.queue_declare(
+            queue=queue_name,
+            durable=True
+        )
+        
+        ch.queue_bind(
+            exchange=queue_config["exchange"],
+            queue=queue_name,
+            routing_key=queue_config["routing_key"]
+        )
+        
+        # Set up consumer with QoS (prefetch count)
+        ch.basic_qos(prefetch_count=1)
+        ch.basic_consume(
+            queue=queue_name,
+            on_message_callback=on_message
+        )
+        
+        print(f"Consumer set up for queue: {queue_name}")
+
+def on_connection_open(conn):
+    """Callback when the connection is opened; create a channel."""
+    global connection
+    connection = conn
+    print("RabbitMQ connection opened")
+    conn.channel(on_open_callback=on_channel_open)
+
+def on_connection_closed(conn, reply_code, reply_text=None):
+    """Callback when the connection is closed."""
+    print(f"RabbitMQ connection closed: reply_code={reply_code}, reply_text={reply_text}")
+    global connection, channel
+    connection = None
+    channel = None
+    conn.ioloop.stop()
+
+def run_async_consumer():
+    """Set up the asynchronous connection for consuming and start the IOLoop with a retry loop."""
+    parameters = pika.ConnectionParameters(
+        host=rabbit_host,
+        port=rabbit_port,
+        heartbeat=300,
+        blocked_connection_timeout=300
+    )
+    
+    while True:
+        try:
+            print(f"Attempting to connect to RabbitMQ at {rabbit_host}:{rabbit_port} ...")
+            conn = pika.SelectConnection(
+                parameters=parameters,
+                on_open_callback=on_connection_open,
+                on_close_callback=on_connection_closed
+            )
+            print("Starting IOLoop for consumer")
+            conn.ioloop.start()
+            break  # Exit the loop if the connection and loop run normally
+        except pika.exceptions.AMQPConnectionError as e:
+            print(f"AMQPConnectionError: {e}. Retrying in 5 seconds...")
+            time.sleep(5)
+        except Exception as e:
+            print(f"Unexpected error: {e}. Retrying in 5 seconds...")
+            time.sleep(5)
+
+def select_driver_internal(start_hospital, end_hospital, transplant_date_time):
+    """Internal function to select a driver"""
+    try:
+        # Fetch driver data
+        response = requests.get(DRIVER_INFO_ENDPOINT)
+        response.raise_for_status()  # Raise exception for HTTP errors
+        drivers = response.json()
+        
+        # Filter available drivers
+        available_drivers = [
+            driver for driver in drivers
+            if not driver.get("isBooked") and driver.get("stationed_hospital") == start_hospital
+        ]
+        
+        if available_drivers:
+            driver_id = available_drivers[0].get("driver_id")
+            if not driver_id:
+                print("Driver found but missing ID")
+                return None
+            
+            return driver_id
+        
+        print("No driver found for this request")
+        return None
+    except Exception as e:
+        print(f"Error selecting driver: {e}")
+        return None
+
+def send_driver_notification(driver_id, driver_email, status):
+    """Send notification about driver assignment via AMQP"""
+    try:
+        if not channel:
+            print("RabbitMQ channel not available. Cannot send notification.")
+            return False
+            
+        message = {
+            "driverId": driver_id,
+            "email": driver_email
+        }
+        
+        # Choose the appropriate routing key based on status
+        routing_key = f"{status}.status"
+        
+        print(f"Sending notification with routing key: {routing_key}")
+        channel.basic_publish(
+            exchange="notification_status_exchange",
+            routing_key=routing_key,
+            body=json.dumps(message),
+            properties=pika.BasicProperties(
+                delivery_mode=2,  # Make message persistent
+                content_type='application/json'
+            )
+        )
+        print(f"Notification sent for driver {driver_id}")
+        return True
+    except Exception as e:
+        print(f"Error sending notification: {e}")
+        return False
 
 @app.route('/selectDriver', methods=["POST"])
 def select_driver():
@@ -27,6 +208,7 @@ def select_driver():
         "data": {"DriverId": String or 0}
     }
     """
+    print("Received request to select driver")
     try:
         data = request.get_json()
         if not data:
@@ -38,6 +220,7 @@ def select_driver():
         response = requests.get(DRIVER_INFO_ENDPOINT)
         response.raise_for_status()  # Raise exception for HTTP errors
         drivers = response.json()
+        # print(drivers)
 
         # Filter available drivers
         available_drivers = [
@@ -46,9 +229,18 @@ def select_driver():
         ]
 
         if available_drivers:
-            driver_id = available_drivers[0].get("driver_id")
+            print("Driver found")
+            driver = available_drivers[0]
+            driver_id = driver.get("driver_id")
+            # driver_email = driver.get("email")
+            driver_email = "weesuan.ang.2023@scis.smu.edu.sg"
+            
             if not driver_id:
                 return jsonify({"error": "Driver found but missing ID"}), 500
+            
+            # Send driver assigned notification
+            if driver_email:
+                send_driver_notification(driver_id, driver_email, "assigned")
             
             return jsonify({
                 "code": 200,
@@ -75,4 +267,8 @@ def health_check():
 
 
 if __name__ == '__main__':
+    # Start RabbitMQ consumer in a separate thread
+    consumer_thread = threading.Thread(target=run_async_consumer, daemon=True)
+    consumer_thread.start()
+    
     app.run(host='0.0.0.0', port=5024)

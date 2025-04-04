@@ -1,15 +1,13 @@
 services:
   selectDriver:
     build:
-      context: ../..
-      # context: ../../composite/selectDriver
+      context: ./
       dockerfile: Dockerfile.selectDriver
     image: GrabOrgan/selectDriver:1.0
     # restart: always
     container_name: selectDriver
     environment:
       - RABBITMQ_HOST=rabbitmq # Connect using RabbitMQ service name
-      - PYTHONPATH=/usr/src/app
     ports:
       - "5024:5000"
     depends_on:

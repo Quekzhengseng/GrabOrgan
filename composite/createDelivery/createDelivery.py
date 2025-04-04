@@ -161,7 +161,7 @@ def get_driver(driver_id):
     return None
 
 
-def create_delivery(origin, destination, polyline, driver_coord, driver_id, organ_type):
+def create_delivery(origin, destination, polyline, organ_type, driver_coord=None, driver_id=None):
     """ Create a new delivery entry. """
     payload = {
         "pickup": origin,
@@ -278,32 +278,33 @@ def create_delivery_composite():
         encoded_polyline = retrieve_polyline(origin_coord, destination_coord)
         if not encoded_polyline:
             return jsonify({"error": "Failed to retrieve polyline"}), 400
-
-        # Match a driver
-        driver_id = match_driver(destination_time, origin_address, destination_address)
-        if not driver_id:
-            return jsonify({"error": "No matching driver found"}), 400
-
-        # Get driver’s stationed hospital
-        driver_address = get_driver(driver_id)
-        if not driver_address:
-            return jsonify({"error": "Failed to retrieve driver information"}), 400
-
-        # Convert driver’s address to coordinates
-        driver_coord = address_to_coord(driver_address)
-        if not driver_coord:
-            return jsonify({"error": "Failed to retrieve driver coordinates"}), 400
-
+        
         # Create delivery record
-        delivery_id = create_delivery(origin_address, destination_address, encoded_polyline, driver_coord, driver_id, organ_type)
+        print('Creating delivery record...')
+        delivery_id = create_delivery(origin_address, destination_address, encoded_polyline, organ_type)
         if not delivery_id:
             return jsonify({"error": "Failed to create delivery"}), 400
-        
-        # Publish driver request to RabbitMQ for asynchronous processing
+
+        # # Match a driver
+        # driver_id = match_driver(destination_time, origin_address, destination_address)
+        # if not driver_id:
+        #     return jsonify({"error": "No matching driver found"}), 400
+
+        # Publish driver request to RabbitMQ for asynchronous driver selection
         publish_delivery_request(delivery_id, data.get("startHospital"), data.get("endHospital"))
         print('Published driver request to RabbitMQ')
+        
+        # # Get driver’s stationed hospital
+        # driver_address = get_driver(driver_id)
+        # if not driver_address:
+        #     return jsonify({"error": "Failed to retrieve driver information"}), 400
 
-        return jsonify({"message": "Delivery successfully created", "data": {"DeliveryId": delivery_id}}), 200
+        # # Convert driver’s address to coordinates
+        # driver_coord = address_to_coord(driver_address)
+        # if not driver_coord:
+        #     return jsonify({"error": "Failed to retrieve driver coordinates"}), 400
+
+        return jsonify({"message": "Delivery successfully created and driver selection initiated", "data": {"DeliveryId": delivery_id}}), 200
     except Exception as e:
         print("Error in create_delivery_composite:", str(e))
         return jsonify({"code": 500, "message": str(e)}), 500
