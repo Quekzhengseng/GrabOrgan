@@ -22,6 +22,7 @@ EXCHANGES = {
     "order_exchange": "direct",
     "notification_status_exchange": "topic",
     "notification_acknowledge_exchange": "topic",
+    "driver_match_exchange": "direct",
 }
 
 # Define queues and their respective exchange bindings
@@ -34,6 +35,7 @@ QUEUES = [
     {"name": "error_queue", "exchange": "error_handling_exchange", "routing_key": "*.error"},  # Topic exchange pattern
      {"name": "noti_delivery_status_queue", "exchange": "notification_status_exchange", "routing_key": "*.status", "type": "topic"},
     {"name": "noti_acknowledgement_queue","exchange":"notification_acknowledge_exchange", "routing_key": "*.acknowledge", "type": "topic"},
+    {"name": "driver_match_request_queue", "exchange": "driver_match_exchange", "routing_key": "driver.request", "type": "direct"},
 ]
 
 
@@ -75,4 +77,5 @@ def setup_amqp():
 
 
 if __name__ == "__main__":
+    print("Setting up AMQP...")
     setup_amqp()
