@@ -487,11 +487,11 @@ def confirm_match():
             except Exception as e:
                 raise Exception("Error invoking Order Service") from e
 
-            print("Publishing message with routing_key=", "match.confirm")
+            print("Publishing message with routing_key=", "order.organ")
             # Prepare the message as a JSON string
             message_body = json.dumps({"matchId": matchId})
             channel.basic_publish(
-                exchange="order_organ_exchange",
+                exchange="order_exchange",
                 routing_key="order.organ",
                 body=message_body,
                 properties=pika.BasicProperties(delivery_mode=2)  # make message persistent

@@ -91,7 +91,7 @@ export const getPersonalData = async (recipientId, passcode) => {
  */
 export const fetchLabReports = async (recipientId) => {
   const response = await fetch(
-    `http://localhost:8000/api/v1/lab-reports/${recipientId}`
+    `http://localhost:8000/api/v1/lab-reports/recipient/${recipientId}`
   );
 
   if (!response.ok) {

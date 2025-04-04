@@ -9,6 +9,7 @@ import threading
 from common.invokes import invoke_http
 import ast
 import time
+import logging
 
 app = Flask(__name__)
 CORS(app)
@@ -211,7 +212,16 @@ def process_message(message_dict):
                     # Assume the useful data is in the "data" key if available.
                     organ_data[organ_uuid] = organ
                     setOfDonorId.add(organ["donorId"])
-                    print(f"Successfully fetched organ data for {organ_uuid}: {organ_result}")
+                    # print(f"Successfully fetched organ data for {organ_uuid}: {organ_result}")
+                    channel.basic_publish(
+                        exchange="activity_log_exchange",
+                        routing_key="test_compatibility.info",
+                        body=json.dumps({
+                            "organId": organ_uuid,
+                            "message": organ_result
+                        }),
+                        properties=pika.BasicProperties(delivery_mode=2)
+                    )
                 else:
                     error_msg = organ_result.get('message', 'Unknown error')
                     print(f"Failed to fetch organ data for organId: {organ_uuid}. Error: {error_msg}")
@@ -253,13 +263,15 @@ def process_message(message_dict):
                     
                     recipient_tissue_data = recipient_tissue_test["data"]
                     donor_tissue_data = donor_tissue_test["data"]
+                    # print(recipient_tissue_data)
+                    # print(donor_tissue_data)
                     
                     # Retrieve response codes (if needed)
                     recipient_code = recipient_tissue_test["code"]
                     donor_code = donor_tissue_test["code"]
 
-                    # print("hlaTyping_D: ", donor_tissue_data["hlaTyping"])
-                    # print("hlaTyping_R: ", recipient_tissue_data["hlaTyping"])
+                    # logging.info("hlaTyping_D: ", donor_tissue_data["hlaTyping"])
+                    # logging.info("hlaTyping_R: ", recipient_tissue_data["hlaTyping"])
 
                     # Compute the HLA matching score.
                     hlaScore = hla_match_score(donor_tissue_data["hlaTyping"], recipient_tissue_data["hlaTyping"])
@@ -285,11 +297,12 @@ def process_message(message_dict):
                     store_compatibility = invoke_http(LAB_INFO_URL, "POST", json=new_lab_info)
                     # print(store_compatibility)
                     if store_compatibility["code"] not in range(200,300):
-                        raise Exception("Failed to Store Compatibility Tests")
+                        logging.error(f"Error processing donor {donor_id}: {e}", exc_info=True)
+                        raise
 
                 except Exception as e:
-                    raise Exception("Failed to invoke HTTP request:") from e
-                
+                    logging.critical("Unhandled error in compatibility processing", exc_info=True)
+                    raise                
         except Exception as e:
             raise Exception(e)
 

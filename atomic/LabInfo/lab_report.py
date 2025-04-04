@@ -88,21 +88,21 @@ def get_all():
         return jsonify({"code":500, "message": str(e)}), 500
 
 
-# @app.route("/lab-reports/<string:uuid>")
-# def get_lab_info(uuid):
-#     try:
-#         lab_info_ref = db.collection("lab_reports").document(uuid)
-#         doc = lab_info_ref.get()
-#         if doc.exists:
-#             lab_info_obj = LabInfo.from_dict(uuid, doc.to_dict())
-#             return {"code":200, "data": lab_info_obj.to_dict()}  # Convert back to JSON-friendly format
-#         else:
-#             return jsonify({"code": 404, "message": "LabInfo does not exist"}), 404
-
-#     except Exception as e:
-#         return jsonify({"code":500, "message": str(e)}), 500
-
 @app.route("/lab-reports/<string:uuid>")
+def get_lab_info(uuid):
+    try:
+        lab_info_ref = db.collection("lab_reports").document(uuid)
+        doc = lab_info_ref.get()
+        if doc.exists:
+            lab_info_obj = LabInfo.from_dict(uuid, doc.to_dict())
+            return {"code":200, "data": lab_info_obj.to_dict()}  # Convert back to JSON-friendly format
+        else:
+            return jsonify({"code": 404, "message": "LabInfo does not exist"}), 404
+
+    except Exception as e:
+        return jsonify({"code":500, "message": str(e)}), 500
+
+@app.route("/lab-reports/recipient/<string:uuid>")
 def get_lab_info_by_recipient(uuid):
     try:
         lab_info_ref = db.collection("lab_reports")
