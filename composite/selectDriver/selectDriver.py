@@ -2,8 +2,9 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import requests
 import random
-from common import invoke_http
+from common.invokes import invoke_http
 import os
+import ast
 import pika
 import json
 import threading
@@ -31,67 +32,114 @@ SUBSCRIBE_QUEUES = [
     {"name": "driver_match_request_queue", "exchange": "driver_match_exchange", "routing_key": "driver.request", "type": "direct"}
 ]
 
-# Global connection and channel variables
-connection = None
+# Global channel for publishing messages (set when the channel opens)
 channel = None
 
-def on_message(ch, method, properties, body):
-    """Process incoming messages from RabbitMQ"""
+MAX_RETRIES = 3  # Maximum number of retries for message processing
+HEADERS = {'Content-Type': 'application/json'}
+TIMEOUT = 10  # API timeout for requests
+
+
+def make_request(url, method="POST", payload=None):
+    """ Helper function to send HTTP requests with error handling. """
     try:
-        print(f"Received message: {body}")
-        message = json.loads(body)
+        print(f"Making {method} request to {url}")
+        if method == "POST":
+            response = requests.post(url, headers=HEADERS, json=payload, timeout=TIMEOUT)
+        elif method == "PUT":
+            response = requests.put(url, headers=HEADERS, json=payload, timeout=TIMEOUT)
+        elif method == "PATCH":
+            response = requests.patch(url, headers=HEADERS, json=payload, timeout=TIMEOUT)
+        else:  # GET request
+            response = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+
+         # Print the raw response for debugging
+        print(f"Response status: {response.status_code}")
+        print(f"Response body: {response.text}")
+
+        response.raise_for_status()
+         # Try to parse JSON but handle cases where response might not be JSON
+        try:
+            return response.json()
+        except ValueError:
+            # If response is not valid JSON, return a dict with the text
+            return {"code": response.status_code, "message": response.text}
         
-        delivery_id = message.get("deliveryId")
-        origin_address = message.get("origin_address")
-        destination_address = message.get("destination_address")
+    except requests.exceptions.RequestException as e:
+        print(f"HTTP Request failed: {e}")
+        return None
+
+def handle_message(ch, method, properties, body):
+    try:
+        message_dict = ast.literal_eval(body.decode())
+        print(f"Received message from {method.routing_key}: {message_dict}")
+        delivery_id = message_dict.get("deliveryId")
+        origin_address = message_dict.get("origin_address")
+        destination_address = message_dict.get("destination_address")
         
         print(f"Processing delivery request: id={delivery_id}, origin={origin_address}, destination={destination_address}")
         
-        # Here you would implement any asynchronous processing needed
-        # For example, updating driver status, sending notifications, etc.
+        # Process the message based on the routing key.
+        if method.routing_key == "driver.request":
+            print("Processing driver request...")
+            driverId = select_driver(delivery_id, origin_address, destination_address)
+            if driverId:
+                print(f"Driver selected: {driverId}")
+                update_driver(driverId, delivery_id)
+                update_delivery(delivery_id, driverId)
+            else:
+                print("No available driver found.")
         
-        # Acknowledge the message to remove it from the queue
+        # Acknowledge the message after successful processing.
         ch.basic_ack(delivery_tag=method.delivery_tag)
-        
+    
     except Exception as e:
-        print(f"Error processing message: {e}")
-        # Negative acknowledgment - message will be requeued
-        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+        print(f"Error while handling message: {e}")
+        
+        # Retrieve current retry count from headers, defaulting to 0 if not present.
+        retry_count = 0
+        if properties.headers and 'x-retry-count' in properties.headers:
+            retry_count = properties.headers['x-retry-count']
+        print(f"Current retry count: {retry_count}")
+
+        if retry_count < MAX_RETRIES:
+            # Increase the retry count.
+            new_retry_count = retry_count + 1
+
+            # Create new properties with the updated retry count.
+            new_properties = pika.BasicProperties(
+                headers={"x-retry-count": new_retry_count},
+                delivery_mode=properties.delivery_mode  # Preserve persistence if set.
+            )
+
+            # Republish the message with the updated headers.
+            print(f"Republishing message, retry attempt {new_retry_count}")
+            ch.basic_publish(
+                exchange=method.exchange,
+                routing_key=method.routing_key,
+                body=body,
+                properties=new_properties
+            )
+            # Acknowledge the current message so it is removed from the queue.
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+        else:
+            print("Max retries reached. Discarding message or sending to dead-letter queue.")
+            # Here you could also publish the message to a dead-letter queue instead.
+            ch.basic_ack(delivery_tag=method.delivery_tag)
 
 def on_channel_open(ch):
-    """Callback when the channel has been opened"""
+    """Callback when the channel has been opened; set up consumers for all queues."""
     global channel
-    channel = ch
-    print("Channel opened for consuming")
-    
-    # Declare exchanges
-    for exchange_name, exchange_type in EXCHANGES.items():
-        print(f"Declaring exchange: {exchange_name} of type {exchange_type}")
-        ch.exchange_declare(exchange=exchange_name, exchange_type=exchange_type, durable=True)
-    
-    # Declare queue and bind to exchange
-    for queue_config in SUBSCRIBE_QUEUES:
-        queue_name = queue_config["name"]
-        
-        ch.queue_declare(
-            queue=queue_name,
-            durable=True
-        )
-        
-        ch.queue_bind(
-            exchange=queue_config["exchange"],
-            queue=queue_name,
-            routing_key=queue_config["routing_key"]
-        )
-        
-        # Set up consumer with QoS (prefetch count)
-        ch.basic_qos(prefetch_count=1)
+    channel = ch  # Save channel for later publishing
+    print("Channel opened, setting up consumers...")
+    for queue in SUBSCRIBE_QUEUES:
+        print(f"Subscribing to queue: {queue['name']}")
         ch.basic_consume(
-            queue=queue_name,
-            on_message_callback=on_message
+            queue=queue["name"],
+            on_message_callback=handle_message,
+            auto_ack=False
         )
-        
-        print(f"Consumer set up for queue: {queue_name}")
+    print("Consumers are set up. Waiting for messages...")
 
 def on_connection_open(conn):
     """Callback when the connection is opened; create a channel."""
@@ -135,33 +183,37 @@ def run_async_consumer():
             print(f"Unexpected error: {e}. Retrying in 5 seconds...")
             time.sleep(5)
 
-def select_driver_internal(start_hospital, end_hospital, transplant_date_time):
-    """Internal function to select a driver"""
-    try:
-        # Fetch driver data
-        response = requests.get(DRIVER_INFO_ENDPOINT)
-        response.raise_for_status()  # Raise exception for HTTP errors
-        drivers = response.json()
-        
-        # Filter available drivers
-        available_drivers = [
-            driver for driver in drivers
-            if not driver.get("isBooked") and driver.get("stationed_hospital") == start_hospital
-        ]
-        
-        if available_drivers:
-            driver_id = available_drivers[0].get("driver_id")
-            if not driver_id:
-                print("Driver found but missing ID")
-                return None
-            
-            return driver_id
-        
-        print("No driver found for this request")
-        return None
-    except Exception as e:
-        print(f"Error selecting driver: {e}")
-        return None
+def ensure_exchange_exists(channel, exchange, exchange_type):
+    # Declare the exchange (it will only create it if it does not already exist)
+    channel.exchange_declare(exchange=exchange, exchange_type=exchange_type, durable=True)
+    
+# Method to update driver records with assigned delivery
+def update_driver(driver_id, delivery_id):
+    """ Update driver record with assigned delivery ID. """
+    payload = {
+        "awaitingAcknowledgement": bool(True),
+        "currentAssignedDeliveryId": str(delivery_id),
+        "isBooked": bool(True),
+        }
+    response = make_request(f"{DRIVER_INFO_ENDPOINT}/{driver_id}", method="PATCH", payload=payload)
+
+    if response:
+        return response.get("message")
+    return None
+
+# Method to update delivery records with assigned driver
+def update_delivery(delivery_id, driver_id):
+    """ Update delivery record with assigned driver ID. """
+    print(driver_id)
+    payload = {
+        "driverId": driver_id,
+        "status": "Assigned",
+        }
+    response = make_request(f"{DELIVERY_ENDPOINT}/{delivery_id}", method="PUT", payload=payload)
+
+    if response:
+        return response.get("message")
+    return None
 
 def send_driver_notification(driver_id, driver_email, status):
     """Send notification about driver assignment via AMQP"""
@@ -194,17 +246,16 @@ def send_driver_notification(driver_id, driver_email, status):
         print(f"Error sending notification: {e}")
         return False
 
-@app.route('/selectDriver', methods=["POST"])
-def select_driver():
+# @app.route('/selectDriver', methods=["POST"])
+def select_driver(deliveryId, origin_address, destination_address): # changed to use AMQP instead of HTTP
     """
     Selects an available driver based on hospital location.
 
     Expects JSON input:
-    {
-        "transplantDateTime": String,
-        "startHospital": String,
-        "endHospital": String
-    }
+    {}
+        "deliveryId": delivery_id,
+        "origin_address": origin_address,
+        "destination_address":
 
     Returns JSON response:
     {
@@ -215,11 +266,11 @@ def select_driver():
     """
     print("Received request to select driver")
     try:
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "No JSON data received"}), 400
+        # data = request.get_json()
+        # if not data:
+        #     return jsonify({"error": "No JSON data received"}), 400
 
-        origin_address = data.get("startHospital")
+        # origin_address = data.get("startHospital")
 
         # Fetch driver data
         response = requests.get(DRIVER_INFO_ENDPOINT)
@@ -231,7 +282,7 @@ def select_driver():
         # Filter available drivers
         available_drivers = [
             driver for driver in drivers
-            if (not driver.get("isBooked")) and (not driver.get("awaitingAcknowledgement")) and (driver.get("stationed_hospital") == origin_address)
+            if (not driver.get("isBooked")) and (driver.get("stationed_hospital") == origin_address)
         ]
 
         print(f"origin address available_drivers: {available_drivers}")
@@ -242,21 +293,16 @@ def select_driver():
             print(f"Chosen driver first round {driver}")
             driver_id = driver.get("driver_id")
             print("Driver found")
-            # driver_email = driver.get("email")
-            driver_email = "weesuan.ang.2023@scis.smu.edu.sg"
+            driver_email = driver.get("email")
             
             if not driver_id:
-                return jsonify({"error": "Driver found but missing ID"}), 500
+                return None
             
             # Send driver assigned notification
             if driver_email:
                 send_driver_notification(driver_id, driver_email, "assigned")
             
-            return jsonify({
-                "code": 200,
-                "message": "Driver successfully found",
-                "data": {"DriverId": driver_id}
-            }), 200
+            return driver_id
         
         #need start finding drivers from other hospitals
         else:
@@ -283,19 +329,11 @@ def select_driver():
                     print(f"The chosen replacement driver is {replacement_driver}")
                     driver_id = replacement_driver.get("driver_id")
                     if not driver_id:
-                        return jsonify({"error": "Driver found but missing ID"}), 500
+                        return None
                     
-                    return jsonify({
-                        "code": 200,
-                        "message": "Driver (different hospital) successfully found",
-                        "data": {"DriverId": driver_id}
-                    }), 200
+                    return driver_id
 
-            return jsonify({
-                "code": 404,
-                "message": "No Driver Found",
-                "data": {"DriverId": 0}
-            }), 404
+            return None
 
     except requests.RequestException as e:
         return jsonify({"error": f"Driver service request failed: {str(e)}"}), 500

@@ -139,14 +139,14 @@ def publish_delivery_request(delivery_id, origin_address, destination_address):
         print(f"Failed to publish message: {e}")
         return False
 
-def match_driver(destination_time, origin, destination):
-    """ Match a driver for the given route and time. """
-    payload = {"transplantDateTime": destination_time, "startHospital": origin, "endHospital": destination}
-    response = make_request(SERVICE_URLS["match_driver"] + "/selectDriver", payload=payload)
+# def match_driver(destination_time, origin, destination):
+#     """ Match a driver for the given route and time. """
+#     payload = {"transplantDateTime": destination_time, "startHospital": origin, "endHospital": destination}
+#     response = make_request(SERVICE_URLS["match_driver"] + "/selectDriver", payload=payload)
 
-    if response:
-        return response.get("data", {}).get("DriverId")
-    return None
+#     if response:
+#         return response.get("data", {}).get("DriverId")
+#     return None
 
 
 def get_driver(driver_id):
@@ -161,7 +161,7 @@ def get_driver(driver_id):
     return None
 
 
-def create_delivery(origin, destination, polyline, organ_type, driver_coord=None, driver_id=None):
+def create_delivery(origin, destination, polyline, organ_type, matchId, driver_coord=None, driver_id=None):
     """ Create a new delivery entry. """
     payload = {
         "pickup": origin,
@@ -172,7 +172,8 @@ def create_delivery(origin, destination, polyline, organ_type, driver_coord=None
         "polyline": polyline,
         "driverCoord": driver_coord,
         "driverId": driver_id,
-        "organType": organ_type
+        "organType": organ_type,
+        "matchId": matchId,
     }
     
     response = make_request(SERVICE_URLS["delivery"] + "/deliveryinfo", payload=payload)
@@ -251,7 +252,6 @@ def run_async_publisher():
             print(f"Unexpected error: {e}. Retrying in 5 seconds...")
             time.sleep(5)
 
-
 @app.route('/createDelivery', methods=['POST'])
 def create_delivery_composite():
     """API endpoint to create a delivery."""
@@ -266,6 +266,7 @@ def create_delivery_composite():
         destination_address = data.get("endHospital")
         destination_time = data.get("transplantDateTime")
         organ_type = data.get("organType")
+        matchId = data.get("matchId")
 
         # Convert addresses to coordinates
         origin_coord = address_to_coord(origin_address)
@@ -281,7 +282,7 @@ def create_delivery_composite():
         
         # Create delivery record
         print('Creating delivery record...')
-        delivery_id = create_delivery(origin_address, destination_address, encoded_polyline, organ_type)
+        delivery_id = create_delivery(origin_address, destination_address, encoded_polyline, organ_type, matchId)
         if not delivery_id:
             return jsonify({"error": "Failed to create delivery"}), 400
 
@@ -292,7 +293,6 @@ def create_delivery_composite():
 
         # Publish driver request to RabbitMQ for asynchronous driver selection
         publish_delivery_request(delivery_id, data.get("startHospital"), data.get("endHospital"))
-        print('Published driver request to RabbitMQ')
         
         # # Get driver’s stationed hospital
         # driver_address = get_driver(driver_id)
