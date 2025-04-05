@@ -109,7 +109,7 @@ def update_person(uuid):
         if new_data:
             # Merge update into Firestore document.
             db.collection("PersonalData").document(uuid).set(new_data["data"], merge=True)
-            return jsonify({"code": 200, "data": new_data}), 200
+            return jsonify({"code": 200, "data": new_data["data"]}), 200
         else:
             return jsonify({
                 "code": 400,

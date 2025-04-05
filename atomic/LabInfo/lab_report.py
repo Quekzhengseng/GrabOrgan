@@ -148,7 +148,7 @@ def update_lab_info(uuid):
             return jsonify(
                 {
                     "code": 200,
-                    "data": new_data
+                    "data": new_data["data"],
                 }
             ), 200
         else:

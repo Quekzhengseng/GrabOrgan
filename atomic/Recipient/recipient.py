@@ -136,7 +136,7 @@ def update_recipient(recipientId):
             return jsonify(
                 {
                     "code": 200,
-                    "data": new_data
+                    "data": new_data["data"]
                 }
             ), 200
         else:
