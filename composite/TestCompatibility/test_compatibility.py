@@ -450,24 +450,21 @@ def post_matches_to_match_service(matches):
                 # Log to activity log after posting to Match Atomic Service
                 match_id = match["matchId"]
                 log_message = f"{match_id} posted into Match Atomic Service"
-                activity_log_message = {
-                    "message": log_message,
-                    "matchId": match_id
-                }
-
-                # Send activity log message to the activity log queue with *.info routing key
-                try:
-                    channel.basic_publish(
-                        exchange="activity_log_exchange",  # Same exchange as defined in activity_log.py
-                        routing_key="test_compatibility.info",  # Routing key for info logs
-                        body=json.dumps(activity_log_message),  # Activity log message
-                        properties=pika.BasicProperties(
-                            delivery_mode=2  # Ensure message is persistent
-                        )
+                
+                # Using the boilerplate code to send the log
+                print(f"Publishing message with routing_key= test_compatibility.info")
+                # Prepare the message as a JSON string
+                message_body = json.dumps({"message": log_message, "matchId": match_id})
+                
+                channel.basic_publish(
+                    exchange="activity_log_exchange",  # Use the activity_log_exchange
+                    routing_key="test_compatibility.info",  # Use routing key 'test_compatibility.info'
+                    body=message_body,  # The log message body
+                    properties=pika.BasicProperties(
+                        delivery_mode=2  # Make message persistent
                     )
-                    print(f"Logged activity: {log_message}")
-                except Exception as log_exception:
-                    print(f"Error sending activity log message: {log_exception}")
+                )
+                print(f"Activity log sent: {log_message}")
                 
             else:
                 print(f"Failed to post matches. Error: {response['message']}")
