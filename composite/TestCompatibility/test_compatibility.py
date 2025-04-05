@@ -297,14 +297,23 @@ def process_message(message_dict):
                     store_compatibility = invoke_http(LAB_INFO_URL, "POST", json=new_lab_info)
                     # print(store_compatibility)
                     if store_compatibility["code"] not in range(200,300):
-                        logging.error(f"Error processing donor {donor_id}: {e}", exc_info=True)
-                        raise
+                        print(f"Publishing error via AMQP: {str(store_compatibility["message"])}")
+                        channel.basic_publish(
+                            exchange="error_handling_exchange",
+                            routing_key="test_compatibility.error",
+                            body=json.dumps({
+                                "message": str(store_compatibility["message"]),
+                                "data": recipient_uuid,
+                            }),
+                            properties=pika.BasicProperties(delivery_mode=2)
+                        )
 
                 except Exception as e:
                     logging.critical("Unhandled error in compatibility processing", exc_info=True)
                     raise                
         except Exception as e:
-            raise Exception(e)
+            logging.error("Top-level error in compatibility service", exc_info=True)
+            raise
 
 
         matches = []
@@ -319,7 +328,7 @@ def process_message(message_dict):
                     code = compatibility_test["code"]
 
                     if code not in range(200, 300):
-                        print(f"Publishing error via AMQP: {str(e)}")
+                        print(f"Publishing error via AMQP: {str(compatibility_test["message"])}")
                         channel.basic_publish(
                             exchange="error_handling_exchange",
                             routing_key="test_compatibility.error",
