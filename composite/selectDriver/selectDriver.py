@@ -346,12 +346,12 @@ def acknowledge_driver():
     """
     Expected input JSON:
     {
-        driverID: XXX,
+        driverId: XXX,
         deliveryId: XXX
     }
     """
     try:
-        data = request.json()
+        data = request.get_json()
         driverId = data.get("driverId")
         deliveryId = data.get("deliveryId")
 

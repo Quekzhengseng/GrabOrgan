@@ -46,13 +46,15 @@ export default function DeliveryOrdersPage() {
 
         for (let i = 0; i < allDeliveryData.length; i++) {
           if (
-            (allDeliveryData[i].driverId == id &&
-              allDeliveryData[i].status == "Assigned") ||
-            allDeliveryData[i].status == "In Progress"
+            allDeliveryData[i].driverId == id &&
+            (allDeliveryData[i].status == "Assigned" ||
+              allDeliveryData[i].status == "In Progress")
           ) {
             deliveryData.push(allDeliveryData[i]);
           }
         }
+
+        console.log(deliveryData);
 
         setDeliveries(deliveryData);
         setFilteredDeliveries(deliveryData);

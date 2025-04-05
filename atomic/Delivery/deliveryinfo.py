@@ -114,7 +114,7 @@ class DeliveryInfo:
             destination_time=data["destination_time"],
             polyline=data["polyline"],
             driverCoord=data["driverCoord"],
-            driverId=data["driverID"],
+            driverId=data.get("driverId", ""),
             organType=data["organType"],
             matchId=data.get("matchId", "") 
         )
@@ -159,7 +159,7 @@ def get_delivery(order_id):
 def create_delivery():
     try:
         data = request.get_json()
-        # required_fields = ["status", "pickup", "pickup_time", "destination", "destination_time", "polyline", "driverCoord", "driveArId", "organType", "matchId"]
+        # required_fields = ["status", "pickup", "pickup_time", "destination", "destination_time", "polyline", "driverCoord", "driverId", "organType", "matchId"]
         
         # if not all(field in data for field in required_fields):
         #     print("Missing required fields in request data")
@@ -174,7 +174,7 @@ def create_delivery():
             "destination_time": data["destination_time"],
             "polyline": data["polyline"],
             "driverCoord": data["driverCoord"],
-            "driverID": data["driverId"],
+            "driverId": data["driverId"],
             "organType": data["organType"],
             "matchId": data["matchId"]
         }

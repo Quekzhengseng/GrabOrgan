@@ -33,7 +33,7 @@ QUEUES = [
     {"name": "order_queue", "exchange": "order_exchange", "routing_key": "order.organ"},
     {"name": "activity_log_queue", "exchange": "activity_log_exchange", "routing_key": "*.info"},  # Topic exchange wildcard
     {"name": "error_queue", "exchange": "error_handling_exchange", "routing_key": "*.error"},  # Topic exchange pattern
-     {"name": "noti_delivery_status_queue", "exchange": "notification_status_exchange", "routing_key": "*.status", "type": "topic"},
+    {"name": "noti_delivery_status_queue", "exchange": "notification_status_exchange", "routing_key": "*.status", "type": "topic"},
     {"name": "noti_acknowledgement_queue","exchange":"notification_acknowledge_exchange", "routing_key": "*.acknowledge", "type": "topic"},
     {"name": "driver_match_request_queue", "exchange": "driver_match_exchange", "routing_key": "driver.request", "type": "direct"},
 ]
