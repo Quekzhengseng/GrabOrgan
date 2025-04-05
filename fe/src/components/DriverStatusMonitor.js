@@ -1,7 +1,7 @@
 // components/DriverStatusMonitor.js
 import { useState, useEffect } from "react";
 import { Bell, BellOff } from "lucide-react";
-import { getSpecificDelivery, getDriver } from "@/utils/routeUtils";
+import { getSpecificDelivery, getDriver, confirmDelivery } from "@/utils/routeUtils";
 
 export default function DriverStatusMonitor({ driverId }) {
   const [isPolling, setIsPolling] = useState(true);
@@ -76,9 +76,11 @@ export default function DriverStatusMonitor({ driverId }) {
 
   // Acknowledge alert
   const acknowledgeAlert = () => {
+    confirmDelivery(driverId);
     setHasAlert(false);
     setStatusMessage(`Monitoring driver ${driverId} status...`);
     // Insert new utill function to call back select driver to update
+
   };
 
   return (

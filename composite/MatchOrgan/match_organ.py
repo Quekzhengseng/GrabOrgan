@@ -489,7 +489,7 @@ def confirm_match():
 
             print("Publishing message with routing_key=", "order.organ")
             # Prepare the message as a JSON string
-            message_body = json.dumps({"matchId": matchId})
+            message_body = json.dumps({"orderId": orderId})
             channel.basic_publish(
                 exchange="order_exchange",
                 routing_key="order.organ",

@@ -336,6 +336,46 @@ export const getDriver = async (driverId) => {
 };
 
 //Insert function to call back selectDriver to update delivery/driver
+export const confirmDelivery = async (driverId) => {
+  try {
+    // Log the exact data being sent for debugging
+    const driverData = await getDriver(driverId);
+
+    if (!driverData || !driverData.currentAssignedDeliveryId) {
+      throw new Error("Driver has no assigned delivery.");
+    }
+
+    const requestBody = {
+      driverId: driverId,
+      deliveryId: driverData.currentAssignedDeliveryId,
+    };
+
+    console.log("Sending request:", requestBody);
+
+    const response = await fetch("http://localhost:5024/acknowledge-driver", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      // Try to get error details from the response
+      try {
+        const errorData = await response.json();
+        throw new Error(
+          `API error: ${response.status} - ${JSON.stringify(errorData)}`
+        );
+      } catch {
+        throw new Error(`API error: ${response.status}`);
+      }
+    }
+  } catch (error) {
+    console.error("Error Updating Delivery:", error);
+    return null;
+  }
+};
 
 //Function to update delivery
 export const trackDelivery = async (deliveryId, driverCoord) => {
