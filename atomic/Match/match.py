@@ -148,7 +148,7 @@ def update_match(matchId):
             return jsonify(
                 {
                     "code": 200,
-                    "data": new_data
+                    "data": new_data["data"],
                 }
             ), 200
         else:
