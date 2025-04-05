@@ -421,6 +421,21 @@ def process_message(message_dict):
         except Exception as publish_exception:
             print("Failed to publish error message:", str(publish_exception))
 
+# def post_matches_to_match_service(matches):
+#     """POST valid matches to Match Atomic Service."""
+#     try:
+#         for match in matches:
+#             response = invoke_http(MATCH_URL, method="POST", json=match)
+#             message = json.dumps(response)
+#             code = response["code"]
+#             if code in range(200, 300):
+#                 print("Matches posted successfully.")
+#             else:
+#                 print(f"Failed to post matches. Error: {response["message"]}")
+#                 raise Exception("Failed to store matches in Match DB")
+#     except Exception as e:
+#         raise
+
 def post_matches_to_match_service(matches):
     """POST valid matches to Match Atomic Service."""
     try:
@@ -428,10 +443,34 @@ def post_matches_to_match_service(matches):
             response = invoke_http(MATCH_URL, method="POST", json=match)
             message = json.dumps(response)
             code = response["code"]
+            
             if code in range(200, 300):
                 print("Matches posted successfully.")
+
+                # Log to activity log after posting to Match Atomic Service
+                match_id = match["matchId"]
+                log_message = f"{match_id} posted into Match Atomic Service"
+                activity_log_message = {
+                    "message": log_message,
+                    "matchId": match_id
+                }
+
+                # Send activity log message to the activity log queue with *.info routing key
+                try:
+                    channel.basic_publish(
+                        exchange="activity_log_exchange",  # Same exchange as defined in activity_log.py
+                        routing_key="test_compatibility.info",  # Routing key for info logs
+                        body=json.dumps(activity_log_message),  # Activity log message
+                        properties=pika.BasicProperties(
+                            delivery_mode=2  # Ensure message is persistent
+                        )
+                    )
+                    print(f"Logged activity: {log_message}")
+                except Exception as log_exception:
+                    print(f"Error sending activity log message: {log_exception}")
+                
             else:
-                print(f"Failed to post matches. Error: {response["message"]}")
+                print(f"Failed to post matches. Error: {response['message']}")
                 raise Exception("Failed to store matches in Match DB")
     except Exception as e:
         raise
