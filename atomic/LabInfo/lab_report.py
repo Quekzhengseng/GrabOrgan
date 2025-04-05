@@ -128,7 +128,7 @@ def get_lab_info_by_recipient(uuid):
 @app.route("/lab-reports/<string:uuid>", methods=['PUT'])
 def update_lab_info(uuid):
     try:
-        lab_info_ref = db.collection("lab_report").document(uuid)
+        lab_info_ref = db.collection("lab_reports").document(uuid)
         doc = lab_info_ref.get()
         if not doc.exists:
             return jsonify(
