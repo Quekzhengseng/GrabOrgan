@@ -73,7 +73,7 @@ DELIVERY_COLLECTION = "delivery_orders"
 
 # DeliveryInfo Class
 class DeliveryInfo:
-    def __init__(self, order_id, status, pickup, pickup_time, destination, destination_time, polyline, driverCoord, driverId, organType, matchId):
+    def __init__(self, order_id, status, pickup, pickup_time, destination, destination_time, polyline, driverCoord, driverId, organType, doctorId, matchId):
         self.order_id = order_id
         self.status = status
         self.pickup = pickup
@@ -84,6 +84,7 @@ class DeliveryInfo:
         self.driverCoord = driverCoord
         self.driverId = driverId
         self.organType = organType
+        self.doctorId = doctorId
         self.matchId = matchId
 
     def to_dict(self):
@@ -99,6 +100,7 @@ class DeliveryInfo:
             "driverCoord": self.driverCoord,
             "driverId": self.driverId,
             "organType": self.organType,
+            "doctorId" : self.doctorId,
             "matchId": self.matchId
         }
 
@@ -116,6 +118,7 @@ class DeliveryInfo:
             driverCoord=data["driverCoord"],
             driverId=data.get("driverId", ""),
             organType=data["organType"],
+            doctorId=data.get("doctorId", ""),
             matchId=data.get("matchId", "") 
         )
 
@@ -176,6 +179,7 @@ def create_delivery():
             "driverCoord": data["driverCoord"],
             "driverId": data["driverId"],
             "organType": data["organType"],
+            "doctorId": data["doctorId"],
             "matchId": data["matchId"]
         }
         

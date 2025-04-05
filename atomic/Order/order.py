@@ -26,9 +26,10 @@ print("Firestore initialized successfully for Donor!")
 db = firestore.client()
 
 class Order:
-    def __init__(self, orderId, organType, transplantDateTime, startHospital, endHospital, matchId, remarks):
+    def __init__(self, orderId, organType, doctorId, transplantDateTime, startHospital, endHospital, matchId, remarks):
         self.orderId = orderId
         self.organType = organType  # e.g., "heart"
+        self.doctorId = doctorId
         self.transplantDateTime = transplantDateTime
         self.startHospital = startHospital  # e.g., "CGH"
         self.endHospital = endHospital  # e.g., "SGH"
@@ -40,6 +41,7 @@ class Order:
         return {
             "orderId": self.orderId,
             "organType": self.organType,
+            "doctorId" : self.doctorId,
             "transplantDateTime": self.transplantDateTime,
             "startHospital": self.startHospital,
             "endHospital": self.endHospital,
@@ -53,6 +55,7 @@ class Order:
         return Order(
             orderId=order_id,
             organType=data["organType"],
+            doctorId=data.get("doctorId", ""),
             transplantDateTime=data["transplantDateTime"],
             startHospital=data["startHospital"],
             endHospital=data["endHospital"],
@@ -161,6 +164,7 @@ def create_order():
         new_order = Order(
             orderId=order_id,
             organType=order_data["organType"],
+            doctorId = order_data["doctorId"],
             transplantDateTime=order_data["transplantDateTime"],
             startHospital=order_data["startHospital"],
             endHospital=order_data["endHospital"],

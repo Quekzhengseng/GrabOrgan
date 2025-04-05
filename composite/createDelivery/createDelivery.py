@@ -317,6 +317,7 @@ def handle_message(ch, method, properties, body):
                 destination_address = order_details.get("endHospital")
                 destination_time = order_details.get("transplantDateTime")
                 organ_type = order_details.get("organType")
+                doctorId = order_details.get("doctorId")
                 match_id = order_details.get("matchId")
 
                 print({
@@ -324,6 +325,7 @@ def handle_message(ch, method, properties, body):
                     destination_address, 
                     destination_time, 
                     organ_type, 
+                    doctorId,
                     match_id
                 })
                 
@@ -352,6 +354,7 @@ def handle_message(ch, method, properties, body):
                     destination_time, 
                     encoded_polyline, 
                     organ_type, 
+                    doctorId,
                     match_id
                 )
                 

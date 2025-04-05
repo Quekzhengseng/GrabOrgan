@@ -43,6 +43,8 @@ export default function OrganMatches({
     if (!confirmedMatch) return;
     const utcDateTime = new Date(transplantDateTime).toISOString();
 
+    console.log(userEmail);
+
     // Build the body fields you want to send
     const payload = {
       organType:
@@ -63,10 +65,10 @@ export default function OrganMatches({
     setConfirmedMatch(null);
   };
 
-  const handleInitiateMatch = () =>{
+  const handleInitiateMatch = () => {
     if (!recipientId) return;
-    initiateMatch(recipientId)
-  }
+    initiateMatch(recipientId);
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-lg overflow-hidden">

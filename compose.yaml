@@ -78,22 +78,22 @@ services:
       - "8001:8001" # Admin API. Listens for calls from the command line over HTTP.
       - "8002:8002" # Kong Manager (GUI). Listens for HTTP traffic.
   deck-sync:
-      image: kong/deck:latest
-      volumes:
-        - ./kong-data:/deck
-      entrypoint: >
-        /bin/sh -c "
-        apk add --no-cache curl &&
-        until curl --silent --fail http://kong:8001/status; do
-          echo 'Waiting for Kong Admin API...';
-          sleep 2;
-        done;
-        echo 'Kong is up! Syncing configuration...';
-        deck sync --state /deck/kong.yaml --kong-addr http://kong:8001"
-      depends_on:
-        - kong
-      networks:
-        - grabOrgan-net
+    image: kong/deck:latest
+    volumes:
+      - ./kong-data:/deck
+    entrypoint: >
+      /bin/sh -c "
+      apk add --no-cache curl &&
+      until curl --silent --fail http://kong:8001/status; do
+        echo 'Waiting for Kong Admin API...';
+        sleep 2;
+      done;
+      echo 'Kong is up! Syncing configuration...';
+      deck sync --state /deck/kong.yaml --kong-addr http://kong:8001"
+    depends_on:
+      - kong
+    networks:
+      - grabOrgan-net
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -394,11 +394,21 @@ services:
     container_name: createDelivery
     environment:
       - PYTHONUNBUFFERED=1
+      - rabbit_host=rabbitmq # The name of the RabbitMQ container defined in the RabbitMQ compose file
+      - rabbit_port=5672
     ports:
       - "5026:5026"
     networks:
       - grabOrgan-net
+    depends_on:
+      - rabbitmq
+      - kong
+      - activity_log
+      - error
+      - delivery_info
     command: ["python", "createDelivery.py"]
+    volumes:
+      - ./common:/usr/src/app/common # Shared volume for common code
   selectDriver:
     build:
       context: ./composite/selectDriver/.
@@ -408,10 +418,20 @@ services:
     container_name: selectDriver
     environment:
       - PYTHONUNBUFFERED=1
+      - rabbit_host=rabbitmq # The name of the RabbitMQ container defined in the RabbitMQ compose file
+      - rabbit_port=5672
     ports:
       - "5024:5024"
     networks:
       - grabOrgan-net
+    depends_on:
+      - rabbitmq
+      - kong
+      - activity_log
+      - error
+      - delivery_info
+      - driverInfo
+      - send_notification
     volumes:
       - ./common:/usr/src/app/common # Shared volume for common code
   trackDelivery:
@@ -423,10 +443,22 @@ services:
     container_name: trackDelivery
     environment:
       - PYTHONUNBUFFERED=1
+      - rabbit_host=rabbitmq # The name of the RabbitMQ container defined in the RabbitMQ compose file
+      - rabbit_port=5672
     ports:
       - "5025:5025"
     networks:
       - grabOrgan-net
+    depends_on:
+      - rabbitmq
+      - kong
+      - activity_log
+      - error
+      - delivery_info
+      - geoalgo
+      - driverInfo
+    volumes:
+      - ./common:/usr/src/app/common # Shared volume for common code
 
   endDelivery:
     build:
@@ -436,11 +468,17 @@ services:
     # restart: always
     container_name: endDelivery
     environment:
-      - RABBITMQ_HOST=rabbitmq # Connect using RabbitMQ service name
+      - rabbit_host=rabbitmq # The name of the RabbitMQ container defined in the RabbitMQ compose file
+      - rabbit_port=5672
     ports:
       - "5028:5028"
     depends_on:
       - rabbitmq
+      - kong
+      - activity_log
+      - error
+      - delivery_info
+      - driverInfo
     networks:
       - grabOrgan-net
     volumes:
