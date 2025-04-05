@@ -12,6 +12,7 @@ import {
   addressToCoordinates,
   calculateProgressByDistance,
   trackDelivery,
+  endDelivery,
 } from "@/utils/routeUtils";
 import next from "next";
 
@@ -35,7 +36,7 @@ const DeliveryMapbox = ({ deliveryId, deliveryData }) => {
   const [routeDeviation, setRouteDeviation] = useState(false);
   const [reachedDestination, setReachedDestination] = useState(false);
   const [driver, setDriver] = useState({
-    name: deliveryData?.driverID || "Driver",
+    name: deliveryData?.driverId || "Driver",
     status: deliveryData?.status || "Ready",
     location: {
       lat: deliveryData?.driverCoord?.lat || 0,
@@ -466,9 +467,10 @@ const DeliveryMapbox = ({ deliveryId, deliveryData }) => {
     }, 1000);
   };
 
-  const endDelivery = () => {
+  const button_endDelivery = () => {
     console.log("Ending delivery...");
     // Empty function for now, will be implemented later
+    endDelivery(deliveryId, deliveryData.driverId);
 
     // Clear any existing interval
     if (animationInterval.current) {
@@ -536,7 +538,7 @@ const DeliveryMapbox = ({ deliveryId, deliveryData }) => {
             <div className="flex items-center gap-2">
               {reachedDestination ? (
                 <button
-                  onClick={endDelivery}
+                  onClick={button_endDelivery}
                   className="px-3 py-1 bg-white text-red-600 rounded-md hover:bg-gray-100 flex items-center gap-1"
                 >
                   End Delivery

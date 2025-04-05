@@ -422,3 +422,47 @@ export const trackDelivery = async (deliveryId, driverCoord) => {
     return null;
   }
 };
+
+//Function to update delivery
+export const endDelivery = async (deliveryId, driverId) => {
+  try {
+    // Log the exact data being sent for debugging
+    const requestBody = {
+      deliveryId: deliveryId,
+      driverId: driverId,
+    };
+    console.log("Sending request:", requestBody);
+
+    const response = await fetch("http://localhost:5028/endDelivery", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      // Try to get error details from the response
+      try {
+        const errorData = await response.json();
+        throw new Error(
+          `API error: ${response.status} - ${JSON.stringify(errorData)}`
+        );
+      } catch {
+        throw new Error(`API error: ${response.status}`);
+      }
+    }
+
+    const data = await response.json();
+    console.log("Response data:", data);
+
+    if (data.status == 200) {
+      return true;
+    } else {
+      return false;
+    }
+  } catch (error) {
+    console.error("Error Ending Delivery:", error);
+    return null;
+  }
+};

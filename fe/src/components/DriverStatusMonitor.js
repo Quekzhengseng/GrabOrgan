@@ -79,8 +79,6 @@ export default function DriverStatusMonitor({ driverId }) {
     confirmDelivery(driverId);
     setHasAlert(false);
     setStatusMessage(`Monitoring driver ${driverId} status...`);
-    // Insert new utill function to call back select driver to update
-
   };
 
   return (

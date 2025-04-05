@@ -399,7 +399,6 @@ services:
     networks:
       - grabOrgan-net
     command: ["python", "createDelivery.py"]
-
   selectDriver:
     build:
       context: ./composite/selectDriver/.
@@ -415,7 +414,6 @@ services:
       - grabOrgan-net
     volumes:
       - ./common:/usr/src/app/common # Shared volume for common code
-
   trackDelivery:
     build:
       context: ./composite/trackDelivery/.
@@ -429,6 +427,24 @@ services:
       - "5025:5025"
     networks:
       - grabOrgan-net
+
+  endDelivery:
+    build:
+      context: ./composite/endDelivery
+      dockerfile: dockerfile.endDelivery
+    image: GrabOrgan/enddelivery:1.0
+    # restart: always
+    container_name: endDelivery
+    environment:
+      - RABBITMQ_HOST=rabbitmq # Connect using RabbitMQ service name
+    ports:
+      - "5028:5028"
+    depends_on:
+      - rabbitmq
+    networks:
+      - grabOrgan-net
+    volumes:
+      - ./common:/usr/src/app/common # Shared volume for common code
 
   request_organ:
     build:
