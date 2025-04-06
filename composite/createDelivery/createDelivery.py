@@ -115,7 +115,7 @@ def retrieve_polyline(coord1, coord2):
     return None
 
 # AMQP selection for driver
-def publish_delivery_request(delivery_id, origin_address, destination_address):
+def publish_delivery_request(origin_address):
     """Publish delivery request to RabbitMQ"""
     global channel
     
@@ -124,9 +124,7 @@ def publish_delivery_request(delivery_id, origin_address, destination_address):
         return False
     
     message = {
-        "deliveryId": delivery_id,
         "origin_address": origin_address,
-        "destination_address": destination_address
     }
     
     try:
@@ -362,7 +360,7 @@ def handle_message(ch, method, properties, body):
                     return
 
                 # Publish driver request to RabbitMQ for asynchronous driver selection
-                publish_delivery_request(delivery_id, origin_address, destination_address)
+                publish_delivery_request(origin_address)
                 
                 print(f"Delivery successfully created with ID: {delivery_id}")
 

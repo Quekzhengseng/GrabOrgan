@@ -82,7 +82,7 @@ def handle_message(ch, method, properties, body):
         # Process the message based on the routing key.
         if method.routing_key == "driver.request":
             print("Processing driver request...")
-            driverId = select_driver(delivery_id, origin_address, destination_address)
+            driverId = select_driver(origin_address)
             if driverId:
                 print(f"Driver selected: {driverId}")
                 update_driver(driverId, delivery_id)
@@ -273,15 +273,16 @@ def send_driver_notification(driver_id, driver_email, status):
         return False
 
 # @app.route('/selectDriver', methods=["POST"])
-def select_driver(deliveryId, origin_address, destination_address): # changed to use AMQP instead of HTTP
+def select_driver(origin_address): # changed to use AMQP instead of HTTP
     """
     Selects an available driver based on hospital location.
 
     Expects JSON input:
-    {}
-        "deliveryId": delivery_id,
-        "origin_address": origin_address,
-        "destination_address":
+    {
+        "origin_address": origin_address
+    }
+        
+
 
     Returns JSON response:
     {
