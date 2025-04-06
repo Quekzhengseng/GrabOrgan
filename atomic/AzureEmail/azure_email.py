@@ -40,12 +40,10 @@ def send_email():
     '''
     try:
         message = request.get_json()
-        print(message)
-        """
+        # print(message)
         # Temporarily comment out to Protect Azure Comms Service during Dev & Testing
         connection_string = CONNECTION_STRING 
         client = EmailClient.from_connection_string(connection_string)
-        """
         # receiver_email = email_data.get("receiverEmail")
         # subject = email_data.get("subject")
         # plainText = email_data.get("plainText")
@@ -62,12 +60,11 @@ def send_email():
         #     },
             
         # }
-        """
+
         # Temporarily comment out to Protect Azure Comms Service during Dev & Testing
         poller = client.begin_send(message)
         result = poller.result()
         print("Message sent: ", result["id"])
-        """
         return jsonify({"code": 200, "message": "Email sent successfully"}), 200
     except Exception as ex:
         print(ex)

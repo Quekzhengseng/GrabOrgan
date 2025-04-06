@@ -79,6 +79,31 @@ def update_delivery(delivery_id):
         return response.get("message")
     return None
 
+def safe_publish(exchange, routing_key, message):
+    """Safely publish a message, with connection checks and error handling"""
+    global channel
+    
+    if channel is None or not hasattr(channel, 'basic_publish'):
+        print("Channel not available. Attempting to reconnect...")
+        if not connect_to_rabbitmq():
+            print("Failed to reconnect to RabbitMQ. Message not sent.")
+            return False
+    
+    try:
+        message_str = message if isinstance(message, str) else json.dumps(message)
+        channel.basic_publish(
+            exchange=exchange,
+            routing_key=routing_key,
+            body=message_str,
+            properties=pika.BasicProperties(delivery_mode=2)
+        )
+        print(f"Message published to {exchange} with routing key {routing_key}")
+        return True
+    except Exception as e:
+        print(f"Error publishing message: {e}")
+        channel = None  # Reset channel so next attempt will reconnect
+        return False
+
 #Migrate to send to doctor instead to end delivery
 # def send_driver_notification(driver_id, driver_email, status):
 #     """Send notification about driver assignment via AMQP"""
@@ -153,18 +178,14 @@ def endDelivery():
         if (driver_response == None):
             return jsonify({"error": "Failed driver update"}), 400
         
-        message = json.dumps({
+        message = {
             "event": "Delivery_Ended",
             "deliveryId": deliveryId,
             "timestamp": time.time()
-        })
+        }
 
-        channel.basic_publish(
-        exchange="activity_log_exchange",
-        routing_key="end_delivery.info",
-        body=message,
-        properties=pika.BasicProperties(delivery_mode=2)
-    )
+        # Use safe_publish instead of direct channel.basic_publish
+        safe_publish("activity_log_exchange", "end_delivery.info", message)
 
         return jsonify({
             "code": 200,
@@ -172,19 +193,16 @@ def endDelivery():
         }), 200
 
     except Exception as e:
-
-        error_payload = json.dumps({
+        print(f"Error ending delivery: {str(e)}")
+        
+        error_payload = {
             "event": "Error ending delivery",
             "error": str(e),
             "timestamp": time.time()
-        })
+        }
 
-        channel.basic_publish(
-        exchange="error_handling_exchange",
-        routing_key="end_delivery.error",
-        body=error_payload,
-        properties=pika.BasicProperties(delivery_mode=2)
-            )
+        # Use safe_publish for error messages too
+        safe_publish("error_handling_exchange", "end_delivery.error", error_payload)
         
         return jsonify({"error": str(e)}), 500
 

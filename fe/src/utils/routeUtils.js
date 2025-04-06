@@ -248,7 +248,7 @@ export const getDeliveryStatusColor = (status) => {
  * @returns {Promise<Array>} Array of delivery objects
  */
 export const fetchDeliveries = async () => {
-  const response = await fetch("http://localhost:5002/deliveryinfo");
+  const response = await fetch("http://localhost:8000/api/v1/delivery-info");
 
   if (!response.ok) {
     throw new Error(`API request failed with status ${response.status}`);
@@ -271,7 +271,7 @@ export const fetchDeliveries = async () => {
  */
 export const getSpecificDelivery = async (deliveryId) => {
   const response = await fetch(
-    `http://localhost:5002/deliveryinfo/${deliveryId}`
+    `http://localhost:8000/api/v1/delivery-info/${deliveryId}`
   );
 
   if (!response.ok) {
@@ -294,7 +294,7 @@ export const getSpecificDelivery = async (deliveryId) => {
  */
 export const deleteDelivery = async (deliveryId) => {
   const response = await fetch(
-    `http://localhost:5002/deliveryinfo/${deliveryId}`,
+    `http://localhost:8000/api/v1/delivery-info/${deliveryId}`,
     {
       method: "DELETE",
       headers: {
@@ -352,13 +352,16 @@ export const confirmDelivery = async (driverId) => {
 
     console.log("Sending request:", requestBody);
 
-    const response = await fetch("http://localhost:5024/acknowledge-driver", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-    });
+    const response = await fetch(
+      "http://localhost:8000/api/v1/acknowledge-driver",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      }
+    );
 
     if (!response.ok) {
       // Try to get error details from the response
@@ -390,13 +393,16 @@ export const trackDelivery = async (deliveryId, driverCoord) => {
     };
     console.log("Sending request:", requestBody);
 
-    const response = await fetch("http://localhost:5025/trackDelivery", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-    });
+    const response = await fetch(
+      "http://localhost:8000/api/v1/track-delivery",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      }
+    );
 
     if (!response.ok) {
       // Try to get error details from the response
@@ -433,7 +439,7 @@ export const endDelivery = async (deliveryId, driverId) => {
     };
     console.log("Sending request:", requestBody);
 
-    const response = await fetch("http://localhost:5028/endDelivery", {
+    const response = await fetch("http://localhost:8000/api/v1/end-delivery", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

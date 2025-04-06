@@ -170,24 +170,33 @@ def create_organ():
     """Create a new organ in Firestore."""
     try:
         data = request.get_json()
-        organ_id = data.get("organId")
+        if not data:
+            return jsonify({
+                "code": 400,
+                "message": "No data provided"
+            }), 400
 
-        # Create Organ object
         organ = Organ(
-            organ_id=organ_id,
-            donor_id=data['donorId'],
-            organ_type=data['organType'],
-            blood_type=data['bloodType'],
-            condition=data['condition'],
+            organ_id=data["organId"],
+            donor_id=data["donorId"],
+            organ_type=data["organType"],
+            blood_type=data["bloodType"],
+            condition=data["condition"],
         )
 
-        # Save organ to Firestore
-        db.collection("organs").document(organ_id).set(organ.to_dict())
+        db.collection("organs").document(data["organId"]).set(organ.to_dict())
 
-        return jsonify({"success": True, "code": 201, "message": "Organ created successfully", "organId": organ_id}), 201
+        return jsonify({
+            "code": 201,
+            "data": organ.to_dict(),
+            "message": "Organ created successfully"
+        }), 201
 
     except Exception as e:
-        return jsonify({"success": False, "code": 500, "error": str(e)}), 500
+        return jsonify({
+            "code": 500,
+            "message": f"Internal server error: {str(e)}"
+        }), 500
 
 @app.route("/organ/<string:organId>", methods=['PUT'])
 def update_organ(organId):

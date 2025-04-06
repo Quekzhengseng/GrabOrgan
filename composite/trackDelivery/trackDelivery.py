@@ -271,7 +271,7 @@ def updateDeliveryComposite():
         status = deliveryData.get("status")
 
         # When delivery is complete (100%)
-        if percentage >= 1 and status == "close_by":
+        if percentage > 0.95 and status == "close_by":
             # Update status to "Arrived"
             updated_data = updateDeliveryStatus(deliveryId, "arrived")
             send_driver_notification(deliveryData.get("driverId"), deliveryData.get("doctorId"), "arrived")
@@ -279,7 +279,6 @@ def updateDeliveryComposite():
             safe_publish("activity_log_exchange", "track_delivery.info", message)
             if not updated_data:
                 return jsonify({"error": "Failed to update delivery status to arrived"}), 500
-
         # When driver is near destination (>75%)
         elif percentage > 0.75 and status == "halfway":
             # Update status to "close_by"
@@ -289,7 +288,6 @@ def updateDeliveryComposite():
             safe_publish("activity_log_exchange", "track_delivery.info", message)
             if not updated_data:
                 return jsonify({"error": "Failed to update delivery status to close by"}), 500
-
         # When driver has covered half the distance (>50%)
         elif percentage > 0.5 and status == "on_the_way":
             # Update status to "halfway"

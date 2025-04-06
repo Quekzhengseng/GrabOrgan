@@ -1,0 +1,1255 @@
+_format_version: "3.0"
+consumers:
+- acls:
+  - group: admins
+  keyauth_credentials:
+  - key: admin
+  username: admin
+- acls:
+  - group: doctors
+  keyauth_credentials:
+  - key: doctor
+  username: doctor
+- keyauth_credentials:
+  - key: reader
+  username: reader
+plugins:
+- config:
+    credentials: true
+    exposed_headers:
+    - X-Auth-Token
+    headers:
+    - Accept
+    - Accept-Version
+    - Content-Length
+    - Content-MD5
+    - Content-Type
+    - Date
+    - X-Auth-Token
+    max_age: 3600
+    methods:
+    - GET
+    - POST
+    - OPTIONS
+    origins:
+    - http://localhost:3000
+    preflight_continue: false
+    private_network: false
+  enabled: true
+  name: cors
+  protocols:
+  - grpc
+  - grpcs
+  - http
+  - https
+services:
+- connect_timeout: 60000
+  enabled: true
+  host: personal-gbst4bsa.outsystemscloud.com
+  name: OSpersonalDataAPI
+  path: /PatientAPI/rest/patientAPI/patients/
+  plugins:
+  - config:
+      anonymous: null
+      hide_credentials: false
+      key_in_body: false
+      key_in_header: true
+      key_in_query: true
+      key_names:
+      - apikey
+      realm: null
+      run_on_preflight: true
+    enabled: true
+    name: key-auth
+    protocols:
+    - grpc
+    - grpcs
+    - http
+    - https
+    - ws
+    - wss
+  port: 443
+  protocol: https
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - GET
+    - OPTIONS
+    name: READ_os_personal_data
+    path_handling: v0
+    paths:
+    - /api/v1/personal
+    plugins:
+    - config:
+        allow:
+        - doctors
+        always_use_authenticated_groups: false
+        deny: null
+        hide_groups_header: false
+        include_consumer_groups: false
+      enabled: true
+      name: acl
+      protocols:
+      - grpc
+      - grpcs
+      - http
+      - https
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: match_organ
+  name: confirmMatchOrganAPI
+  path: /confirm-match
+  port: 5020
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - POST
+    - OPTIONS
+    name: confirm_match
+    path_handling: v0
+    paths:
+    - /api/v1/confirm-match
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: zsq.outsystemscloud.com
+  name: coordToPlaceAPI
+  path: /Location/rest/Location/CoordToPlace/
+  port: 443
+  protocol: https
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - POST
+    - OPTIONS
+    name: coordToPlace_route
+    path_handling: v0
+    paths:
+    - /api/v1/coord-to-place
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: createDelivery
+  name: createDeliveryAPI
+  path: /createDelivery
+  port: 5026
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - POST
+    - OPTIONS
+    name: create_delivery
+    path_handling: v0
+    paths:
+    - /api/v1/create-delivery
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: delivery_info
+  name: deliveryServiceAPI
+  path: /deliveryinfo
+  port: 5002
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - POST
+    - OPTIONS
+    name: CREATE_delivery
+    path_handling: v0
+    paths:
+    - /api/v1/delivery-info
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - DELETE
+    - OPTIONS
+    name: DELETE_delivery
+    path_handling: v0
+    paths:
+    - /api/v1/delivery-info
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - GET
+    - OPTIONS
+    name: READ_delivery
+    path_handling: v0
+    paths:
+    - /api/v1/delivery-info
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - PUT
+    - OPTIONS
+    name: UPDATE_delivery
+    path_handling: v0
+    paths:
+    - /api/v1/delivery-info
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: donor
+  name: donorapi
+  path: /donor
+  plugins:
+  - config:
+      anonymous: null
+      hide_credentials: false
+      key_in_body: false
+      key_in_header: true
+      key_in_query: true
+      key_names:
+      - apikey
+      realm: null
+      run_on_preflight: true
+    enabled: true
+    name: key-auth
+    protocols:
+    - grpc
+    - grpcs
+    - http
+    - https
+    - ws
+    - wss
+  port: 5003
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - POST
+    - OPTIONS
+    name: CREATE
+    path_handling: v0
+    paths:
+    - /api/v1/donor
+    plugins:
+    - config:
+        allow:
+        - admins
+        always_use_authenticated_groups: false
+        deny: null
+        hide_groups_header: false
+        include_consumer_groups: false
+      enabled: true
+      name: acl
+      protocols:
+      - grpc
+      - grpcs
+      - http
+      - https
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - DELETE
+    - OPTIONS
+    name: DELETE_donor
+    path_handling: v0
+    paths:
+    - /api/v1/donor
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - GET
+    - OPTIONS
+    name: READ
+    path_handling: v0
+    paths:
+    - /api/v1/donor
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - PUT
+    - OPTIONS
+    name: UPDATE_donor
+    path_handling: v0
+    paths:
+    - /api/v1/donor
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: driverInfo
+  name: driverAPI
+  path: /drivers
+  port: 5004
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - POST
+    - OPTIONS
+    name: CREATE_driver
+    path_handling: v0
+    paths:
+    - /api/v1/drivers
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - DELETE
+    - OPTIONS
+    name: DELETE_driver
+    path_handling: v0
+    paths:
+    - /api/v1/drivers
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - GET
+    - OPTIONS
+    name: READ_driver
+    path_handling: v0
+    paths:
+    - /api/v1/drivers
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - GET
+    - OPTIONS
+    name: READ_driver_by_id
+    path_handling: v0
+    paths:
+    - /api/v1/drivers/~[a-zA-Z0-9_]+$
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 10
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - PATCH
+    - OPTIONS
+    name: UPDATE_driver
+    path_handling: v0
+    paths:
+    - /api/v1/drivers
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: geoalgo
+  name: geoAlgoDecodeAPI
+  path: /decode
+  port: 5006
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - POST
+    - OPTIONS
+    name: geoAlgo_decode
+    path_handling: v0
+    paths:
+    - /api/v1/geo-algo-decode
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: geoalgo
+  name: geoAlgoDeviateAPI
+  path: /deviate
+  port: 5006
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    name: geoAlgo_deviate
+    path_handling: v0
+    paths:
+    - /api/v1/geo-algo-deviate
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: match
+  name: getMatchesByRecipientAPI
+  path: /matches/recipient/
+  port: 5008
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - GET
+    - OPTIONS
+    name: READ_matches_by_recipient
+    path_handling: v0
+    paths:
+    - /api/v1/organ-matches/
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: match_organ
+  name: initiateMatchOrganAPI
+  path: /initiate-match
+  port: 5020
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - POST
+    - OPTIONS
+    name: initiateMatch
+    path_handling: v0
+    paths:
+    - /api/v1/initiate-match
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: labInfo
+  name: labInfoAPI
+  path: /lab-reports
+  port: 5007
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - POST
+    - OPTIONS
+    name: CREATE_labInfo
+    path_handling: v0
+    paths:
+    - /api/v1/lab-reports
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - DELETE
+    - OPTIONS
+    name: DELETE_labInfo
+    path_handling: v0
+    paths:
+    - /api/v1/lab-reports
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - GET
+    - OPTIONS
+    name: READ_labInfo
+    path_handling: v0
+    paths:
+    - /api/v1/lab-reports
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - PUT
+    - OPTIONS
+    name: UPDATE_labInfo
+    path_handling: v0
+    paths:
+    - /api/v1/lab-reports
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: labInfo
+  name: labInfoByRecipientAPI
+  path: /lab-reports/recipient/
+  port: 5007
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    id: 2d01e939-677f-4af4-b751-247362543228
+    methods:
+    - POST
+    - OPTIONS
+    path_handling: v0
+    paths:
+    - /api/v1/lab-reports/recipient/
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: match
+  name: matchAPI
+  path: /matches
+  port: 5008
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - POST
+    - OPTIONS
+    name: CREATE_match
+    path_handling: v0
+    paths:
+    - /api/v1/matches
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - DELETE
+    - OPTIONS
+    name: DELETE_match
+    path_handling: v0
+    paths:
+    - /api/v1/matches
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - GET
+    - OPTIONS
+    name: READ_match
+    path_handling: v0
+    paths:
+    - /api/v1/matches
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - PUT
+    - OPTIONS
+    name: UPDATE_match
+    path_handling: v0
+    paths:
+    - /api/v1/matches
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: order
+  name: orderAPI
+  path: /order
+  port: 5009
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - POST
+    - OPTIONS
+    name: CREATE_order
+    path_handling: v0
+    paths:
+    - /api/v1/order
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - DELETE
+    - OPTIONS
+    name: DELETE_order
+    path_handling: v0
+    paths:
+    - /api/v1/order
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - GET
+    - OPTIONS
+    name: READ_order
+    path_handling: v0
+    paths:
+    - /api/v1/order
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - PUT
+    - OPTIONS
+    name: UPDATE_order
+    path_handling: v0
+    paths:
+    - /api/v1/order
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: organ
+  name: organAPI
+  path: /organ
+  port: 5010
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - POST
+    - OPTIONS
+    name: CREATE_organ
+    path_handling: v0
+    paths:
+    - /api/v1/organ
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - DELETE
+    - OPTIONS
+    name: DELETE_organ
+    path_handling: v0
+    paths:
+    - /api/v1/organ
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - GET
+    - OPTIONS
+    name: READ_organ
+    path_handling: v0
+    paths:
+    - /api/v1/organ
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - PUT
+    - OPTIONS
+    name: UPDATE_organ
+    path_handling: v0
+    paths:
+    - /api/v1/organ
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: personal-gbst4bsa.outsystemscloud.com
+  name: patientAPI
+  path: /PatientAPI/rest/patientAPI/GetFullPatientByUUID
+  port: 443
+  protocol: https
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - POST
+    - OPTIONS
+    name: READ_GetByUUID
+    path_handling: v0
+    paths:
+    - /api/v1/patients
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: personalData
+  name: personalDataAPI
+  path: /person
+  plugins:
+  - config:
+      anonymous: null
+      hide_credentials: false
+      key_in_body: false
+      key_in_header: true
+      key_in_query: true
+      key_names:
+      - apikey
+      realm: null
+      run_on_preflight: true
+    enabled: true
+    name: key-auth
+    protocols:
+    - grpc
+    - grpcs
+    - http
+    - https
+    - ws
+    - wss
+  port: 5011
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - POST
+    - OPTIONS
+    name: CREATE_Personal
+    path_handling: v0
+    paths:
+    - /api/v1/person
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - DELETE
+    - OPTIONS
+    name: DELETE_Person
+    path_handling: v0
+    paths:
+    - /api/v1/person
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - GET
+    - OPTIONS
+    name: READ_Personal
+    path_handling: v0
+    paths:
+    - /api/v1/person
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - PUT
+    - OPTIONS
+    name: UPDATE_Personal
+    path_handling: v0
+    paths:
+    - /api/v1/person
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: pseudonym
+  name: pseudonymAPI
+  path: /pseudonymise
+  port: 5012
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - POST
+    - OPTIONS
+    name: CREATE_pseudonym
+    path_handling: v0
+    paths:
+    - /api/v1/pseudonym
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: recipient
+  name: recipientAPI
+  path: /recipient
+  port: 5013
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - POST
+    - OPTIONS
+    name: CREATE_recipient
+    path_handling: v0
+    paths:
+    - /api/v1/recipient
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - DELETE
+    - OPTIONS
+    name: DELETE_recipient
+    path_handling: v0
+    paths:
+    - /api/v1/recipient
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - GET
+    - OPTIONS
+    name: READ_recipient
+    path_handling: v0
+    paths:
+    - /api/v1/recipient
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  - https_redirect_status_code: 426
+    methods:
+    - PUT
+    - OPTIONS
+    name: UPDATE_recipient
+    path_handling: v0
+    paths:
+    - /api/v1/recipient
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: request_organ
+  name: requestOrganAPI
+  path: /request-for-organ
+  port: 5021
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - POST
+    - OPTIONS
+    name: POST_requestOrgan
+    path_handling: v0
+    paths:
+    - /api/v1/request-for-organ
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: zsq.outsystemscloud.com
+  name: routeCreationAPI
+  path: /Location/rest/Location/CoordToPlace
+  port: 443
+  protocol: https
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - POST
+    - OPTIONS
+    name: RouteCreation
+    path_handling: v0
+    paths:
+    - /api/v1/route-creation
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: selectDriver
+  name: selectDriverAPI
+  path: /selectDriver
+  port: 5024
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - POST
+    - OPTIONS
+    name: select_driver
+    path_handling: v0
+    paths:
+    - /api/v1/select-driver
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: test_compatibility
+  name: testCompatibilityAPI
+  path: /test-compatibility
+  port: 5022
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - GET
+    - OPTIONS
+    name: healthCheck_testCompatibility
+    path_handling: v0
+    paths:
+    - /api/v1/test-compatibility-health
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
+- connect_timeout: 60000
+  enabled: true
+  host: trackDelivery
+  name: trackDeliveryAPI
+  path: /trackDelivery
+  port: 5025
+  protocol: http
+  read_timeout: 60000
+  retries: 5
+  routes:
+  - https_redirect_status_code: 426
+    methods:
+    - POST
+    - OPTIONS
+    name: track_delivery
+    path_handling: v0
+    paths:
+    - /api/v1/track-delivery
+    preserve_host: false
+    protocols:
+    - http
+    - https
+    regex_priority: 0
+    request_buffering: true
+    response_buffering: true
+    strip_path: true
+  write_timeout: 60000
