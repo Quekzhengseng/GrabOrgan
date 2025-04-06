@@ -89,12 +89,38 @@ def handle_message(ch, method, properties, body):
                 update_delivery(delivery_id, driverId)
             else:
                 print("No available driver found.")
-        
+
+            message = json.dumps({
+                "event": "Driver_Searched",
+                "driverId": driverId,
+                "timestamp": time.time()
+            })
+
+            channel.basic_publish(
+            exchange="activity_log_exchange",
+            routing_key="select_driver.info",
+            body=message,
+            properties=pika.BasicProperties(delivery_mode=2)
+        )
+            
         # Acknowledge the message after successful processing.
         ch.basic_ack(delivery_tag=method.delivery_tag)
     
     except Exception as e:
         print(f"Error while handling message: {e}")
+
+        error_payload = json.dumps({
+            "event": "Error processing driver",
+            "error": str(e),
+            "timestamp": time.time()
+        })
+
+        channel.basic_publish(
+        exchange="error_handling_exchange",
+        routing_key="select_driver.error",
+        body=error_payload,
+        properties=pika.BasicProperties(delivery_mode=2)
+            )
         
         # Retrieve current retry count from headers, defaulting to 0 if not present.
         retry_count = 0
@@ -186,14 +212,14 @@ def run_async_consumer():
 def ensure_exchange_exists(channel, exchange, exchange_type):
     # Declare the exchange (it will only create it if it does not already exist)
     channel.exchange_declare(exchange=exchange, exchange_type=exchange_type, durable=True)
-    
+
 # Method to update driver records with assigned delivery
 def update_driver(driver_id, delivery_id):
     """ Update driver record with assigned delivery ID. """
     payload = {
         "awaitingAcknowledgement": bool(True),
         "currentAssignedDeliveryId": str(delivery_id),
-        "isBooked": bool(True),
+        "isBooked": bool(False),
         }
     response = make_request(f"{DRIVER_INFO_ENDPOINT}/{driver_id}", method="PATCH", payload=payload)
 
@@ -201,13 +227,13 @@ def update_driver(driver_id, delivery_id):
         return response.get("message")
     return None
 
+
 # Method to update delivery records with assigned driver
 def update_delivery(delivery_id, driver_id):
     """ Update delivery record with assigned driver ID. """
     print(driver_id)
     payload = {
         "driverId": driver_id,
-        "status": "Assigned",
         }
     response = make_request(f"{DELIVERY_ENDPOINT}/{delivery_id}", method="PUT", payload=payload)
 
@@ -363,7 +389,7 @@ def acknowledge_driver():
 
         # Update Delivery atomic service
         delivery_url = f"{DELIVERY_ENDPOINT}/{deliveryId}"
-        delivery_update = {"driverId": driverId, "status": "Assigned"}
+        delivery_update = {"status": "Assigned"}
         delivery_resp = invoke_http(delivery_url, method="PUT", json=delivery_update)
         
 
@@ -373,12 +399,39 @@ def acknowledge_driver():
         driver_update = {"isBooked": True, "awaitingAcknowledgement": False}
         driver_resp = invoke_http(driver_url, method="PATCH", json=driver_update)
 
+        message = json.dumps({
+            "event": "Driver_confirmed",
+            "driverId": driverId,
+            "timestamp": time.time()
+        })
+
+        channel.basic_publish(
+        exchange="activity_log_exchange",
+        routing_key="select_driver.info",
+        body=message,
+        properties=pika.BasicProperties(delivery_mode=2)
+    )
+    
         return jsonify({
             "code": 200,
             "message": "Driver acknowledged and updated Driver & Delivery successfully."
         }), 200
 
     except Exception as e:
+
+        error_payload = json.dumps({
+            "event": "Error processing confirming driver",
+            "error": str(e),
+            "timestamp": time.time()
+        })
+
+        channel.basic_publish(
+        exchange="error_handling_exchange",
+        routing_key="select_driver.error",
+        body=error_payload,
+        properties=pika.BasicProperties(delivery_mode=2)
+            )
+        
         return jsonify({"error": str(e)}), 500
 
 

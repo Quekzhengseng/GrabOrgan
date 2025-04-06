@@ -123,8 +123,34 @@ def connect_to_rabbitmq():
     channel = None
     return False
 
+def safe_publish(exchange, routing_key, message):
+    """Safely publish a message, with connection checks and error handling"""
+    global channel
+    
+    if channel is None:
+        print("Channel not available. Attempting to reconnect...")
+        if not connect_to_rabbitmq():
+            print("Failed to reconnect to RabbitMQ. Message not sent.")
+            return False
+    
+    try:
+        message_str = message if isinstance(message, str) else json.dumps(message)
+        channel.basic_publish(
+            exchange=exchange,
+            routing_key=routing_key,
+            body=message_str,
+            properties=pika.BasicProperties(delivery_mode=2)
+        )
+        print(f"Message published to {exchange} with routing key {routing_key}")
+        return True
+    except Exception as e:
+        print(f"Error publishing message: {e}")
+        channel = None  # Reset channel so next attempt will reconnect
+        return False
+
 def getPercentageProgress(originCoord, destinationCoord, currentCoord):
-    """Retrieve a progress given 3 points, start, end, current"""
+    """Retrieve a progress given 3 points, start, end, current based on travel duration"""
+    # Get total trip duration (origin to destination)
     payload = {
         "routingPreference": "TRAFFIC_AWARE",
         "travelMode": "DRIVE",
@@ -135,11 +161,21 @@ def getPercentageProgress(originCoord, destinationCoord, currentCoord):
     try:
         response = requests.post(f"{SERVICE_URLS['location']}/route", headers=HEADERS, json=payload, timeout=5)
         response.raise_for_status()
-        totaldistance = response.json().get("Route", [{}])[0].get("Distance", {})
-    except requests.exceptions.RequestException as e:
-        print(f"Error in retrievePolyline: {e}")
-        return None
+        
+        # Extract duration from string like "1472s"
+        duration_str = response.json().get("Route", [{}])[0].get("Duration", "0s")
+        total_duration = int(duration_str.replace("s", ""))
+        
+        # If total duration is 0, return a default value
+        if total_duration == 0:
+            print("Total duration is 0, returning default progress value of 0.0")
+            return 0.0
+            
+    except Exception as e:
+        print(f"Error getting total duration: {e}")
+        return 0.0  # Return a default instead of None
 
+    # Get duration from origin to current position
     payload2 = {
         "routingPreference": "TRAFFIC_AWARE",
         "travelMode": "DRIVE",
@@ -151,13 +187,22 @@ def getPercentageProgress(originCoord, destinationCoord, currentCoord):
     try:
         response2 = requests.post(f"{SERVICE_URLS['location']}/route", headers=HEADERS, json=payload2, timeout=5)
         response2.raise_for_status()
-        currentdistance = response2.json().get("Route", [{}])[0].get("Distance", {})
-    except requests.exceptions.RequestException as e:
-        print(f"Error in retrievePolyline: {e}")
-        return None
+        
+        # Extract duration from string like "1472s"
+        current_duration_str = response2.json().get("Route", [{}])[0].get("Duration", "0s")
+        current_duration = int(current_duration_str.replace("s", ""))
+    except Exception as e:
+        print(f"Error getting current duration: {e}")
+        return 0.0  # Return a default instead of None
     
-    percent = currentdistance/totaldistance
-    return max(0.0, min(1.0, percent))
+    # Calculate percentage and ensure it's between 0 and 1
+    try:
+        percent = current_duration / total_duration if total_duration > 0 else 0.0
+        print(f"Current Percentage: {percent}")
+        return max(0.0, min(1.0, percent))
+    except Exception as e:
+        print(f"Error calculating percentage: {e}")
+        return 0.0  # Return a default value in case of calculation errors
 
 def send_driver_notification(driver_id, driver_email, status):
     """Send notification about driver assignment via AMQP"""
@@ -175,15 +220,7 @@ def send_driver_notification(driver_id, driver_email, status):
         routing_key = f"{status}.status"
         
         print(f"Sending notification with routing key: {routing_key}")
-        channel.basic_publish(
-            exchange="notification_status_exchange",
-            routing_key=routing_key,
-            body=json.dumps(message),
-            properties=pika.BasicProperties(
-                delivery_mode=2,  # Make message persistent
-                content_type='application/json'
-            )
-        )
+        safe_publish("notification_status_exchange", routing_key , message)
         print(f"Notification sent for driver {driver_id}")
         return True
     except Exception as e:
@@ -239,14 +276,9 @@ def updateDeliveryComposite():
             updated_data = updateDeliveryStatus(deliveryId, "arrived")
             send_driver_notification(deliveryData.get("driverId"), deliveryData.get("doctorId"), "arrived")
             message = json.dumps({"Status": "arrived", "deliveryId": deliveryId})
-            channel.basic_publish(
-            exchange="activity_log_exchange",
-            routing_key="track_delivery.info",
-            body=message,
-            properties=pika.BasicProperties(delivery_mode=2)
-        )
+            safe_publish("activity_log_exchange", "track_delivery.info", message)
             if not updated_data:
-                return jsonify({"error": "Failed to update delivery status to Arrived"}), 500
+                return jsonify({"error": "Failed to update delivery status to arrived"}), 500
 
         # When driver is near destination (>75%)
         elif percentage > 0.75 and status == "halfway":
@@ -254,14 +286,9 @@ def updateDeliveryComposite():
             updated_data = updateDeliveryStatus(deliveryId, "close_by")
             send_driver_notification(deliveryData.get("driverId"), deliveryData.get("doctorId"), "close_by")
             message = json.dumps({"Status": "close_by", "deliveryId": deliveryId})
-            channel.basic_publish(
-            exchange="activity_log_exchange",
-            routing_key="track_delivery.info",
-            body=message,
-            properties=pika.BasicProperties(delivery_mode=2)
-        )
+            safe_publish("activity_log_exchange", "track_delivery.info", message)
             if not updated_data:
-                return jsonify({"error": "Failed to update delivery status to Reaching"}), 500
+                return jsonify({"error": "Failed to update delivery status to close by"}), 500
 
         # When driver has covered half the distance (>50%)
         elif percentage > 0.5 and status == "on_the_way":
@@ -269,27 +296,17 @@ def updateDeliveryComposite():
             updated_data = updateDeliveryStatus(deliveryId, "halfway")
             send_driver_notification(deliveryData.get("driverId"), deliveryData.get("doctorId"), "halfway")
             message = json.dumps({"Status": "halfway", "deliveryId": deliveryId})
-            channel.basic_publish(
-            exchange="activity_log_exchange",
-            routing_key="track_delivery.info",
-            body=message,
-            properties=pika.BasicProperties(delivery_mode=2)
-        )
+            safe_publish("activity_log_exchange", "track_delivery.info", message)
             if not updated_data:
-                return jsonify({"error": "Failed to update delivery status to EnRoute"}), 500
-        elif percentage > 0 and status == "assigned":
+                return jsonify({"error": "Failed to update delivery status to halfway"}), 500
+        elif percentage > 0 and status == "Assigned":
             # Update status to "on_the_Way"
             updated_data = updateDeliveryStatus(deliveryId, "on_the_way")
             send_driver_notification(deliveryData.get("driverId"), deliveryData.get("doctorId"), "on_the_way")
             message = json.dumps({"Status": "on_the_way", "deliveryId": deliveryId})
-            channel.basic_publish(
-            exchange="activity_log_exchange",
-            routing_key="track_delivery.info",
-            body=message,
-            properties=pika.BasicProperties(delivery_mode=2)
-        )
+            safe_publish("activity_log_exchange", "track_delivery.info", message)
             if not updated_data:
-                return jsonify({"error": "Failed to update delivery status to EnRoute"}), 500
+                return jsonify({"error": "Failed to update delivery status to on the way"}), 500
 
         if deviation:
             # Retrieve new polyline if deviation occurs
@@ -317,12 +334,7 @@ def updateDeliveryComposite():
             "track_delivery": deliveryId
         })
         try:
-            channel.basic_publish(
-                exchange="error_handling_exchange",
-                routing_key="track_delivery.error",
-                body=error_payload,
-                properties=pika.BasicProperties(delivery_mode=2)
-            )
+            safe_publish("error_handling_exchange", "track_delivery.error", error_payload)
         except Exception as publish_exception:
             print("Failed to publish error message:", str(publish_exception))
         return jsonify({"code": 500, "message": "Error processing match request."}), 500

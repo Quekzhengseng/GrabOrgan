@@ -43,8 +43,6 @@ export default function OrganMatches({
     if (!confirmedMatch) return;
     const utcDateTime = new Date(transplantDateTime).toISOString();
 
-    console.log(userEmail);
-
     // Build the body fields you want to send
     const payload = {
       organType:

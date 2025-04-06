@@ -45,8 +45,8 @@ const DeliveryMapbox = ({ deliveryId, deliveryData }) => {
     progress: 0,
   });
 
-  console.log("Received deliveryId:", deliveryId);
-  console.log("Received deliveryData:", deliveryData);
+  // console.log("Received deliveryId:", deliveryId);
+  // console.log("Received deliveryData:", deliveryData);
 
   // Clean up resources when component unmounts
   useEffect(() => {
@@ -312,14 +312,10 @@ const DeliveryMapbox = ({ deliveryId, deliveryData }) => {
     console.log("index: " + index);
 
     animationInterval.current = setInterval(() => {
-      if (index >= routePoints.length - 1) {
-        clearInterval(animationInterval.current);
-        setDriver((prev) => ({ ...prev, status: "Delivered" }));
-        setReachedDestination(true);
-        return;
-      }
+      const newIndex = Math.min(index + 20, routePoints.length - 1);
 
-      index++;
+      // Update the index safely
+      index = newIndex;
       setCurrentPointIndex(index);
       const nextPoint = routePoints[index];
 
@@ -464,12 +460,22 @@ const DeliveryMapbox = ({ deliveryId, deliveryData }) => {
         console.error("Error moving truck:", err);
         clearInterval(animationInterval.current);
       }
-    }, 1000);
+
+      // Check if we've reached the end or are about to
+      if (newIndex >= routePoints.length - 1) {
+        clearInterval(animationInterval.current);
+        setDriver((prev) => ({ ...prev, status: "Delivered" }));
+        setReachedDestination(true);
+        return;
+      }
+    }, 2000);
   };
 
   const button_endDelivery = () => {
     console.log("Ending delivery...");
     // Empty function for now, will be implemented later
+    console.log("deliveryId: " + deliveryId);
+    console.log("driverId:" + deliveryData.driverId);
     endDelivery(deliveryId, deliveryData.driverId);
 
     // Clear any existing interval

@@ -45,11 +45,7 @@ export default function DeliveryOrdersPage() {
         let deliveryData = [];
 
         for (let i = 0; i < allDeliveryData.length; i++) {
-          if (
-            allDeliveryData[i].driverId == id &&
-            (allDeliveryData[i].status == "Assigned" ||
-              allDeliveryData[i].status == "In Progress")
-          ) {
+          if (allDeliveryData[i].driverId == id) {
             deliveryData.push(allDeliveryData[i]);
           }
         }

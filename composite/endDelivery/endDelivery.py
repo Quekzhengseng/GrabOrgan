@@ -2,6 +2,10 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import requests
 from common.invokes import invoke_http
+import pika
+import os
+import time
+import json
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
@@ -12,6 +16,13 @@ DELIVERY_ENDPOINT = "http://delivery_service:5002/deliveryinfo"
 MAX_RETRIES = 3  # Maximum number of retries for message processing
 HEADERS = {'Content-Type': 'application/json'}
 TIMEOUT = 10  # API timeout for requests
+
+# RabbitMQ connection parameters
+rabbit_host = os.environ.get("rabbit_host", "localhost")
+rabbit_port = int(os.environ.get("rabbit_port", "5672"))
+
+channel = None
+
 
 def make_request(url, method="POST", payload=None):
     """ Helper function to send HTTP requests with error handling. """
@@ -100,6 +111,25 @@ def update_delivery(delivery_id):
 #         print(f"Error sending notification: {e}")
 #         return False
 
+def connect_to_rabbitmq():
+    global channel
+    for i in range(5):  # Try 5 times
+        try:
+            print(f"Attempt {i+1} to connect to RabbitMQ at {rabbit_host}:{rabbit_port}")
+            connection = pika.BlockingConnection(
+                pika.ConnectionParameters(host=rabbit_host, port=rabbit_port)
+            )
+            channel = connection.channel()
+            print("Connected to RabbitMQ successfully")
+            return True
+        except Exception as e:
+            print(f"Failed to connect to RabbitMQ: {str(e)}")
+            if i < 4:  # Don't sleep after the last attempt
+                print(f"Retrying in 5 seconds...")
+                time.sleep(5)
+    channel = None
+    return False
+
 @app.route('/endDelivery', methods=['POST'])
 def endDelivery():
     """Ends Delivery with updates to delivery and driver"""
@@ -122,6 +152,19 @@ def endDelivery():
 
         if (driver_response == None):
             return jsonify({"error": "Failed driver update"}), 400
+        
+        message = json.dumps({
+            "event": "Delivery_Ended",
+            "deliveryId": deliveryId,
+            "timestamp": time.time()
+        })
+
+        channel.basic_publish(
+        exchange="activity_log_exchange",
+        routing_key="end_delivery.info",
+        body=message,
+        properties=pika.BasicProperties(delivery_mode=2)
+    )
 
         return jsonify({
             "code": 200,
@@ -129,6 +172,20 @@ def endDelivery():
         }), 200
 
     except Exception as e:
+
+        error_payload = json.dumps({
+            "event": "Error ending delivery",
+            "error": str(e),
+            "timestamp": time.time()
+        })
+
+        channel.basic_publish(
+        exchange="error_handling_exchange",
+        routing_key="end_delivery.error",
+        body=error_payload,
+        properties=pika.BasicProperties(delivery_mode=2)
+            )
+        
         return jsonify({"error": str(e)}), 500
 
 @app.route('/health', methods=['GET'])
@@ -137,4 +194,5 @@ def health_check():
     return jsonify({"status": "healthy"}), 200
 
 if __name__ == '__main__':
+    connect_to_rabbitmq()
     app.run(host='0.0.0.0', port=5028)

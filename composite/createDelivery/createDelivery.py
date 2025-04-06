@@ -64,7 +64,6 @@ SUBSCRIBE_QUEUES = [
     {"name": "order_queue", "exchange": "order_exchange", "routing_key": "order.organ", "type": "direct"}
 ]
 
-
 print('exchange & keys declared')
 
 HEADERS = {'Content-Type': 'application/json'}
@@ -167,8 +166,7 @@ def get_driver(driver_id):
         return response.get("stationed_hospital")
     return None
 
-
-def create_delivery(origin, destination, destination_time, polyline, organ_type, matchId, driver_coord=None, driver_id=None):
+def create_delivery(origin, destination, destination_time, polyline, organ_type, doctorId, matchId, driver_coord=None, driver_id=None):    
     """ Create a new delivery entry. """
     payload = {
         "pickup": origin,
@@ -180,6 +178,7 @@ def create_delivery(origin, destination, destination_time, polyline, organ_type,
         "driverCoord": driver_coord,
         "driverId": driver_id,
         "organType": organ_type,
+        "doctorId": doctorId,
         "matchId": matchId,
     }
     
@@ -329,7 +328,6 @@ def handle_message(ch, method, properties, body):
                     match_id
                 })
                 
-                
                 # Convert addresses to coordinates
                 origin_coord = address_to_coord(origin_address)
                 destination_coord = address_to_coord(destination_address)
@@ -367,6 +365,19 @@ def handle_message(ch, method, properties, body):
                 publish_delivery_request(delivery_id, origin_address, destination_address)
                 
                 print(f"Delivery successfully created with ID: {delivery_id}")
+
+                message = json.dumps({
+                    "event": "delivery_created",
+                    "deliveryId": delivery_id,
+                    "timestamp": time.time()
+                })
+
+                channel.basic_publish(
+                exchange="activity_log_exchange",
+                routing_key="create_delivery.info",
+                body=message,
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
                 
             except Exception as inner_e:
                 print(f"Error processing delivery: {inner_e}")
@@ -376,6 +387,19 @@ def handle_message(ch, method, properties, body):
         
     except Exception as e:
         print(f"Error processing message: {e}")
+        error_payload = json.dumps({
+            "event": "Error processing message",
+            "error": e,
+            "timestamp": time.time()
+        })
+
+        channel.basic_publish(
+        exchange="error_handling_exchange",
+        routing_key="create_delivery.error",
+        body=error_payload,
+        properties=pika.BasicProperties(delivery_mode=2)
+            )
+        
         # Negative acknowledge with requeue=False
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 

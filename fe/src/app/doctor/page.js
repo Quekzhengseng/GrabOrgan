@@ -105,6 +105,7 @@ export default function RecipientsDashboard() {
   // Handle click on a recipient to view details
   const handleRecipientClick = (recipient) => {
     setSelectedRecipient(recipient);
+    localStorage.setItem("selectedRecipient", JSON.stringify(recipient));
     setSelectedMatch(null);
     setMatches([]);
     setMatchError(null);
@@ -123,6 +124,17 @@ export default function RecipientsDashboard() {
       loadDeliveries(recipient.recipientId);
     }
   };
+
+  useEffect(() => {
+    const savedRecipient = localStorage.getItem("selectedRecipient");
+    if (savedRecipient) {
+      const recipient = JSON.parse(savedRecipient);
+      setSelectedRecipient(recipient);
+      loadLabReports(recipient.recipientId);
+      handleFindMatches(recipient.recipientId);
+      loadDeliveries(recipient.recipientId);
+    }
+  }, []);
 
   // Go back to recipient list
   const handleBackClick = () => {
