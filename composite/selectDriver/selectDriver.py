@@ -253,11 +253,11 @@ def send_driver_notification(driver_id, driver_email, status):
         }
         
         # Choose the appropriate routing key based on status
-        routing_key = f"{status}.status"
+        routing_key = f"{status}.acknowledge"
         
         print(f"Sending notification with routing key: {routing_key}")
         channel.basic_publish(
-            exchange="notification_status_exchange",
+            exchange="notification_acknowledge_exchange",
             routing_key=routing_key,
             body=json.dumps(message),
             properties=pika.BasicProperties(
@@ -326,7 +326,7 @@ def select_driver(origin_address): # changed to use AMQP instead of HTTP
             
             # Send driver assigned notification
             if driver_email:
-                send_driver_notification(driver_id, driver_email, "assigned")
+                send_driver_notification(driver_id, driver_email, "request")
             
             return driver_id
         

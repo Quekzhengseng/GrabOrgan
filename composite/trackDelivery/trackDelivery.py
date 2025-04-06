@@ -146,7 +146,7 @@ def safe_publish(exchange, routing_key, message):
     except Exception as e:
         print(f"Error publishing message: {e}")
         channel = None  # Reset channel so next attempt will reconnect
-        return False
+        pass
 
 def getPercentageProgress(originCoord, destinationCoord, currentCoord):
     """Retrieve a progress given 3 points, start, end, current based on travel duration"""

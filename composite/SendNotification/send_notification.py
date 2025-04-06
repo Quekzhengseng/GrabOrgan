@@ -146,6 +146,8 @@ def delivery_status_email(status):
     </html>
     """
     return plain_text, html_text
+
+
 def request_acknowledgement_email():
     """
     Returns a tuple of (plain_text, html_text)
@@ -236,7 +238,8 @@ def process_delivery_status(message_dict, routing_key):
                 body=json_resp,
                 properties=pika.BasicProperties(delivery_mode=2)
             )
-            return jsonify({"code": code, "message": email_resp["message"]}), code
+            # return jsonify({"code": code, "message": email_resp["message"]}), code
+            return
         
         print("Publishing message to with routing_key: ", "status.info")
         channel.basic_publish(
