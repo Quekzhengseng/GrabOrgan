@@ -190,6 +190,33 @@ services:
     write_timeout: 60000
   - connect_timeout: 60000
     enabled: true
+    host: endDelivery
+    name: endDeliveryAPI
+    path: /endDelivery
+    port: 5028
+    protocol: http
+    read_timeout: 60000
+    retries: 5
+    routes:
+      - https_redirect_status_code: 426
+        methods:
+          - POST
+          - OPTIONS
+        name: end_delivery
+        path_handling: v0
+        paths:
+          - /api/v1/end-delivery
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+    write_timeout: 60000
+  - connect_timeout: 60000
+    enabled: true
     host: delivery_info
     name: deliveryServiceAPI
     path: /deliveryinfo
@@ -259,6 +286,22 @@ services:
           - http
           - https
         regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+      - https_redirect_status_code: 426
+        methods:
+          - GET
+          - OPTIONS
+        name: READ_delivery_by_id
+        path_handling: v0
+        paths:
+          - /api/v1/delivery-info/~[a-zA-Z0-9_-]+$
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 10  # Higher priority to match before the generic paths
         request_buffering: true
         response_buffering: true
         strip_path: true
@@ -1219,6 +1262,33 @@ services:
         path_handling: v0
         paths:
           - /api/v1/track-delivery
+        preserve_host: false
+        protocols:
+          - http
+          - https
+        regex_priority: 0
+        request_buffering: true
+        response_buffering: true
+        strip_path: true
+    write_timeout: 60000
+  - connect_timeout: 60000
+    enabled: true
+    host: selectDriver
+    name: acknowledgeDriverAPI
+    path: /acknowledge-driver
+    port: 5024
+    protocol: http
+    read_timeout: 60000
+    retries: 5
+    routes:
+      - https_redirect_status_code: 426
+        methods:
+          - POST
+          - OPTIONS
+        name: acknowledge_driver
+        path_handling: v0
+        paths:
+          - /api/v1/acknowledge-driver
         preserve_host: false
         protocols:
           - http

@@ -279,7 +279,6 @@ def updateDeliveryComposite():
             safe_publish("activity_log_exchange", "track_delivery.info", message)
             if not updated_data:
                 return jsonify({"error": "Failed to update delivery status to arrived"}), 500
-
         # When driver is near destination (>75%)
         elif percentage > 0.75 and status == "halfway":
             # Update status to "close_by"
@@ -289,7 +288,6 @@ def updateDeliveryComposite():
             safe_publish("activity_log_exchange", "track_delivery.info", message)
             if not updated_data:
                 return jsonify({"error": "Failed to update delivery status to close by"}), 500
-
         # When driver has covered half the distance (>50%)
         elif percentage > 0.5 and status == "on_the_way":
             # Update status to "halfway"
