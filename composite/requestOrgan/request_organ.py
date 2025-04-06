@@ -63,6 +63,10 @@ def generate_hla_profile():
 @app.route('/request-for-organ', methods=['POST'])
 def request_for_organ():
     # Set a default for payload in case request.get_json() fails.
+    global channel
+    if channel is None or channel.is_closed:
+        connectAMQP()
+
     payload = {}
     try:
         payload = request.get_json() or {}

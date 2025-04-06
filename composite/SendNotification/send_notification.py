@@ -270,7 +270,6 @@ def process_acknowledgment_request(message_dict, routing_key):
 
     amqp message example:
     {
-        "driverId": "driver123",
         "email": "example@gmail.com"
     }
     """

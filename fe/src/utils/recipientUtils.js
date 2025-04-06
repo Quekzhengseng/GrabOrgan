@@ -116,7 +116,7 @@ export const fetchLabReports = async (recipientId) => {
  */
 export const findOrganMatches = async (recipientId) => {
   console.log("Searching for matches with recipient number:", recipientId);
-  // Use the endpoint to get matches by recipient ID number
+
   const response = await fetch(
     `http://localhost:8000/api/v1/organ-matches/${recipientId}`,
     {
@@ -126,6 +126,11 @@ export const findOrganMatches = async (recipientId) => {
       },
     }
   );
+
+  // Handle 404 manually
+  if (response.status === 404) {
+    return []; // Treat as "no matches" instead of an error
+  }
 
   if (!response.ok) {
     throw new Error(`API request failed with status ${response.status}`);

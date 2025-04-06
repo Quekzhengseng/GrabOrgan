@@ -22,7 +22,7 @@ export default function OrganMatches({
   const [selectedStartHospital, setSelectedStartHospital] = useState("");
   const [selectedEndHospital, setSelectedEndHospital] = useState("");
   const [userEmail, setUserEmail] = useState("");
-
+  const [findMatchLoading, setFindMatchLoading] = useState(false);
   useEffect(() => {
     const email = sessionStorage.getItem("userEmail");
     setUserEmail(email);
@@ -63,9 +63,19 @@ export default function OrganMatches({
     setConfirmedMatch(null);
   };
 
-  const handleInitiateMatch = () => {
+  const handleInitiateMatch = async () => {
     if (!recipientId) return;
-    initiateMatch(recipientId);
+
+    setFindMatchLoading(true);
+    try {
+      await initiateMatch(recipientId); // assume this is an async function
+      // Optionally show success toast/message
+    } catch (err) {
+      console.error("Failed to initiate match:", err);
+      // Optionally show error toast/message
+    } finally {
+      setFindMatchLoading(false);
+    }
   };
 
   return (
@@ -77,9 +87,9 @@ export default function OrganMatches({
             <button
               onClick={handleInitiateMatch}
               className="px-4 py-2 bg-white text-orange-600 rounded-md hover:bg-gray-100 transition-colors flex items-center"
-              disabled={requestLoading}
+              disabled={findMatchLoading}
             >
-              {requestLoading ? (
+              {findMatchLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Requesting...
