@@ -312,7 +312,7 @@ const DeliveryMapbox = ({ deliveryId, deliveryData }) => {
     console.log("index: " + index);
 
     animationInterval.current = setInterval(() => {
-      const newIndex = Math.min(index + 20, routePoints.length - 1);
+      const newIndex = Math.min(index + 10, routePoints.length - 1);
 
       // Update the index safely
       index = newIndex;
@@ -468,7 +468,7 @@ const DeliveryMapbox = ({ deliveryId, deliveryData }) => {
         setReachedDestination(true);
         return;
       }
-    }, 2000);
+    }, 5000);
   };
 
   const button_endDelivery = () => {
