@@ -8,7 +8,7 @@
 export const addressToCoordinates = async (address) => {
   try {
     const response = await fetch(
-      "https://zsq.outsystemscloud.com/Location/rest/Location/PlaceToCoord",
+      "http://localhost:8000/api/v1/coord-to-place",
       {
         method: "POST",
         headers: {
@@ -47,13 +47,16 @@ export const addressToCoordinates = async (address) => {
  */
 export const decodePolyline = async (polyline) => {
   try {
-    const response = await fetch("http://localhost:5006/decode", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ polyline }),
-    });
+    const response = await fetch(
+      "http://localhost:8000/api/v1/geo-algo-decode",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ polyline }),
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`Decode API error: ${response.status}`);
@@ -96,16 +99,19 @@ export const calculateDistance = (point1, point2) => {
  */
 export const checkRouteDeviation = async (polyline, driverCoord) => {
   try {
-    const response = await fetch("http://localhost:5006/deviate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        polyline,
-        driverCoord,
-      }),
-    });
+    const response = await fetch(
+      "http://localhost:8000/api/v1/geo-algo-deviate",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          polyline,
+          driverCoord,
+        }),
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`);
@@ -131,7 +137,7 @@ export const checkRouteDeviation = async (polyline, driverCoord) => {
 export const requestNewRoute = async (currentPosition, destinationPoint) => {
   try {
     const response = await fetch(
-      "https://zsq.outsystemscloud.com/Location/rest/Location/route",
+      "http://localhost:8000/api/v1/route-creation",
       {
         method: "POST",
         headers: {

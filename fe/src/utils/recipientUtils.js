@@ -203,7 +203,7 @@ export const createDeliveryRequest = async () => {
  * @returns {Promise<Object>} Response from the request-for-organ API
  */
 export const requestNewOrgans = async (payload) => {
-  console.log(payload);
+  // console.log(payload);
   const response = await fetch(
     "http://localhost:8000/api/v1/request-for-organ",
     {
