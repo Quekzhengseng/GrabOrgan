@@ -106,14 +106,15 @@ def get_match(matchId):
 @app.route("/matches/recipient/<string:recipientId>", methods=['GET'])
 def get_matches_by_recipient(recipientId):
     try:
-        # Query the Firestore collection filtering by recipientId
         match_ref = db.collection("matches")
         docs = match_ref.where("recipientId", "==", recipientId).get()
-        matches = []
+        matches = [doc.to_dict() for doc in docs]
 
-        for doc in docs:
-            match_data = doc.to_dict()
-            matches.append(match_data)
+        if not matches:
+            return jsonify({
+                "code": 404,
+                "message": f"No matches found for recipient ID {recipientId}"
+            }), 404
 
         return jsonify({
             "code": 200,

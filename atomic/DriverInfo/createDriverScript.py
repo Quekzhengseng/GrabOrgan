@@ -79,6 +79,6 @@ for hospital, address in hospital_coords_dict.items():
 print(f"There are no stationed drivers that work at the following hospitals: {no_stationed}")
 print(f"All drivers are currently booked at the following hospitals: {no_available}")
 """
-There are no stationed drivers that work at the following hospitals: ['SGH']
-All drivers are currently booked at the following hospitals: ['TTSH', 'SKGH', 'KTPH']
+There are no stationed drivers that work at the following hospitals: []
+All drivers are currently booked at the following hospitals: ['TTSH', 'SKGH', 'NUH', 'KTPH', 'NTFGH']
 """
