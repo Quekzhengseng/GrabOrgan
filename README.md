@@ -22,7 +22,7 @@
 ### 2. Unzip `secrets.zip` or build your own Firestore for each service
 
 1. Place the unzipped `secrets` directory in the root (e.g. `GrabOrgan/secrets`).
-2. Verify the folder structure. A common unzip bug may create a duplicate folder (e.g. `secrets/recipient/recipient.json/recipient.json`).  
+2. Verify the folder structure. A common unzip bug may create a duplicate folder (e.g. `secrets/recipient/recipient.json/recipient.json`).
    - If found, remove the duplicate so that each key is located at, for example, `secrets/recipient/recipient_Key.json`.
 
 ---
@@ -38,6 +38,7 @@ AZURE_CONNECTION_STRING=<YOUR-CONNECTION-STRING-FROM-AZURE>
 ### 4. Build Docker Containers
 
 From the root directory (GrabOrgan), run:
+
 ```bash
 docker compose up -d --build
 ```
@@ -45,26 +46,37 @@ docker compose up -d --build
 ### 5. Set Up RabbitMQ Configuration
 
 Once the RabbitMQ container is running, perform the following steps:
-1.	Change directory to the RabbitMQ setup folder:
+
+1. Change directory to the RabbitMQ setup folder:
+
 ```bash
 cd common/rabbitmq
 ```
-2.	Create a virtual environment:
+
+2. Create a virtual environment:
+
 ```bash
 python3 -m venv venv
 ```
-3.	Activate the virtual environment:
+
+3. Activate the virtual environment:
+
 ```bash
 source venv/bin/activate
 ```
-4.	Install dependencies:
+
+4. Install dependencies:
+
 ```bash
 python -m pip install --no-cache-dir -r requirements.txt
 ```
-5.	Run the AMQP setup script:
+
+5. Run the AMQP setup script:
+
 ```bash
 python amqp_setup.py
 ```
+
 ### If successful, you should see output similar to:
 
     Setting up AMQP...
@@ -100,15 +112,20 @@ python amqp_setup.py
     Binding queue: driver_match_request_queue to exchange: driver_match_exchange with routing key: driver.request
     ✅ AMQP Setup Complete!
 
-### 6. Load Kong Configuration
-The compose.yaml includes a deck-sync service that automatically loads the kong-data/kong.yaml file into Kong. To manually sync the configuration, run:
+### 6. Load Kong Configuration (Manually)
+
+### The compose.yaml includes a deck-sync service that **automatically loads the kong-data/kong.yaml** file into Kong.
+However, if you wish to manually sync the configuration, run:
+
 ```
 docker run --rm \
     -v "$(pwd)/kong-data:/deck" \
     kong/deck:latest \
     sync --state /deck/kong.yaml --kong-addr http://localhost:8001
 ```
+
     To dump your current Kong configuration into kong.yaml:
+
 ```
 deck dump --output-file kong.yaml --kong-addr http://localhost:8001
 ```
@@ -116,13 +133,21 @@ deck dump --output-file kong.yaml --kong-addr http://localhost:8001
 | Note: Even with a global CORS plugin configuration in Kong, if your routes define a methods list, ensure OPTIONS is included (or remove the methods field to allow all methods).
 
 ### 7. Install Frontend Dependencies
+
 From the root directory (GrabOrgan), navigate to the frontend folder and install dependencies:
+
 ```
 cd fe
 npm install
 ```
+
 ### 8. Start the Frontend Server
+
 Start your frontend development server:
+
 ```
 npm run dev
 ```
+
+### 9. API Documentation
+Link to API documentation: https://documenter.getpostman.com/view/37602876/2sB2cShPUC
