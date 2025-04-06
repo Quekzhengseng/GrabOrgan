@@ -271,7 +271,7 @@ def updateDeliveryComposite():
         status = deliveryData.get("status")
 
         # When delivery is complete (100%)
-        if percentage >= 1 and status == "close_by":
+        if percentage > 0.95 and status == "close_by":
             # Update status to "Arrived"
             updated_data = updateDeliveryStatus(deliveryId, "arrived")
             send_driver_notification(deliveryData.get("driverId"), deliveryData.get("doctorId"), "arrived")

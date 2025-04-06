@@ -227,7 +227,6 @@ def update_driver(driver_id, delivery_id):
         return response.get("message")
     return None
 
-
 # Method to update delivery records with assigned driver
 def update_delivery(delivery_id, driver_id):
     """ Update delivery record with assigned driver ID. """
