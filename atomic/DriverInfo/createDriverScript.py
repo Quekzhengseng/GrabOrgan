@@ -40,7 +40,7 @@ while len(drivers) < 15: #i only want 15 drivers for now
         "stationed_hospital": hospital_coords_dict[hospital],
         "currentAssignedDeliveryId": delivery_id,
         "awaitingAcknowledgement": awaiting_ack,
-        "email": "alysa.tsjin.2023@scis.smu.edu.sg"
+        "email": "ezyisaiah@gmail.com"
     }
     drivers.append(driver)
     hospital_driver_count[hospital] += 1
@@ -80,5 +80,5 @@ print(f"There are no stationed drivers that work at the following hospitals: {no
 print(f"All drivers are currently booked at the following hospitals: {no_available}")
 """
 There are no stationed drivers that work at the following hospitals: []
-All drivers are currently booked at the following hospitals: ['TTSH', 'SKGH', 'NUH', 'KTPH', 'NTFGH']
+All drivers are currently booked at the following hospitals: ['SKGH', 'NTFGH']
 """
