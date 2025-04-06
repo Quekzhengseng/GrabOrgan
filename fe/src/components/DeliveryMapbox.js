@@ -322,6 +322,10 @@ const DeliveryMapbox = ({ deliveryId, deliveryData }) => {
       // Check for deviation
       trackDelivery(deliveryId, nextPoint)
         .then((result) => {
+          if (!result) {
+            setRouteDeviation(false);
+            return;
+          }
           if (result.deviation) {
             console.log("Route deviation detected at position:", nextPoint);
             setRouteDeviation(true);

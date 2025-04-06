@@ -383,7 +383,6 @@ export const confirmDelivery = async (driverId) => {
 //Function to update delivery
 export const trackDelivery = async (deliveryId, driverCoord) => {
   try {
-    // Log the exact data being sent for debugging
     const requestBody = {
       deliveryId: deliveryId,
       driverCoord: {
@@ -405,26 +404,19 @@ export const trackDelivery = async (deliveryId, driverCoord) => {
     );
 
     if (!response.ok) {
-      // Try to get error details from the response
-      try {
-        const errorData = await response.json();
-        throw new Error(
-          `API error: ${response.status} - ${JSON.stringify(errorData)}`
-        );
-      } catch {
-        throw new Error(`API error: ${response.status}`);
-      }
+      console.warn(`API error: ${response.status}`);
+      return null;
     }
 
     const data = await response.json();
     console.log("Response data:", data);
 
     return {
-      polyline: data.data.polyline,
-      deviation: data.data.deviation,
+      polyline: data.data?.polyline || null,
+      deviation: data.data?.deviation || false,
     };
   } catch (error) {
-    console.error("Error Updating Delivery:", error);
+    console.warn("Error Updating Delivery:", error);
     return null;
   }
 };
