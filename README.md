@@ -6,18 +6,9 @@
 
 ## Setting up Your Environment
 
-### 1. Set Up Cloud Firestore on Firebase
+### 1. Set Up Firestore
 
-1. **Enable Firestore API** on your Google Cloud project.
-2. Generate a **private key JSON file** and rename it to `*_Key.json`.
-3. Place the `*_Key.json` file into a `secrets` directory within the respective atomic service directory.
-4. When running locally, set the environment variable:
-   - **Windows:**  
-     `set <SERVICE>_DB_KEY=secrets/<filename>.json`
-   - **Mac/Linux:**  
-     `export <SERVICE>_DB_KEY=secrets/<filename>.json`
-
----
+1. Add `secrets` folder containing all JSON keys for atomic services into the GrabOrgan Directory
 
 ### 2. Unzip `secrets.zip` or build your own Firestore for each service
 
@@ -115,6 +106,7 @@ python amqp_setup.py
 ### 6. Load Kong Configuration (Manually)
 
 ### The compose.yaml includes a deck-sync service that **automatically loads the kong-data/kong.yaml** file into Kong.
+
 However, if you wish to manually sync the configuration, run:
 
 ```
@@ -150,4 +142,5 @@ npm run dev
 ```
 
 ### 9. API Documentation
+
 Link to API documentation: https://documenter.getpostman.com/view/37602876/2sB2cShPUC

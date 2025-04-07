@@ -8,7 +8,7 @@
 export const addressToCoordinates = async (address) => {
   try {
     const response = await fetch(
-      "http://localhost:8000/api/v1/coord-to-place",
+      "http://localhost:8000/api/v1/place-to-coord",
       {
         method: "POST",
         headers: {
